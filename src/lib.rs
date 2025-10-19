@@ -9,9 +9,9 @@ use egui_taffy::taffy::{
     prelude::*,
     style::{AlignItems, FlexDirection, JustifyContent},
 };
-use egui_taffy::{tui, TuiBuilderLogic};
+use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
 
-const NUM_SLIDERS: usize = 8;
+const NUM_SLIDERS: usize = 4;
 
 pub struct Device {
     params: Arc<DeviceParams>,
@@ -59,65 +59,108 @@ impl Plugin for Device {
             |_, _| {},
             move |egui_ctx, setter, _state| {
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
-                    ui.vertical(|ui| {
-                        ui.heading("Device - 4/4 Rhythm Loop");
-                        ui.add_space(30.0);
+                    let slider_height = 280.0;
+                    let max_slider_width = 20.0;
+                    let window_width = 800.0;
+                    let outer_padding = 20.0;
+                    let frame_margin = 20.0;
+                    let content_width = window_width - (outer_padding * 2.0);
+                    let sliders_width = content_width - (frame_margin * 2.0);
 
-                        let slider_height = 280.0;
-                        let max_slider_width = 20.0;
+                    taffy_layout(ui, ui.id().with("page_layout"))
+                        .reserve_available_space()
+                        .style(Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Column,
+                            justify_content: Some(JustifyContent::SpaceBetween),
+                            align_items: Some(AlignItems::Stretch),
+                            padding: egui_taffy::taffy::Rect {
+                                left: length(outer_padding),
+                                right: length(outer_padding),
+                                top: length(outer_padding),
+                                bottom: length(outer_padding),
+                            },
+                            gap: Size {
+                                width: length(0.0),
+                                height: length(20.0),
+                            },
+                            ..Default::default()
+                        })
+                        .show(|tui| {
+                            tui.ui(|ui| {
+                                ui.heading("Device - 4/4 Rhythm Loop");
+                            });
 
-                        tui(ui, ui.id().with("sliders"))
-                            .reserve_available_space()
-                            .style(Style {
-                                display: Display::Flex,
-                                flex_direction: FlexDirection::Row,
-                                justify_content: Some(JustifyContent::SpaceEvenly),
-                                align_items: Some(AlignItems::Center),
-                                padding: egui_taffy::taffy::Rect {
-                                    left: length(40.0),
-                                    right: length(40.0),
-                                    top: length(8.0),
-                                    bottom: length(8.0),
-                                },
-                                gap: Size {
-                                    width: length(0.0),
-                                    height: length(0.0),
+                            tui.style(Style {
+                                flex_grow: 1.0,
+                                size: Size {
+                                    width: length(content_width),
+                                    height: auto(),
                                 },
                                 ..Default::default()
                             })
-                            .show(|tui| {
-                                for i in 0..NUM_SLIDERS {
-                                    tui.style(Style {
-                                        size: Size {
-                                            width: length(max_slider_width),
-                                            height: length(slider_height),
-                                        },
-                                        ..Default::default()
-                                    })
-                                    .ui(|ui| {
-                                        let param = params.get_slider_param(i);
-                                        let mut value = param.modulated_plain_value();
+                            .ui(|ui| {
+                                egui::Frame::default()
+                                    .fill(ui.visuals().extreme_bg_color)
+                                    .inner_margin(frame_margin)
+                                    .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                                    .show(ui, |ui| {
+                                        taffy_layout(ui, ui.id().with("sliders_container"))
+                                            .style(Style {
+                                                display: Display::Flex,
+                                                flex_direction: FlexDirection::Row,
+                                                justify_content: Some(JustifyContent::SpaceEvenly),
+                                                align_items: Some(AlignItems::Center),
+                                                size: Size {
+                                                    width: length(sliders_width),
+                                                    height: length(slider_height),
+                                                },
+                                                ..Default::default()
+                                            })
+                                            .show(|sliders_tui| {
+                                                for i in 0..NUM_SLIDERS {
+                                                    sliders_tui
+                                                        .style(Style {
+                                                            size: Size {
+                                                                width: length(max_slider_width),
+                                                                height: length(slider_height),
+                                                            },
+                                                            ..Default::default()
+                                                        })
+                                                        .ui(|ui| {
+                                                            let param = params.get_slider_param(i);
+                                                            let mut value = param.modulated_plain_value();
 
-                                        if ui
-                                            .add_sized(
-                                                [max_slider_width, slider_height],
-                                                egui::Slider::new(&mut value, 0.0..=1.0)
-                                                    .vertical()
-                                                    .trailing_fill(true)
-                                                    .smart_aim(true)
-                                                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
-                                                    .show_value(false),
-                                            )
-                                            .changed()
-                                        {
-                                            setter.begin_set_parameter(param);
-                                            setter.set_parameter(param, value);
-                                            setter.end_set_parameter(param);
-                                        }
+                                                            if ui
+                                                                .add_sized(
+                                                                    [max_slider_width, slider_height],
+                                                                    egui::Slider::new(&mut value, 0.0..=1.0)
+                                                                        .vertical()
+                                                                        .trailing_fill(true)
+                                                                        .smart_aim(true)
+                                                                        .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
+                                                                        .show_value(false),
+                                                                )
+                                                                .changed()
+                                                            {
+                                                                setter.begin_set_parameter(param);
+                                                                setter.set_parameter(param, value);
+                                                                setter.end_set_parameter(param);
+                                                            }
+                                                        });
+                                                }
+                                            });
                                     });
-                                }
                             });
-                    });
+
+                            tui.ui(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label("v0.1.0");
+                                    ui.separator();
+                                    ui.label("Device Audio");
+                                });
+                            });
+                        });
                 });
             },
         )
