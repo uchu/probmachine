@@ -1,10 +1,15 @@
 mod params;
 
 use nih_plug::prelude::*;
-use nih_plug_egui::egui::style::HandleShape::Rect;
+use nih_plug_egui::egui::style::HandleShape;
 use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
+use egui_taffy::taffy::{
+    prelude::*,
+    style::{AlignItems, FlexDirection, JustifyContent},
+};
+use egui_taffy::{tui, TuiBuilderLogic};
 
 const NUM_SLIDERS: usize = 8;
 
@@ -58,53 +63,49 @@ impl Plugin for Device {
                         ui.heading("Device - 4/4 Rhythm Loop");
                         ui.add_space(30.0);
 
-                        let available_width = ui.available_width();
-                        let side_margin = 40.0;
-                        // let group_width = available_width - (side_margin * 2.0);
-                        let group_width = available_width - 80.0;
                         let slider_height = 280.0;
+                        let max_slider_width = 20.0;
 
-                        let min_gap: f32 = 0.0;
-                        let max_slider_width: f32 = 20.0;
-
-                        let min_total_width = NUM_SLIDERS as f32 * 20.0 + (NUM_SLIDERS + 1) as f32 * min_gap;
-                        let slider_width = if min_total_width > group_width {
-                            ((group_width - (NUM_SLIDERS + 1) as f32 * min_gap) / NUM_SLIDERS as f32).max(10.0)
-                        } else {
-                            max_slider_width.min((group_width - (NUM_SLIDERS + 1) as f32 * min_gap) / NUM_SLIDERS as f32)
-                        };
-
-                        let total_slider_width = slider_width * NUM_SLIDERS as f32;
-                        let total_gap_space = group_width - total_slider_width;
-                        let num_gaps = NUM_SLIDERS + 1;
-                        let gap_spacing = (total_gap_space / num_gaps as f32).max(min_gap);
-
-                        ui.horizontal(|ui| {
-                            ui.add_space(side_margin);
-
-                            egui::Frame::group(ui.style())
-                                // .inner_margin(8.0)
-                                .show(ui, |ui| {
-                                    ui.allocate_ui_with_layout(
-                                        egui::vec2(group_width - 16.0, slider_height + 10.0),
-                                        egui::Layout::left_to_right(egui::Align::Center),
-                                        |ui| {
-                                            ui.spacing_mut().item_spacing.x = 0.0;
-
-                                    for i in 0..NUM_SLIDERS {
-                                        ui.add_space(gap_spacing);
-
+                        tui(ui, ui.id().with("sliders"))
+                            .reserve_available_space()
+                            .style(Style {
+                                display: Display::Flex,
+                                flex_direction: FlexDirection::Row,
+                                justify_content: Some(JustifyContent::SpaceEvenly),
+                                align_items: Some(AlignItems::Center),
+                                padding: egui_taffy::taffy::Rect {
+                                    left: length(40.0),
+                                    right: length(40.0),
+                                    top: length(8.0),
+                                    bottom: length(8.0),
+                                },
+                                gap: Size {
+                                    width: length(0.0),
+                                    height: length(0.0),
+                                },
+                                ..Default::default()
+                            })
+                            .show(|tui| {
+                                for i in 0..NUM_SLIDERS {
+                                    tui.style(Style {
+                                        size: Size {
+                                            width: length(max_slider_width),
+                                            height: length(slider_height),
+                                        },
+                                        ..Default::default()
+                                    })
+                                    .ui(|ui| {
                                         let param = params.get_slider_param(i);
                                         let mut value = param.modulated_plain_value();
 
                                         if ui
                                             .add_sized(
-                                                [slider_width, slider_height],
+                                                [max_slider_width, slider_height],
                                                 egui::Slider::new(&mut value, 0.0..=1.0)
                                                     .vertical()
                                                     .trailing_fill(true)
                                                     .smart_aim(true)
-                                                    .handle_shape(Rect { aspect_ratio: 0.0 })
+                                                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
                                                     .show_value(false),
                                             )
                                             .changed()
@@ -113,15 +114,9 @@ impl Plugin for Device {
                                             setter.set_parameter(param, value);
                                             setter.end_set_parameter(param);
                                         }
-                                    }
-
-                                    ui.add_space(gap_spacing);
-                                        },
-                                    );
-                                });
-                        });
-
-                        // ui.add_space(20.0);
+                                    });
+                                }
+                            });
                     });
                 });
             },
