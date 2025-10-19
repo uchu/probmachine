@@ -6,7 +6,7 @@ use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
 
-const NUM_SLIDERS: usize = 32;
+const NUM_SLIDERS: usize = 8;
 
 pub struct Device {
     params: Arc<DeviceParams>,
@@ -60,61 +60,68 @@ impl Plugin for Device {
 
                         let available_width = ui.available_width();
                         let side_margin = 40.0;
-                        let group_width = available_width - (side_margin * 2.0);
+                        // let group_width = available_width - (side_margin * 2.0);
+                        let group_width = available_width - 80.0;
+                        let slider_height = 280.0;
+
+                        let min_gap: f32 = 0.0;
+                        let max_slider_width: f32 = 20.0;
+
+                        let min_total_width = NUM_SLIDERS as f32 * 20.0 + (NUM_SLIDERS + 1) as f32 * min_gap;
+                        let slider_width = if min_total_width > group_width {
+                            ((group_width - (NUM_SLIDERS + 1) as f32 * min_gap) / NUM_SLIDERS as f32).max(10.0)
+                        } else {
+                            max_slider_width.min((group_width - (NUM_SLIDERS + 1) as f32 * min_gap) / NUM_SLIDERS as f32)
+                        };
+
+                        let total_slider_width = slider_width * NUM_SLIDERS as f32;
+                        let total_gap_space = group_width - total_slider_width;
+                        let num_gaps = NUM_SLIDERS + 1;
+                        let gap_spacing = (total_gap_space / num_gaps as f32).max(min_gap);
 
                         ui.horizontal(|ui| {
                             ui.add_space(side_margin);
 
-                            ui.group(|ui| {
-                                ui.set_min_width(group_width);
+                            egui::Frame::group(ui.style())
+                                // .inner_margin(8.0)
+                                .show(ui, |ui| {
+                                    ui.allocate_ui_with_layout(
+                                        egui::vec2(group_width - 16.0, slider_height + 10.0),
+                                        egui::Layout::left_to_right(egui::Align::Center),
+                                        |ui| {
+                                            ui.spacing_mut().item_spacing.x = 0.0;
 
-                                let slider_width = 60.0;
-                                let slider_height = 280.0;
-
-                                let group_padding = ui.spacing().item_spacing.x * 2.0;
-                                let usable_width = group_width - group_padding;
-                                let total_slider_width = slider_width * NUM_SLIDERS as f32;
-                                let total_gap_space = usable_width - total_slider_width;
-                                let gap_spacing = if NUM_SLIDERS > 1 {
-                                    total_gap_space / (NUM_SLIDERS - 1) as f32
-                                } else {
-                                    0.0
-                                };
-
-                                ui.spacing_mut().item_spacing.x = gap_spacing;
-
-                                ui.horizontal(|ui| {
                                     for i in 0..NUM_SLIDERS {
+                                        ui.add_space(gap_spacing);
+
                                         let param = params.get_slider_param(i);
                                         let mut value = param.modulated_plain_value();
 
-                                        ui.vertical(|ui| {
-                                            ui.spacing_mut().item_spacing.y = 2.0;
-
-                                            if ui
-                                                .add_sized(
-                                                    [slider_width, slider_height],
-                                                    egui::Slider::new(&mut value, 0.0..=1.0)
-                                                        .vertical()
-                                                        .trailing_fill(true)
-                                                        .smart_aim(true)
-                                                        .handle_shape(Rect { aspect_ratio: 0.0 })
-                                                        .show_value(false),
-                                                )
-                                                .changed()
-                                            {
-                                                setter.begin_set_parameter(param);
-                                                setter.set_parameter(param, value);
-                                                setter.end_set_parameter(param);
-                                            }
-                                            ui.label(format!("Beat {}", i + 1));
-                                        });
+                                        if ui
+                                            .add_sized(
+                                                [slider_width, slider_height],
+                                                egui::Slider::new(&mut value, 0.0..=1.0)
+                                                    .vertical()
+                                                    .trailing_fill(true)
+                                                    .smart_aim(true)
+                                                    .handle_shape(Rect { aspect_ratio: 0.0 })
+                                                    .show_value(false),
+                                            )
+                                            .changed()
+                                        {
+                                            setter.begin_set_parameter(param);
+                                            setter.set_parameter(param, value);
+                                            setter.end_set_parameter(param);
+                                        }
                                     }
+
+                                    ui.add_space(gap_spacing);
+                                        },
+                                    );
                                 });
-                            });
                         });
 
-                        ui.add_space(20.0);
+                        // ui.add_space(20.0);
                     });
                 });
             },
