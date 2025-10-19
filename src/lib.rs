@@ -12,7 +12,7 @@ use egui_taffy::taffy::{
 use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
 use nih_plug_egui::egui::{Color32, Shadow};
 
-const NUM_SLIDERS: usize = 4;
+const NUM_SLIDERS: usize = 32;
 
 pub struct Device {
     params: Arc<DeviceParams>,
@@ -133,26 +133,33 @@ impl Plugin for Device {
                                         let container_rect = ui.available_rect_before_wrap();
                                         let painter = ui.painter();
                                         let container_width = 732.0;
-                                        let line_spacing = container_width / 32.0;
+                                        let slider_width = 10.0;
+                                        let num_grid_positions = 32;
 
-                                        for i in 0..32 {
-                                            let x = container_rect.min.x + (i as f32 * line_spacing);
+                                        let total_slider_width = num_grid_positions as f32 * slider_width;
+                                        let remaining_space = container_width - total_slider_width;
+                                        let gap_size = remaining_space / (num_grid_positions + 1) as f32;
+
+                                        for i in 0..num_grid_positions {
+                                            let x = container_rect.min.x + gap_size + (i as f32 * (gap_size + slider_width)) + (slider_width / 2.0);
                                             let line_num = i + 1;
 
-                                            let (color, width) = if (line_num - 1) % 4 == 0 {
-                                                (Color32::from_white_alpha(120), 2.0)
+                                            let color = if (line_num - 1) % 8 == 0 {
+                                                Color32::from_white_alpha(7)
+                                            } else if line_num % 4 == 1 {
+                                                Color32::from_white_alpha(5)
                                             } else if line_num % 2 == 1 {
-                                                (Color32::from_white_alpha(40), 1.0)
+                                                Color32::from_white_alpha(2)
                                             } else {
-                                                (Color32::from_white_alpha(15), 1.0)
+                                                Color32::from_white_alpha(1)
                                             };
 
                                             painter.line_segment(
                                                 [
-                                                    egui::pos2(x, container_rect.min.y),
-                                                    egui::pos2(x, container_rect.max.y),
+                                                    egui::pos2(x + 3.5, container_rect.min.y),
+                                                    egui::pos2(x + 3.5, container_rect.max.y),
                                                 ],
-                                                egui::Stroke::new(width, color),
+                                                egui::Stroke::new(1.0, color),
                                             );
                                         }
 
