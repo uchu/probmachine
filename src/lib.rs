@@ -130,6 +130,32 @@ impl Plugin for Device {
                                         color: Color32::from_black_alpha(80),
                                     })
                                     .show(ui, |ui| {
+                                        let container_rect = ui.available_rect_before_wrap();
+                                        let painter = ui.painter();
+                                        let container_width = 732.0;
+                                        let line_spacing = container_width / 32.0;
+
+                                        for i in 0..32 {
+                                            let x = container_rect.min.x + (i as f32 * line_spacing);
+                                            let line_num = i + 1;
+
+                                            let (color, width) = if (line_num - 1) % 4 == 0 {
+                                                (Color32::from_white_alpha(120), 2.0)
+                                            } else if line_num % 2 == 1 {
+                                                (Color32::from_white_alpha(40), 1.0)
+                                            } else {
+                                                (Color32::from_white_alpha(15), 1.0)
+                                            };
+
+                                            painter.line_segment(
+                                                [
+                                                    egui::pos2(x, container_rect.min.y),
+                                                    egui::pos2(x, container_rect.max.y),
+                                                ],
+                                                egui::Stroke::new(width, color),
+                                            );
+                                        }
+
                                         taffy_layout(ui, ui.id().with("sliders_container"))
                                             .reserve_available_space()
                                             .style(Style {
