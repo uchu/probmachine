@@ -1,16 +1,16 @@
 mod params;
 
-use nih_plug::prelude::*;
-use nih_plug_egui::egui::style::HandleShape;
-use nih_plug_egui::{create_egui_editor, egui};
-use params::DeviceParams;
-use std::sync::Arc;
 use egui_taffy::taffy::{
     prelude::*,
     style::{AlignItems, FlexDirection, JustifyContent},
 };
 use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
+use nih_plug::prelude::*;
+use nih_plug_egui::egui::style::HandleShape;
 use nih_plug_egui::egui::{Color32, Shadow};
+use nih_plug_egui::{create_egui_editor, egui};
+use params::DeviceParams;
+use std::sync::Arc;
 
 const NUM_SLIDERS: usize = 4;
 
@@ -62,7 +62,6 @@ impl Plugin for Device {
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
                     let outer_padding = 20.0;
                     let frame_margin = 0.0;
-                    let inner_padding = 0.0;
                     let container_height = 300.0;
 
                     taffy_layout(ui, ui.id().with("page_layout"))
@@ -85,7 +84,6 @@ impl Plugin for Device {
                             ..Default::default()
                         })
                         .show(|tui| {
-
                             tui.ui(|ui| {
                                 ui.horizontal(|ui| {
                                     let selected_tab = ui.memory_mut(|mem| {
@@ -93,15 +91,21 @@ impl Plugin for Device {
                                     });
 
                                     for i in 0..7 {
-                                        if ui.selectable_label(selected_tab == i, format!("Something {}", i + 1)).clicked() {
+                                        if ui
+                                            .selectable_label(
+                                                selected_tab == i,
+                                                format!("Something {}", i + 1),
+                                            )
+                                            .clicked()
+                                        {
                                             ui.memory_mut(|mem| {
-                                                mem.data.insert_temp(ui.id().with("selected_tab"), i);
+                                                mem.data
+                                                    .insert_temp(ui.id().with("selected_tab"), i);
                                             });
                                         }
                                     }
                                 });
                             });
-
 
                             tui.ui(|ui| {
                                 ui.add_space(24.0);
@@ -120,7 +124,10 @@ impl Plugin for Device {
                                 egui::Frame::default()
                                     .fill(ui.visuals().extreme_bg_color)
                                     .inner_margin(frame_margin)
-                                    .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                                    .stroke(egui::Stroke::new(
+                                        1.0,
+                                        ui.visuals().window_stroke.color,
+                                    ))
                                     .corner_radius(15.0)
                                     .shadow(Shadow {
                                         offset: [0, 4],
@@ -131,22 +138,22 @@ impl Plugin for Device {
                                     .show(ui, |ui| {
                                         let container_rect = ui.available_rect_before_wrap();
                                         let painter = ui.painter();
-                                        let container_width = 732.0;
-                                        let slider_width = 10.0;
-                                        let num_grid_positions = 32;
-
-                                        let total_slider_width = num_grid_positions as f32 * slider_width;
-                                        let remaining_space = container_width - total_slider_width;
-                                        let gap_size = remaining_space / (num_grid_positions + 1) as f32;
+                                        let container_width = 740.0;
+                                        let slider_width = container_width / 33.0 - 2.0;
+                                        let num_grid_positions = 33;
+                                        let gap_size = 2.0;
 
                                         for i in 0..num_grid_positions {
-                                            let x = container_rect.min.x + gap_size + (i as f32 * (gap_size + slider_width)) + (slider_width / 2.0);
+                                            let x = container_rect.min.x
+                                                + gap_size
+                                                + (i as f32 * (gap_size + slider_width))
+                                                + (slider_width / 2.0);
                                             let line_num = i + 1;
 
                                             let color = if (line_num - 1) % 8 == 0 {
                                                 Color32::from_white_alpha(7)
                                             } else if line_num % 4 == 1 {
-                                                Color32::from_white_alpha(5)
+                                                Color32::from_white_alpha(3)
                                             } else if line_num % 2 == 1 {
                                                 Color32::from_white_alpha(2)
                                             } else {
@@ -162,58 +169,55 @@ impl Plugin for Device {
                                             );
                                         }
 
-                                        taffy_layout(ui, ui.id().with("sliders_container"))
-                                            .reserve_available_space()
-                                            .style(Style {
-                                                // display: Display::Flex,
-                                                // flex_direction: FlexDirection::Row,
-                                                // justify_content: Some(JustifyContent::SpaceBetween),
-                                                // align_items: Some(AlignItems::Center),
-                                                padding: egui_taffy::taffy::Rect {
-                                                    left: length(inner_padding),
-                                                    right: length(inner_padding),
-                                                    top: length(24.0),
-                                                    bottom: length(0.0),
-                                                },
-                                                size: Size {
-                                                    width: length(732.0),
-                                                    height: length(container_height),
-                                                },
-                                                ..Default::default()
-                                            })
-                                            .show(|sliders_tui| {
+                                        ui.vertical(|ui| {
+                                            ui.set_min_size(egui::vec2(740.0, container_height));
+                                            ui.set_max_width(740.0);
+                                            ui.add_space(24.0);
+
+                                            ui.horizontal_top(|ui| {
+                                                ui.add_space(5.0);
                                                 for i in 0..NUM_SLIDERS {
-                                                    sliders_tui
-                                                        .ui(|ui| {
-                                                            ui.add_space(40.0);
-                                                            let param = params.get_slider_param(i);
-                                                            let mut value = param.modulated_plain_value();
-                                                            ui.style_mut().spacing.slider_width = 250.0;
-                                                            ui.style_mut().spacing.slider_rail_height = 5.0;
-                                                            if ui
-                                                                .add(
-                                                                    egui::Slider::new(&mut value, 0.0..=127.0)
-                                                                        .vertical()
-                                                                        .trailing_fill(true)
-                                                                        .step_by(1.0)
-                                                                        .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
-                                                                        .show_value(false),
+                                                    ui.vertical(|ui| {
+                                                        let param = params.get_slider_param(i);
+                                                        let mut value =
+                                                            param.modulated_plain_value();
+                                                        ui.style_mut().spacing.slider_width = 250.0;
+                                                        ui.style_mut().spacing.slider_rail_height =
+                                                            (container_width - 5.0)
+                                                                / NUM_SLIDERS as f32
+                                                                - 5.0;
+                                                        if ui
+                                                            .add(
+                                                                egui::Slider::new(
+                                                                    &mut value,
+                                                                    0.0..=127.0,
                                                                 )
-                                                                .changed()
-                                                            {
-                                                                setter.begin_set_parameter(param);
-                                                                setter.set_parameter(param, value);
-                                                                setter.end_set_parameter(param);
-                                                            }
-                                                        });
+                                                                .vertical()
+                                                                .trailing_fill(true)
+                                                                .step_by(1.0)
+                                                                .handle_shape(HandleShape::Rect {
+                                                                    aspect_ratio: 0.2,
+                                                                })
+                                                                .show_value(false),
+                                                            )
+                                                            .changed()
+                                                        {
+                                                            setter.begin_set_parameter(param);
+                                                            setter.set_parameter(param, value);
+                                                            setter.end_set_parameter(param);
+                                                        }
+                                                    });
+                                                    ui.add_space(
+                                                        container_width / NUM_SLIDERS as f32 - 5.0,
+                                                    );
                                                 }
                                             });
+                                        });
                                         ui.horizontal(|ui| {
                                             ui.label("v0.1.0");
                                             ui.separator();
                                             ui.label("Device Audio");
                                         });
-
                                     });
                             });
 
