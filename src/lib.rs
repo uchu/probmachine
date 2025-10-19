@@ -138,15 +138,14 @@ impl Plugin for Device {
                                     .show(ui, |ui| {
                                         let container_rect = ui.available_rect_before_wrap();
                                         let painter = ui.painter();
-                                        let container_width = 740.0;
-                                        let slider_width = container_width / 33.0 - 2.0;
+                                        let container_width = 738.0;
                                         let num_grid_positions = 33;
-                                        let gap_size = 2.0;
+                                        let slider_width =
+                                            container_width / num_grid_positions as f32;
 
                                         for i in 0..num_grid_positions {
                                             let x = container_rect.min.x
-                                                + gap_size
-                                                + (i as f32 * (gap_size + slider_width))
+                                                + i as f32 * slider_width
                                                 + (slider_width / 2.0);
                                             let line_num = i + 1;
 
@@ -170,12 +169,12 @@ impl Plugin for Device {
                                         }
 
                                         ui.vertical(|ui| {
-                                            ui.set_min_size(egui::vec2(740.0, container_height));
-                                            ui.set_max_width(740.0);
+                                            ui.set_min_size(egui::vec2(738.0, container_height));
+                                            ui.set_max_width(738.0);
                                             ui.add_space(24.0);
 
                                             ui.horizontal_top(|ui| {
-                                                ui.add_space(5.0);
+                                                ui.add_space(3.0);
                                                 for i in 0..NUM_SLIDERS {
                                                     ui.vertical(|ui| {
                                                         let param = params.get_slider_param(i);
@@ -183,41 +182,39 @@ impl Plugin for Device {
                                                             param.modulated_plain_value();
                                                         ui.style_mut().spacing.slider_width = 250.0;
                                                         ui.style_mut().spacing.slider_rail_height =
-                                                            (container_width - 5.0)
-                                                                / NUM_SLIDERS as f32
-                                                                - 5.0;
-                                                        let response = ui.add(
-                                                            egui::Slider::new(
-                                                                &mut value,
-                                                                0.0..=127.0,
+                                                            9.0;
+                                                        if ui
+                                                            .add(
+                                                                egui::Slider::new(
+                                                                    &mut value,
+                                                                    0.0..=127.0,
+                                                                )
+                                                                .vertical()
+                                                                .trailing_fill(true)
+                                                                .step_by(1.0)
+                                                                .handle_shape(HandleShape::Rect {
+                                                                    aspect_ratio: 0.0,
+                                                                })
+                                                                .show_value(false),
                                                             )
-                                                            .vertical()
-                                                            .trailing_fill(true)
-                                                            .step_by(1.0)
-                                                            .handle_shape(HandleShape::Rect {
-                                                                aspect_ratio: 0.2,
-                                                            })
-                                                            .show_value(false),
-                                                        );
-
-                                                        if response.clicked() {
-                                                            if let Some(pos) = response.interact_pointer_pos() {
-                                                                let rect = response.rect;
-                                                                let normalized = 1.0 - ((pos.y - rect.min.y) / rect.height());
-                                                                value = (normalized * 127.0).clamp(0.0, 127.0);
-                                                                setter.begin_set_parameter(param);
-                                                                setter.set_parameter(param, value);
-                                                                setter.end_set_parameter(param);
-                                                            }
-                                                        } else if response.changed() {
+                                                            .changed()
+                                                        {
                                                             setter.begin_set_parameter(param);
                                                             setter.set_parameter(param, value);
                                                             setter.end_set_parameter(param);
                                                         }
                                                     });
-                                                    ui.add_space(
-                                                        container_width / NUM_SLIDERS as f32 - 5.0,
-                                                    );
+
+                                                    let space = match NUM_SLIDERS {
+                                                        1 => 0.0,
+                                                        2 => 200.0,
+                                                        4 => 152.5,
+                                                        8 => 63.3,
+                                                        16 => 20.0,
+                                                        32 => 10.0,
+                                                        _ => 0.0,
+                                                    };
+                                                    ui.add_space(space);
                                                 }
                                             });
                                         });
