@@ -12,7 +12,7 @@ use egui_taffy::taffy::{
 use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
 use nih_plug_egui::egui::{Color32, Shadow};
 
-const NUM_SLIDERS: usize = 32;
+const NUM_SLIDERS: usize = 4;
 
 pub struct Device {
     params: Arc<DeviceParams>,
@@ -60,11 +60,10 @@ impl Plugin for Device {
             |_, _| {},
             move |egui_ctx, setter, _state| {
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
-                    let slider_height = 300.0;
-                    let max_slider_width = 10.0;
                     let outer_padding = 20.0;
                     let frame_margin = 0.0;
                     let inner_padding = 0.0;
+                    let container_height = 300.0;
 
                     taffy_layout(ui, ui.id().with("page_layout"))
                         .reserve_available_space()
@@ -116,7 +115,7 @@ impl Plugin for Device {
                                 ..Default::default()
                             })
                             .ui(|ui| {
-                                ui.set_min_size(egui::vec2(742.0, slider_height));
+                                ui.set_min_size(egui::vec2(742.0, container_height));
                                 ui.set_max_width(742.0);
                                 egui::Frame::default()
                                     .fill(ui.visuals().extreme_bg_color)
@@ -156,8 +155,8 @@ impl Plugin for Device {
 
                                             painter.line_segment(
                                                 [
-                                                    egui::pos2(x + 3.5, container_rect.min.y),
-                                                    egui::pos2(x + 3.5, container_rect.max.y),
+                                                    egui::pos2(x, container_rect.min.y),
+                                                    egui::pos2(x, container_rect.max.y),
                                                 ],
                                                 egui::Stroke::new(1.0, color),
                                             );
@@ -168,7 +167,7 @@ impl Plugin for Device {
                                             .style(Style {
                                                 display: Display::Flex,
                                                 flex_direction: FlexDirection::Row,
-                                                justify_content: Some(JustifyContent::SpaceEvenly),
+                                                justify_content: Some(JustifyContent::SpaceBetween),
                                                 align_items: Some(AlignItems::Center),
                                                 padding: egui_taffy::taffy::Rect {
                                                     left: length(inner_padding),
@@ -178,32 +177,25 @@ impl Plugin for Device {
                                                 },
                                                 size: Size {
                                                     width: length(732.0),
-                                                    height: length(slider_height),
+                                                    height: length(container_height),
                                                 },
                                                 ..Default::default()
                                             })
                                             .show(|sliders_tui| {
                                                 for i in 0..NUM_SLIDERS {
                                                     sliders_tui
-                                                        .style(Style {
-                                                            size: Size {
-                                                                width: length(max_slider_width),
-                                                                height: length(slider_height),
-                                                            },
-                                                            ..Default::default()
-                                                        })
                                                         .ui(|ui| {
                                                             let param = params.get_slider_param(i);
                                                             let mut value = param.modulated_plain_value();
-
+                                                            ui.style_mut().spacing.slider_width = 250.0;
+                                                            ui.style_mut().spacing.slider_rail_height = 10.0;
                                                             if ui
-                                                                .add_sized(
-                                                                    [max_slider_width, slider_height],
+                                                                .add(
                                                                     egui::Slider::new(&mut value, 0.0..=127.0)
                                                                         .vertical()
                                                                         .trailing_fill(true)
-                                                                        .smart_aim(true)
-                                                                        .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
+                                                                        .step_by(1.0)
+                                                                        .handle_shape(HandleShape::Rect { aspect_ratio: 0.1 })
                                                                         .show_value(false),
                                                                 )
                                                                 .changed()
@@ -215,6 +207,12 @@ impl Plugin for Device {
                                                         });
                                                 }
                                             });
+                                        ui.horizontal(|ui| {
+                                            ui.label("v0.1.0");
+                                            ui.separator();
+                                            ui.label("Device Audio");
+                                        });
+
                                     });
                             });
 

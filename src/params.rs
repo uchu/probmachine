@@ -151,259 +151,227 @@ impl Default for DeviceParams {
 
             beat1_probability: FloatParam::new(
                 "Beat 1 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat2_probability: FloatParam::new(
                 "Beat 2 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat3_probability: FloatParam::new(
                 "Beat 3 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat4_probability: FloatParam::new(
                 "Beat 4 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat5_probability: FloatParam::new(
                 "Beat 5 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat6_probability: FloatParam::new(
                 "Beat 6 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat7_probability: FloatParam::new(
                 "Beat 7 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat8_probability: FloatParam::new(
                 "Beat 8 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat9_probability: FloatParam::new(
                 "Beat 9 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat10_probability: FloatParam::new(
                 "Beat 10 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat11_probability: FloatParam::new(
                 "Beat 11 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat12_probability: FloatParam::new(
                 "Beat 12 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat13_probability: FloatParam::new(
                 "Beat 13 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat14_probability: FloatParam::new(
                 "Beat 14 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat15_probability: FloatParam::new(
                 "Beat 15 probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat16_probability: FloatParam::new(
                 "Beat 16 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat17_probability: FloatParam::new(
                 "Beat 17 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat18_probability: FloatParam::new(
                 "Beat 18 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat19_probability: FloatParam::new(
                 "Beat 19 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat20_probability: FloatParam::new(
                 "Beat 20 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat21_probability: FloatParam::new(
                 "Beat 21 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat22_probability: FloatParam::new(
                 "Beat 22 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat23_probability: FloatParam::new(
                 "Beat 23 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat24_probability: FloatParam::new(
                 "Beat 24 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat25_probability: FloatParam::new(
                 "Beat 25 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat26_probability: FloatParam::new(
                 "Beat 26 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat27_probability: FloatParam::new(
                 "Beat 27 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat28_probability: FloatParam::new(
                 "Beat 28 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat29_probability: FloatParam::new(
                 "Beat 29 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat30_probability: FloatParam::new(
                 "Beat 30 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat31_probability: FloatParam::new(
                 "Beat 31 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
 
             beat32_probability: FloatParam::new(
                 "Beat 32 Probability",
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 },
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 },
             )
-            .with_smoother(SmoothingStyle::Linear(50.0))
-            .with_step_size(0.01),
+            .with_smoother(SmoothingStyle::Linear(50.0)),
         }
     }
 }
