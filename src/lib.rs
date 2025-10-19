@@ -76,7 +76,7 @@ impl Plugin for Device {
                             padding: egui_taffy::taffy::Rect {
                                 left: length(outer_padding),
                                 right: length(outer_padding),
-                                top: length(outer_padding),
+                                top: length(0.0),
                                 bottom: length(outer_padding),
                             },
                             gap: Size {
@@ -86,8 +86,28 @@ impl Plugin for Device {
                             ..Default::default()
                         })
                         .show(|tui| {
+
                             tui.ui(|ui| {
-                                ui.heading("Device - 4/4 Rhythm Loop");
+                                ui.horizontal(|ui| {
+                                    let selected_tab = ui.memory_mut(|mem| {
+                                        *mem.data.get_temp_mut_or(ui.id().with("selected_tab"), 0)
+                                    });
+
+                                    for i in 0..7 {
+                                        if ui.selectable_label(selected_tab == i, format!("Something {}", i + 1)).clicked() {
+                                            ui.memory_mut(|mem| {
+                                                mem.data.insert_temp(ui.id().with("selected_tab"), i);
+                                            });
+                                        }
+                                    }
+                                });
+                            });
+
+
+                            tui.ui(|ui| {
+                                ui.add_space(24.0);
+                                ui.heading("   Beat Probability");
+                                ui.add_space(8.0);
                             });
 
                             tui.style(Style {
@@ -120,11 +140,11 @@ impl Plugin for Device {
                                                 padding: egui_taffy::taffy::Rect {
                                                     left: length(inner_padding),
                                                     right: length(inner_padding),
-                                                    top: length(0.0),
+                                                    top: length(24.0),
                                                     bottom: length(0.0),
                                                 },
                                                 size: Size {
-                                                    width: length(720.0),
+                                                    width: length(732.0),
                                                     height: length(slider_height),
                                                 },
                                                 ..Default::default()
