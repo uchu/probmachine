@@ -186,22 +186,30 @@ impl Plugin for Device {
                                                             (container_width - 5.0)
                                                                 / NUM_SLIDERS as f32
                                                                 - 5.0;
-                                                        if ui
-                                                            .add(
-                                                                egui::Slider::new(
-                                                                    &mut value,
-                                                                    0.0..=127.0,
-                                                                )
-                                                                .vertical()
-                                                                .trailing_fill(true)
-                                                                .step_by(1.0)
-                                                                .handle_shape(HandleShape::Rect {
-                                                                    aspect_ratio: 0.2,
-                                                                })
-                                                                .show_value(false),
+                                                        let response = ui.add(
+                                                            egui::Slider::new(
+                                                                &mut value,
+                                                                0.0..=127.0,
                                                             )
-                                                            .changed()
-                                                        {
+                                                            .vertical()
+                                                            .trailing_fill(true)
+                                                            .step_by(1.0)
+                                                            .handle_shape(HandleShape::Rect {
+                                                                aspect_ratio: 0.2,
+                                                            })
+                                                            .show_value(false),
+                                                        );
+
+                                                        if response.clicked() {
+                                                            if let Some(pos) = response.interact_pointer_pos() {
+                                                                let rect = response.rect;
+                                                                let normalized = 1.0 - ((pos.y - rect.min.y) / rect.height());
+                                                                value = (normalized * 127.0).clamp(0.0, 127.0);
+                                                                setter.begin_set_parameter(param);
+                                                                setter.set_parameter(param, value);
+                                                                setter.end_set_parameter(param);
+                                                            }
+                                                        } else if response.changed() {
                                                             setter.begin_set_parameter(param);
                                                             setter.set_parameter(param, value);
                                                             setter.end_set_parameter(param);
