@@ -199,7 +199,7 @@ impl Plugin for Device {
                                                             if ui
                                                                 .add_sized(
                                                                     [max_slider_width, slider_height],
-                                                                    egui::Slider::new(&mut value, 0.0..=1.0)
+                                                                    egui::Slider::new(&mut value, 0.0..=127.0)
                                                                         .vertical()
                                                                         .trailing_fill(true)
                                                                         .smart_aim(true)
