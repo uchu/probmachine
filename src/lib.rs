@@ -10,8 +10,9 @@ use egui_taffy::taffy::{
     style::{AlignItems, FlexDirection, JustifyContent},
 };
 use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
+use nih_plug_egui::egui::{Color32, Shadow};
 
-const NUM_SLIDERS: usize = 32;
+const NUM_SLIDERS: usize = 4;
 
 pub struct Device {
     params: Arc<DeviceParams>,
@@ -59,13 +60,11 @@ impl Plugin for Device {
             |_, _| {},
             move |egui_ctx, setter, _state| {
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
-                    let slider_height = 280.0;
-                    let max_slider_width = 20.0;
-                    let window_width = 800.0;
+                    let slider_height = 300.0;
+                    let max_slider_width = 10.0;
                     let outer_padding = 20.0;
-                    let frame_margin = 20.0;
-                    let content_width = window_width - (outer_padding * 2.0);
-                    let sliders_width = content_width - (frame_margin * 2.0);
+                    let frame_margin = 0.0;
+                    let inner_padding = 0.0;
 
                     taffy_layout(ui, ui.id().with("page_layout"))
                         .reserve_available_space()
@@ -82,7 +81,7 @@ impl Plugin for Device {
                             },
                             gap: Size {
                                 width: length(0.0),
-                                height: length(20.0),
+                                height: length(0.0),
                             },
                             ..Default::default()
                         })
@@ -93,83 +92,75 @@ impl Plugin for Device {
 
                             tui.style(Style {
                                 flex_grow: 1.0,
-                                size: Size {
-                                    width: length(content_width),
-                                    height: auto(),
-                                },
+                                align_items: Some(AlignItems::Stretch),
                                 ..Default::default()
                             })
                             .ui(|ui| {
+                                ui.set_min_size(egui::vec2(742.0, slider_height));
+                                ui.set_max_width(742.0);
                                 egui::Frame::default()
                                     .fill(ui.visuals().extreme_bg_color)
                                     .inner_margin(frame_margin)
                                     .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                                    .corner_radius(15.0)
+                                    .shadow(Shadow {
+                                        offset: [0, 4],
+                                        blur: 12,
+                                        spread: 0,
+                                        color: Color32::from_black_alpha(80),
+                                    })
                                     .show(ui, |ui| {
-                                        taffy_layout(ui, ui.id().with("sliders_outer"))
+                                        taffy_layout(ui, ui.id().with("sliders_container"))
+                                            .reserve_available_space()
                                             .style(Style {
                                                 display: Display::Flex,
                                                 flex_direction: FlexDirection::Row,
-                                                size: Size {
-                                                    width: length(sliders_width),
-                                                    height: length(slider_height),
-                                                },
+                                                justify_content: Some(JustifyContent::SpaceEvenly),
+                                                align_items: Some(AlignItems::Center),
                                                 padding: egui_taffy::taffy::Rect {
-                                                    left: length(20.0),
-                                                    right: length(20.0),
+                                                    left: length(inner_padding),
+                                                    right: length(inner_padding),
                                                     top: length(0.0),
                                                     bottom: length(0.0),
                                                 },
+                                                size: Size {
+                                                    width: length(720.0),
+                                                    height: length(slider_height),
+                                                },
                                                 ..Default::default()
                                             })
-                                            .show(|outer_tui| {
-                                                outer_tui.ui(|ui| {
-                                                    taffy_layout(ui, ui.id().with("sliders_inner"))
+                                            .show(|sliders_tui| {
+                                                for i in 0..NUM_SLIDERS {
+                                                    sliders_tui
                                                         .style(Style {
-                                                            display: Display::Flex,
-                                                            flex_direction: FlexDirection::Row,
-                                                            justify_content: Some(JustifyContent::SpaceEvenly),
-                                                            align_items: Some(AlignItems::Center),
-                                                            flex_grow: 1.0,
                                                             size: Size {
-                                                                width: percent(1.0),
+                                                                width: length(max_slider_width),
                                                                 height: length(slider_height),
                                                             },
                                                             ..Default::default()
                                                         })
-                                                        .show(|sliders_tui| {
-                                                            for i in 0..NUM_SLIDERS {
-                                                                sliders_tui
-                                                                    .style(Style {
-                                                                        size: Size {
-                                                                            width: length(max_slider_width),
-                                                                            height: length(slider_height),
-                                                                        },
-                                                                        ..Default::default()
-                                                                    })
-                                                                    .ui(|ui| {
-                                                                        let param = params.get_slider_param(i);
-                                                                        let mut value = param.modulated_plain_value();
+                                                        .ui(|ui| {
+                                                            let param = params.get_slider_param(i);
+                                                            let mut value = param.modulated_plain_value();
 
-                                                                        if ui
-                                                                            .add_sized(
-                                                                                [max_slider_width, slider_height],
-                                                                                egui::Slider::new(&mut value, 0.0..=1.0)
-                                                                                    .vertical()
-                                                                                    .trailing_fill(true)
-                                                                                    .smart_aim(true)
-                                                                                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
-                                                                                    .show_value(false),
-                                                                            )
-                                                                            .changed()
-                                                                        {
-                                                                            setter.begin_set_parameter(param);
-                                                                            setter.set_parameter(param, value);
-                                                                            setter.end_set_parameter(param);
-                                                                        }
-                                                                    });
+                                                            if ui
+                                                                .add_sized(
+                                                                    [max_slider_width, slider_height],
+                                                                    egui::Slider::new(&mut value, 0.0..=1.0)
+                                                                        .vertical()
+                                                                        .trailing_fill(true)
+                                                                        .smart_aim(true)
+                                                                        .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
+                                                                        .show_value(false),
+                                                                )
+                                                                .changed()
+                                                            {
+                                                                setter.begin_set_parameter(param);
+                                                                setter.set_parameter(param, value);
+                                                                setter.end_set_parameter(param);
                                                             }
                                                         });
-                                                });
+                                                }
                                             });
                                     });
                             });
