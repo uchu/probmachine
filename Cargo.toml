@@ -1,0 +1,27 @@
+[package]
+name = "device"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["xtask"]
+
+[dependencies]
+nih_plug = { path = "../nih-plug-patched", features = ["standalone"] }
+nih_plug_egui = { path = "../nih-plug-patched/nih_plug_egui" }
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "device"
+path = "src/main.rs"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = "none"
