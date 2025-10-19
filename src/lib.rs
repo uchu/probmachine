@@ -165,10 +165,10 @@ impl Plugin for Device {
                                         taffy_layout(ui, ui.id().with("sliders_container"))
                                             .reserve_available_space()
                                             .style(Style {
-                                                display: Display::Flex,
-                                                flex_direction: FlexDirection::Row,
-                                                justify_content: Some(JustifyContent::SpaceBetween),
-                                                align_items: Some(AlignItems::Center),
+                                                // display: Display::Flex,
+                                                // flex_direction: FlexDirection::Row,
+                                                // justify_content: Some(JustifyContent::SpaceBetween),
+                                                // align_items: Some(AlignItems::Center),
                                                 padding: egui_taffy::taffy::Rect {
                                                     left: length(inner_padding),
                                                     right: length(inner_padding),
@@ -185,17 +185,18 @@ impl Plugin for Device {
                                                 for i in 0..NUM_SLIDERS {
                                                     sliders_tui
                                                         .ui(|ui| {
+                                                            ui.add_space(40.0);
                                                             let param = params.get_slider_param(i);
                                                             let mut value = param.modulated_plain_value();
                                                             ui.style_mut().spacing.slider_width = 250.0;
-                                                            ui.style_mut().spacing.slider_rail_height = 10.0;
+                                                            ui.style_mut().spacing.slider_rail_height = 5.0;
                                                             if ui
                                                                 .add(
                                                                     egui::Slider::new(&mut value, 0.0..=127.0)
                                                                         .vertical()
                                                                         .trailing_fill(true)
                                                                         .step_by(1.0)
-                                                                        .handle_shape(HandleShape::Rect { aspect_ratio: 0.1 })
+                                                                        .handle_shape(HandleShape::Rect { aspect_ratio: 0.0 })
                                                                         .show_value(false),
                                                                 )
                                                                 .changed()
