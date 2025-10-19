@@ -11,7 +11,7 @@ use egui_taffy::taffy::{
 };
 use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
 
-const NUM_SLIDERS: usize = 4;
+const NUM_SLIDERS: usize = 32;
 
 pub struct Device {
     params: Arc<DeviceParams>,
@@ -109,7 +109,7 @@ impl Plugin for Device {
                                             .style(Style {
                                                 display: Display::Flex,
                                                 flex_direction: FlexDirection::Row,
-                                                justify_content: Some(JustifyContent::SpaceEvenly),
+                                                justify_content: Some(JustifyContent::SpaceBetween),
                                                 align_items: Some(AlignItems::Center),
                                                 size: Size {
                                                     width: length(sliders_width),
