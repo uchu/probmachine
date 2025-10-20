@@ -216,7 +216,7 @@ impl Plugin for Device {
                                                         8 => 63.5,
                                                         16 => 18.75,
                                                         32 => -3.63,
-                                                        _ => 0.0,
+                                                        _ => { panic!("Invalid division") },
                                                     };
                                                     ui.add_space(space);
                                                 }
@@ -247,6 +247,23 @@ impl Plugin for Device {
                                             });
                                         }
                                     }
+
+                                    ui.add_space(40.0);
+
+                                    let button_s = egui::Button::new(
+                                        egui::RichText::new("S").size(16.0)
+                                    ).min_size(egui::vec2(60.0, 32.0));
+                                    ui.add(button_s);
+
+                                    let button_t = egui::Button::new(
+                                        egui::RichText::new("T").size(16.0)
+                                    ).min_size(egui::vec2(60.0, 32.0));
+                                    ui.add(button_t);
+
+                                    let button_d = egui::Button::new(
+                                        egui::RichText::new("D").size(16.0)
+                                    ).min_size(egui::vec2(60.0, 32.0));
+                                    ui.add(button_d);
                                 });
                             });
                         });
