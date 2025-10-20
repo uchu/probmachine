@@ -107,10 +107,34 @@ impl Plugin for Device {
                                 });
                             });
 
-                            tui.ui(|ui| {
+                            let (beat_mode, num_sliders) = tui.ui(|ui| {
+                                let (mode, sliders) = ui.memory_mut(|mem| {
+                                    let mode = *mem.data.get_temp_mut_or(
+                                        egui::Id::new("beat_mode"),
+                                        BeatMode::Straight,
+                                    );
+                                    let mut sliders = *mem.data.get_temp_mut_or(
+                                        egui::Id::new("num_sliders"),
+                                        NUM_SLIDERS,
+                                    );
+
+                                    if !DeviceParams::is_valid_beat_count(mode, sliders)
+                                    {
+                                        sliders = DeviceParams::get_default_beat_count(mode);
+                                        mem.data.insert_temp(
+                                            egui::Id::new("num_sliders"),
+                                            sliders,
+                                        );
+                                    }
+
+                                    (mode, sliders)
+                                });
+
                                 ui.add_space(24.0);
                                 ui.heading("   Beat Probability");
                                 ui.add_space(8.0);
+
+                                (mode, sliders)
                             });
 
                             tui.style(Style {
@@ -121,6 +145,7 @@ impl Plugin for Device {
                             .ui(|ui| {
                                 ui.set_min_size(egui::vec2(742.0, container_height));
                                 ui.set_max_width(742.0);
+
                                 egui::Frame::default()
                                     .fill(ui.visuals().extreme_bg_color)
                                     .inner_margin(frame_margin)
@@ -129,12 +154,6 @@ impl Plugin for Device {
                                         ui.visuals().window_stroke.color,
                                     ))
                                     .corner_radius(15.0)
-                                    .shadow(Shadow {
-                                        offset: [0, 4],
-                                        blur: 12,
-                                        spread: 0,
-                                        color: Color32::from_black_alpha(80),
-                                    })
                                     .show(ui, |ui| {
                                         let container_rect = ui.available_rect_before_wrap();
                                         let painter = ui.painter();
@@ -172,29 +191,6 @@ impl Plugin for Device {
                                             ui.set_min_size(egui::vec2(738.0, container_height));
                                             ui.set_max_width(738.0);
                                             ui.add_space(24.0);
-
-                                            let (beat_mode, num_sliders) = ui.memory_mut(|mem| {
-                                                let mode = *mem.data.get_temp_mut_or(
-                                                    egui::Id::new("beat_mode"),
-                                                    BeatMode::Straight,
-                                                );
-                                                let mut sliders = *mem.data.get_temp_mut_or(
-                                                    egui::Id::new("num_sliders"),
-                                                    NUM_SLIDERS,
-                                                );
-
-                                                if !DeviceParams::is_valid_beat_count(mode, sliders)
-                                                {
-                                                    sliders =
-                                                        DeviceParams::get_default_beat_count(mode);
-                                                    mem.data.insert_temp(
-                                                        egui::Id::new("num_sliders"),
-                                                        sliders,
-                                                    );
-                                                }
-
-                                                (mode, sliders)
-                                            });
 
                                             ui.horizontal_top(|ui| {
                                                 ui.add_space(2.0);
@@ -264,25 +260,6 @@ impl Plugin for Device {
                             tui.ui(|ui| {
                                 ui.add_space(16.0);
                                 ui.horizontal(|ui| {
-                                    let (beat_mode, num_sliders) = ui.memory_mut(|mem| {
-                                        let mode = *mem.data.get_temp_mut_or(
-                                            egui::Id::new("beat_mode"),
-                                            BeatMode::Straight,
-                                        );
-                                        let mut sliders = *mem.data.get_temp_mut_or(
-                                            egui::Id::new("num_sliders"),
-                                            NUM_SLIDERS,
-                                        );
-
-                                        if !DeviceParams::is_valid_beat_count(mode, sliders) {
-                                            sliders = DeviceParams::get_default_beat_count(mode);
-                                            mem.data
-                                                .insert_temp(egui::Id::new("num_sliders"), sliders);
-                                        }
-
-                                        (mode, sliders)
-                                    });
-
                                     let divisions = DeviceParams::get_divisions_for_mode(beat_mode);
                                     let mode_suffix = beat_mode.as_str();
 
@@ -334,7 +311,7 @@ impl Plugin for Device {
                                             .min_size(egui::vec2(60.0, 32.0))
                                             .selected(beat_mode == BeatMode::Straight);
 
-                                    if ui.add(button_s).clicked() {
+                                    if ui.add(button_s).clicked() && beat_mode != BeatMode::Straight {
                                         ui.memory_mut(|mem| {
                                             mem.data.insert_temp(
                                                 egui::Id::new("beat_mode"),
@@ -353,7 +330,7 @@ impl Plugin for Device {
                                             .min_size(egui::vec2(60.0, 32.0))
                                             .selected(beat_mode == BeatMode::Triplet);
 
-                                    if ui.add(button_t).clicked() {
+                                    if ui.add(button_t).clicked() && beat_mode != BeatMode::Triplet {
                                         ui.memory_mut(|mem| {
                                             mem.data.insert_temp(
                                                 egui::Id::new("beat_mode"),
@@ -372,7 +349,7 @@ impl Plugin for Device {
                                             .min_size(egui::vec2(60.0, 32.0))
                                             .selected(beat_mode == BeatMode::Dotted);
 
-                                    if ui.add(button_d).clicked() {
+                                    if ui.add(button_d).clicked() && beat_mode != BeatMode::Dotted {
                                         ui.memory_mut(|mem| {
                                             mem.data.insert_temp(
                                                 egui::Id::new("beat_mode"),
