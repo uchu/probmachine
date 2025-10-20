@@ -2,6 +2,23 @@ use nih_plug::prelude::*;
 use nih_plug_egui::EguiState;
 use std::sync::Arc;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeatMode {
+    Straight,
+    Triplet,
+    Dotted,
+}
+
+impl BeatMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BeatMode::Straight => "S",
+            BeatMode::Triplet => "T",
+            BeatMode::Dotted => "D",
+        }
+    }
+}
+
 #[derive(Params)]
 pub struct DeviceParams {
     #[persist = "editor-state"]
@@ -138,93 +155,429 @@ pub struct DeviceParams {
     pub div32_beat31: FloatParam,
     #[id = "div32_beat32"]
     pub div32_beat32: FloatParam,
+
+    #[id = "div3t_beat1"]
+    pub div3t_beat1: FloatParam,
+    #[id = "div3t_beat2"]
+    pub div3t_beat2: FloatParam,
+    #[id = "div3t_beat3"]
+    pub div3t_beat3: FloatParam,
+
+    #[id = "div6t_beat1"]
+    pub div6t_beat1: FloatParam,
+    #[id = "div6t_beat2"]
+    pub div6t_beat2: FloatParam,
+    #[id = "div6t_beat3"]
+    pub div6t_beat3: FloatParam,
+    #[id = "div6t_beat4"]
+    pub div6t_beat4: FloatParam,
+    #[id = "div6t_beat5"]
+    pub div6t_beat5: FloatParam,
+    #[id = "div6t_beat6"]
+    pub div6t_beat6: FloatParam,
+
+    #[id = "div12t_beat1"]
+    pub div12t_beat1: FloatParam,
+    #[id = "div12t_beat2"]
+    pub div12t_beat2: FloatParam,
+    #[id = "div12t_beat3"]
+    pub div12t_beat3: FloatParam,
+    #[id = "div12t_beat4"]
+    pub div12t_beat4: FloatParam,
+    #[id = "div12t_beat5"]
+    pub div12t_beat5: FloatParam,
+    #[id = "div12t_beat6"]
+    pub div12t_beat6: FloatParam,
+    #[id = "div12t_beat7"]
+    pub div12t_beat7: FloatParam,
+    #[id = "div12t_beat8"]
+    pub div12t_beat8: FloatParam,
+    #[id = "div12t_beat9"]
+    pub div12t_beat9: FloatParam,
+    #[id = "div12t_beat10"]
+    pub div12t_beat10: FloatParam,
+    #[id = "div12t_beat11"]
+    pub div12t_beat11: FloatParam,
+    #[id = "div12t_beat12"]
+    pub div12t_beat12: FloatParam,
+
+    #[id = "div24t_beat1"]
+    pub div24t_beat1: FloatParam,
+    #[id = "div24t_beat2"]
+    pub div24t_beat2: FloatParam,
+    #[id = "div24t_beat3"]
+    pub div24t_beat3: FloatParam,
+    #[id = "div24t_beat4"]
+    pub div24t_beat4: FloatParam,
+    #[id = "div24t_beat5"]
+    pub div24t_beat5: FloatParam,
+    #[id = "div24t_beat6"]
+    pub div24t_beat6: FloatParam,
+    #[id = "div24t_beat7"]
+    pub div24t_beat7: FloatParam,
+    #[id = "div24t_beat8"]
+    pub div24t_beat8: FloatParam,
+    #[id = "div24t_beat9"]
+    pub div24t_beat9: FloatParam,
+    #[id = "div24t_beat10"]
+    pub div24t_beat10: FloatParam,
+    #[id = "div24t_beat11"]
+    pub div24t_beat11: FloatParam,
+    #[id = "div24t_beat12"]
+    pub div24t_beat12: FloatParam,
+    #[id = "div24t_beat13"]
+    pub div24t_beat13: FloatParam,
+    #[id = "div24t_beat14"]
+    pub div24t_beat14: FloatParam,
+    #[id = "div24t_beat15"]
+    pub div24t_beat15: FloatParam,
+    #[id = "div24t_beat16"]
+    pub div24t_beat16: FloatParam,
+    #[id = "div24t_beat17"]
+    pub div24t_beat17: FloatParam,
+    #[id = "div24t_beat18"]
+    pub div24t_beat18: FloatParam,
+    #[id = "div24t_beat19"]
+    pub div24t_beat19: FloatParam,
+    #[id = "div24t_beat20"]
+    pub div24t_beat20: FloatParam,
+    #[id = "div24t_beat21"]
+    pub div24t_beat21: FloatParam,
+    #[id = "div24t_beat22"]
+    pub div24t_beat22: FloatParam,
+    #[id = "div24t_beat23"]
+    pub div24t_beat23: FloatParam,
+    #[id = "div24t_beat24"]
+    pub div24t_beat24: FloatParam,
+
+    #[id = "div1d_beat1"]
+    pub div1d_beat1: FloatParam,
+
+    #[id = "div2d_beat1"]
+    pub div2d_beat1: FloatParam,
+    #[id = "div2d_beat2"]
+    pub div2d_beat2: FloatParam,
+
+    #[id = "div5d_beat1"]
+    pub div5d_beat1: FloatParam,
+    #[id = "div5d_beat2"]
+    pub div5d_beat2: FloatParam,
+    #[id = "div5d_beat3"]
+    pub div5d_beat3: FloatParam,
+    #[id = "div5d_beat4"]
+    pub div5d_beat4: FloatParam,
+    #[id = "div5d_beat5"]
+    pub div5d_beat5: FloatParam,
+
+    #[id = "div10d_beat1"]
+    pub div10d_beat1: FloatParam,
+    #[id = "div10d_beat2"]
+    pub div10d_beat2: FloatParam,
+    #[id = "div10d_beat3"]
+    pub div10d_beat3: FloatParam,
+    #[id = "div10d_beat4"]
+    pub div10d_beat4: FloatParam,
+    #[id = "div10d_beat5"]
+    pub div10d_beat5: FloatParam,
+    #[id = "div10d_beat6"]
+    pub div10d_beat6: FloatParam,
+    #[id = "div10d_beat7"]
+    pub div10d_beat7: FloatParam,
+    #[id = "div10d_beat8"]
+    pub div10d_beat8: FloatParam,
+    #[id = "div10d_beat9"]
+    pub div10d_beat9: FloatParam,
+    #[id = "div10d_beat10"]
+    pub div10d_beat10: FloatParam,
+
+    #[id = "div21d_beat1"]
+    pub div21d_beat1: FloatParam,
+    #[id = "div21d_beat2"]
+    pub div21d_beat2: FloatParam,
+    #[id = "div21d_beat3"]
+    pub div21d_beat3: FloatParam,
+    #[id = "div21d_beat4"]
+    pub div21d_beat4: FloatParam,
+    #[id = "div21d_beat5"]
+    pub div21d_beat5: FloatParam,
+    #[id = "div21d_beat6"]
+    pub div21d_beat6: FloatParam,
+    #[id = "div21d_beat7"]
+    pub div21d_beat7: FloatParam,
+    #[id = "div21d_beat8"]
+    pub div21d_beat8: FloatParam,
+    #[id = "div21d_beat9"]
+    pub div21d_beat9: FloatParam,
+    #[id = "div21d_beat10"]
+    pub div21d_beat10: FloatParam,
+    #[id = "div21d_beat11"]
+    pub div21d_beat11: FloatParam,
+    #[id = "div21d_beat12"]
+    pub div21d_beat12: FloatParam,
+    #[id = "div21d_beat13"]
+    pub div21d_beat13: FloatParam,
+    #[id = "div21d_beat14"]
+    pub div21d_beat14: FloatParam,
+    #[id = "div21d_beat15"]
+    pub div21d_beat15: FloatParam,
+    #[id = "div21d_beat16"]
+    pub div21d_beat16: FloatParam,
+    #[id = "div21d_beat17"]
+    pub div21d_beat17: FloatParam,
+    #[id = "div21d_beat18"]
+    pub div21d_beat18: FloatParam,
+    #[id = "div21d_beat19"]
+    pub div21d_beat19: FloatParam,
+    #[id = "div21d_beat20"]
+    pub div21d_beat20: FloatParam,
+    #[id = "div21d_beat21"]
+    pub div21d_beat21: FloatParam,
 }
 
 impl DeviceParams {
-    pub fn get_division_param(&self, division: usize, beat_index: usize) -> &FloatParam {
-        match division {
-            1 => match beat_index {
-                0 => &self.div1_beat1,
-                _ => panic!("Invalid beat index {} for division 1/1", beat_index),
+    pub fn get_division_param(&self, mode: BeatMode, beat_count: usize, beat_index: usize) -> &FloatParam {
+        match mode {
+            BeatMode::Straight => match beat_count {
+                1 => match beat_index {
+                    0 => &self.div1_beat1,
+                    _ => panic!("Invalid beat index {} for 1/1", beat_index),
+                },
+                2 => match beat_index {
+                    0 => &self.div2_beat1,
+                    1 => &self.div2_beat2,
+                    _ => panic!("Invalid beat index {} for 1/2", beat_index),
+                },
+                4 => match beat_index {
+                    0 => &self.div4_beat1,
+                    1 => &self.div4_beat2,
+                    2 => &self.div4_beat3,
+                    3 => &self.div4_beat4,
+                    _ => panic!("Invalid beat index {} for 1/4", beat_index),
+                },
+                8 => match beat_index {
+                    0 => &self.div8_beat1,
+                    1 => &self.div8_beat2,
+                    2 => &self.div8_beat3,
+                    3 => &self.div8_beat4,
+                    4 => &self.div8_beat5,
+                    5 => &self.div8_beat6,
+                    6 => &self.div8_beat7,
+                    7 => &self.div8_beat8,
+                    _ => panic!("Invalid beat index {} for 1/8", beat_index),
+                },
+                16 => match beat_index {
+                    0 => &self.div16_beat1,
+                    1 => &self.div16_beat2,
+                    2 => &self.div16_beat3,
+                    3 => &self.div16_beat4,
+                    4 => &self.div16_beat5,
+                    5 => &self.div16_beat6,
+                    6 => &self.div16_beat7,
+                    7 => &self.div16_beat8,
+                    8 => &self.div16_beat9,
+                    9 => &self.div16_beat10,
+                    10 => &self.div16_beat11,
+                    11 => &self.div16_beat12,
+                    12 => &self.div16_beat13,
+                    13 => &self.div16_beat14,
+                    14 => &self.div16_beat15,
+                    15 => &self.div16_beat16,
+                    _ => panic!("Invalid beat index {} for 1/16", beat_index),
+                },
+                32 => match beat_index {
+                    0 => &self.div32_beat1,
+                    1 => &self.div32_beat2,
+                    2 => &self.div32_beat3,
+                    3 => &self.div32_beat4,
+                    4 => &self.div32_beat5,
+                    5 => &self.div32_beat6,
+                    6 => &self.div32_beat7,
+                    7 => &self.div32_beat8,
+                    8 => &self.div32_beat9,
+                    9 => &self.div32_beat10,
+                    10 => &self.div32_beat11,
+                    11 => &self.div32_beat12,
+                    12 => &self.div32_beat13,
+                    13 => &self.div32_beat14,
+                    14 => &self.div32_beat15,
+                    15 => &self.div32_beat16,
+                    16 => &self.div32_beat17,
+                    17 => &self.div32_beat18,
+                    18 => &self.div32_beat19,
+                    19 => &self.div32_beat20,
+                    20 => &self.div32_beat21,
+                    21 => &self.div32_beat22,
+                    22 => &self.div32_beat23,
+                    23 => &self.div32_beat24,
+                    24 => &self.div32_beat25,
+                    25 => &self.div32_beat26,
+                    26 => &self.div32_beat27,
+                    27 => &self.div32_beat28,
+                    28 => &self.div32_beat29,
+                    29 => &self.div32_beat30,
+                    30 => &self.div32_beat31,
+                    31 => &self.div32_beat32,
+                    _ => panic!("Invalid beat index {} for 1/32", beat_index),
+                },
+                _ => panic!("Invalid beat count {} for Straight mode", beat_count),
             },
-            2 => match beat_index {
-                0 => &self.div2_beat1,
-                1 => &self.div2_beat2,
-                _ => panic!("Invalid beat index {} for division 1/2", beat_index),
+            BeatMode::Triplet => match beat_count {
+                3 => match beat_index {
+                    0 => &self.div3t_beat1,
+                    1 => &self.div3t_beat2,
+                    2 => &self.div3t_beat3,
+                    _ => panic!("Invalid beat index {} for 1/2T", beat_index),
+                },
+                6 => match beat_index {
+                    0 => &self.div6t_beat1,
+                    1 => &self.div6t_beat2,
+                    2 => &self.div6t_beat3,
+                    3 => &self.div6t_beat4,
+                    4 => &self.div6t_beat5,
+                    5 => &self.div6t_beat6,
+                    _ => panic!("Invalid beat index {} for 1/4T", beat_index),
+                },
+                12 => match beat_index {
+                    0 => &self.div12t_beat1,
+                    1 => &self.div12t_beat2,
+                    2 => &self.div12t_beat3,
+                    3 => &self.div12t_beat4,
+                    4 => &self.div12t_beat5,
+                    5 => &self.div12t_beat6,
+                    6 => &self.div12t_beat7,
+                    7 => &self.div12t_beat8,
+                    8 => &self.div12t_beat9,
+                    9 => &self.div12t_beat10,
+                    10 => &self.div12t_beat11,
+                    11 => &self.div12t_beat12,
+                    _ => panic!("Invalid beat index {} for 1/8T", beat_index),
+                },
+                24 => match beat_index {
+                    0 => &self.div24t_beat1,
+                    1 => &self.div24t_beat2,
+                    2 => &self.div24t_beat3,
+                    3 => &self.div24t_beat4,
+                    4 => &self.div24t_beat5,
+                    5 => &self.div24t_beat6,
+                    6 => &self.div24t_beat7,
+                    7 => &self.div24t_beat8,
+                    8 => &self.div24t_beat9,
+                    9 => &self.div24t_beat10,
+                    10 => &self.div24t_beat11,
+                    11 => &self.div24t_beat12,
+                    12 => &self.div24t_beat13,
+                    13 => &self.div24t_beat14,
+                    14 => &self.div24t_beat15,
+                    15 => &self.div24t_beat16,
+                    16 => &self.div24t_beat17,
+                    17 => &self.div24t_beat18,
+                    18 => &self.div24t_beat19,
+                    19 => &self.div24t_beat20,
+                    20 => &self.div24t_beat21,
+                    21 => &self.div24t_beat22,
+                    22 => &self.div24t_beat23,
+                    23 => &self.div24t_beat24,
+                    _ => panic!("Invalid beat index {} for 1/16T", beat_index),
+                },
+                _ => panic!("Invalid beat count {} for Triplet mode", beat_count),
             },
-            4 => match beat_index {
-                0 => &self.div4_beat1,
-                1 => &self.div4_beat2,
-                2 => &self.div4_beat3,
-                3 => &self.div4_beat4,
-                _ => panic!("Invalid beat index {} for division 1/4", beat_index),
+            BeatMode::Dotted => match beat_count {
+                1 => match beat_index {
+                    0 => &self.div1d_beat1,
+                    _ => panic!("Invalid beat index {} for 1/2D", beat_index),
+                },
+                2 => match beat_index {
+                    0 => &self.div2d_beat1,
+                    1 => &self.div2d_beat2,
+                    _ => panic!("Invalid beat index {} for 1/4D", beat_index),
+                },
+                5 => match beat_index {
+                    0 => &self.div5d_beat1,
+                    1 => &self.div5d_beat2,
+                    2 => &self.div5d_beat3,
+                    3 => &self.div5d_beat4,
+                    4 => &self.div5d_beat5,
+                    _ => panic!("Invalid beat index {} for 1/8D", beat_index),
+                },
+                10 => match beat_index {
+                    0 => &self.div10d_beat1,
+                    1 => &self.div10d_beat2,
+                    2 => &self.div10d_beat3,
+                    3 => &self.div10d_beat4,
+                    4 => &self.div10d_beat5,
+                    5 => &self.div10d_beat6,
+                    6 => &self.div10d_beat7,
+                    7 => &self.div10d_beat8,
+                    8 => &self.div10d_beat9,
+                    9 => &self.div10d_beat10,
+                    _ => panic!("Invalid beat index {} for 1/16D", beat_index),
+                },
+                21 => match beat_index {
+                    0 => &self.div21d_beat1,
+                    1 => &self.div21d_beat2,
+                    2 => &self.div21d_beat3,
+                    3 => &self.div21d_beat4,
+                    4 => &self.div21d_beat5,
+                    5 => &self.div21d_beat6,
+                    6 => &self.div21d_beat7,
+                    7 => &self.div21d_beat8,
+                    8 => &self.div21d_beat9,
+                    9 => &self.div21d_beat10,
+                    10 => &self.div21d_beat11,
+                    11 => &self.div21d_beat12,
+                    12 => &self.div21d_beat13,
+                    13 => &self.div21d_beat14,
+                    14 => &self.div21d_beat15,
+                    15 => &self.div21d_beat16,
+                    16 => &self.div21d_beat17,
+                    17 => &self.div21d_beat18,
+                    18 => &self.div21d_beat19,
+                    19 => &self.div21d_beat20,
+                    20 => &self.div21d_beat21,
+                    _ => panic!("Invalid beat index {} for 1/32D", beat_index),
+                },
+                _ => panic!("Invalid beat count {} for Dotted mode", beat_count),
             },
-            8 => match beat_index {
-                0 => &self.div8_beat1,
-                1 => &self.div8_beat2,
-                2 => &self.div8_beat3,
-                3 => &self.div8_beat4,
-                4 => &self.div8_beat5,
-                5 => &self.div8_beat6,
-                6 => &self.div8_beat7,
-                7 => &self.div8_beat8,
-                _ => panic!("Invalid beat index {} for division 1/8", beat_index),
-            },
-            16 => match beat_index {
-                0 => &self.div16_beat1,
-                1 => &self.div16_beat2,
-                2 => &self.div16_beat3,
-                3 => &self.div16_beat4,
-                4 => &self.div16_beat5,
-                5 => &self.div16_beat6,
-                6 => &self.div16_beat7,
-                7 => &self.div16_beat8,
-                8 => &self.div16_beat9,
-                9 => &self.div16_beat10,
-                10 => &self.div16_beat11,
-                11 => &self.div16_beat12,
-                12 => &self.div16_beat13,
-                13 => &self.div16_beat14,
-                14 => &self.div16_beat15,
-                15 => &self.div16_beat16,
-                _ => panic!("Invalid beat index {} for division 1/16", beat_index),
-            },
-            32 => match beat_index {
-                0 => &self.div32_beat1,
-                1 => &self.div32_beat2,
-                2 => &self.div32_beat3,
-                3 => &self.div32_beat4,
-                4 => &self.div32_beat5,
-                5 => &self.div32_beat6,
-                6 => &self.div32_beat7,
-                7 => &self.div32_beat8,
-                8 => &self.div32_beat9,
-                9 => &self.div32_beat10,
-                10 => &self.div32_beat11,
-                11 => &self.div32_beat12,
-                12 => &self.div32_beat13,
-                13 => &self.div32_beat14,
-                14 => &self.div32_beat15,
-                15 => &self.div32_beat16,
-                16 => &self.div32_beat17,
-                17 => &self.div32_beat18,
-                18 => &self.div32_beat19,
-                19 => &self.div32_beat20,
-                20 => &self.div32_beat21,
-                21 => &self.div32_beat22,
-                22 => &self.div32_beat23,
-                23 => &self.div32_beat24,
-                24 => &self.div32_beat25,
-                25 => &self.div32_beat26,
-                26 => &self.div32_beat27,
-                27 => &self.div32_beat28,
-                28 => &self.div32_beat29,
-                29 => &self.div32_beat30,
-                30 => &self.div32_beat31,
-                31 => &self.div32_beat32,
-                _ => panic!("Invalid beat index {} for division 1/32", beat_index),
-            },
-            _ => panic!("Invalid division: {}", division),
+        }
+    }
+
+    pub fn get_divisions_for_mode(mode: BeatMode) -> &'static [(usize, &'static str)] {
+        match mode {
+            BeatMode::Straight => &[
+                (1, "1/1"),
+                (2, "1/2"),
+                (4, "1/4"),
+                (8, "1/8"),
+                (16, "1/16"),
+                (32, "1/32"),
+            ],
+            BeatMode::Triplet => &[
+                (3, "1/2"),
+                (6, "1/4"),
+                (12, "1/8"),
+                (24, "1/16"),
+            ],
+            BeatMode::Dotted => &[
+                (1, "1/2"),
+                (2, "1/4"),
+                (5, "1/8"),
+                (10, "1/16"),
+                (21, "1/32"),
+            ],
+        }
+    }
+
+    pub fn is_valid_beat_count(mode: BeatMode, beat_count: usize) -> bool {
+        Self::get_divisions_for_mode(mode)
+            .iter()
+            .any(|(count, _)| *count == beat_count)
+    }
+
+    pub fn get_default_beat_count(mode: BeatMode) -> usize {
+        match mode {
+            BeatMode::Straight => 4,
+            BeatMode::Triplet => 6,
+            BeatMode::Dotted => 2,
         }
     }
 
@@ -307,6 +660,99 @@ impl Default for DeviceParams {
             div32_beat30: Self::create_param("1/32 Beat 30".to_string(), 0.0),
             div32_beat31: Self::create_param("1/32 Beat 31".to_string(), 0.0),
             div32_beat32: Self::create_param("1/32 Beat 32".to_string(), 0.0),
+
+            div3t_beat1: Self::create_param("1/2T Beat 1".to_string(), 0.0),
+            div3t_beat2: Self::create_param("1/2T Beat 2".to_string(), 0.0),
+            div3t_beat3: Self::create_param("1/2T Beat 3".to_string(), 0.0),
+
+            div6t_beat1: Self::create_param("1/4T Beat 1".to_string(), 0.0),
+            div6t_beat2: Self::create_param("1/4T Beat 2".to_string(), 0.0),
+            div6t_beat3: Self::create_param("1/4T Beat 3".to_string(), 0.0),
+            div6t_beat4: Self::create_param("1/4T Beat 4".to_string(), 0.0),
+            div6t_beat5: Self::create_param("1/4T Beat 5".to_string(), 0.0),
+            div6t_beat6: Self::create_param("1/4T Beat 6".to_string(), 0.0),
+
+            div12t_beat1: Self::create_param("1/8T Beat 1".to_string(), 0.0),
+            div12t_beat2: Self::create_param("1/8T Beat 2".to_string(), 0.0),
+            div12t_beat3: Self::create_param("1/8T Beat 3".to_string(), 0.0),
+            div12t_beat4: Self::create_param("1/8T Beat 4".to_string(), 0.0),
+            div12t_beat5: Self::create_param("1/8T Beat 5".to_string(), 0.0),
+            div12t_beat6: Self::create_param("1/8T Beat 6".to_string(), 0.0),
+            div12t_beat7: Self::create_param("1/8T Beat 7".to_string(), 0.0),
+            div12t_beat8: Self::create_param("1/8T Beat 8".to_string(), 0.0),
+            div12t_beat9: Self::create_param("1/8T Beat 9".to_string(), 0.0),
+            div12t_beat10: Self::create_param("1/8T Beat 10".to_string(), 0.0),
+            div12t_beat11: Self::create_param("1/8T Beat 11".to_string(), 0.0),
+            div12t_beat12: Self::create_param("1/8T Beat 12".to_string(), 0.0),
+
+            div24t_beat1: Self::create_param("1/16T Beat 1".to_string(), 0.0),
+            div24t_beat2: Self::create_param("1/16T Beat 2".to_string(), 0.0),
+            div24t_beat3: Self::create_param("1/16T Beat 3".to_string(), 0.0),
+            div24t_beat4: Self::create_param("1/16T Beat 4".to_string(), 0.0),
+            div24t_beat5: Self::create_param("1/16T Beat 5".to_string(), 0.0),
+            div24t_beat6: Self::create_param("1/16T Beat 6".to_string(), 0.0),
+            div24t_beat7: Self::create_param("1/16T Beat 7".to_string(), 0.0),
+            div24t_beat8: Self::create_param("1/16T Beat 8".to_string(), 0.0),
+            div24t_beat9: Self::create_param("1/16T Beat 9".to_string(), 0.0),
+            div24t_beat10: Self::create_param("1/16T Beat 10".to_string(), 0.0),
+            div24t_beat11: Self::create_param("1/16T Beat 11".to_string(), 0.0),
+            div24t_beat12: Self::create_param("1/16T Beat 12".to_string(), 0.0),
+            div24t_beat13: Self::create_param("1/16T Beat 13".to_string(), 0.0),
+            div24t_beat14: Self::create_param("1/16T Beat 14".to_string(), 0.0),
+            div24t_beat15: Self::create_param("1/16T Beat 15".to_string(), 0.0),
+            div24t_beat16: Self::create_param("1/16T Beat 16".to_string(), 0.0),
+            div24t_beat17: Self::create_param("1/16T Beat 17".to_string(), 0.0),
+            div24t_beat18: Self::create_param("1/16T Beat 18".to_string(), 0.0),
+            div24t_beat19: Self::create_param("1/16T Beat 19".to_string(), 0.0),
+            div24t_beat20: Self::create_param("1/16T Beat 20".to_string(), 0.0),
+            div24t_beat21: Self::create_param("1/16T Beat 21".to_string(), 0.0),
+            div24t_beat22: Self::create_param("1/16T Beat 22".to_string(), 0.0),
+            div24t_beat23: Self::create_param("1/16T Beat 23".to_string(), 0.0),
+            div24t_beat24: Self::create_param("1/16T Beat 24".to_string(), 0.0),
+
+            div1d_beat1: Self::create_param("1/2D Beat 1".to_string(), 0.0),
+
+            div2d_beat1: Self::create_param("1/4D Beat 1".to_string(), 0.0),
+            div2d_beat2: Self::create_param("1/4D Beat 2".to_string(), 0.0),
+
+            div5d_beat1: Self::create_param("1/8D Beat 1".to_string(), 0.0),
+            div5d_beat2: Self::create_param("1/8D Beat 2".to_string(), 0.0),
+            div5d_beat3: Self::create_param("1/8D Beat 3".to_string(), 0.0),
+            div5d_beat4: Self::create_param("1/8D Beat 4".to_string(), 0.0),
+            div5d_beat5: Self::create_param("1/8D Beat 5".to_string(), 0.0),
+
+            div10d_beat1: Self::create_param("1/16D Beat 1".to_string(), 0.0),
+            div10d_beat2: Self::create_param("1/16D Beat 2".to_string(), 0.0),
+            div10d_beat3: Self::create_param("1/16D Beat 3".to_string(), 0.0),
+            div10d_beat4: Self::create_param("1/16D Beat 4".to_string(), 0.0),
+            div10d_beat5: Self::create_param("1/16D Beat 5".to_string(), 0.0),
+            div10d_beat6: Self::create_param("1/16D Beat 6".to_string(), 0.0),
+            div10d_beat7: Self::create_param("1/16D Beat 7".to_string(), 0.0),
+            div10d_beat8: Self::create_param("1/16D Beat 8".to_string(), 0.0),
+            div10d_beat9: Self::create_param("1/16D Beat 9".to_string(), 0.0),
+            div10d_beat10: Self::create_param("1/16D Beat 10".to_string(), 0.0),
+
+            div21d_beat1: Self::create_param("1/32D Beat 1".to_string(), 0.0),
+            div21d_beat2: Self::create_param("1/32D Beat 2".to_string(), 0.0),
+            div21d_beat3: Self::create_param("1/32D Beat 3".to_string(), 0.0),
+            div21d_beat4: Self::create_param("1/32D Beat 4".to_string(), 0.0),
+            div21d_beat5: Self::create_param("1/32D Beat 5".to_string(), 0.0),
+            div21d_beat6: Self::create_param("1/32D Beat 6".to_string(), 0.0),
+            div21d_beat7: Self::create_param("1/32D Beat 7".to_string(), 0.0),
+            div21d_beat8: Self::create_param("1/32D Beat 8".to_string(), 0.0),
+            div21d_beat9: Self::create_param("1/32D Beat 9".to_string(), 0.0),
+            div21d_beat10: Self::create_param("1/32D Beat 10".to_string(), 0.0),
+            div21d_beat11: Self::create_param("1/32D Beat 11".to_string(), 0.0),
+            div21d_beat12: Self::create_param("1/32D Beat 12".to_string(), 0.0),
+            div21d_beat13: Self::create_param("1/32D Beat 13".to_string(), 0.0),
+            div21d_beat14: Self::create_param("1/32D Beat 14".to_string(), 0.0),
+            div21d_beat15: Self::create_param("1/32D Beat 15".to_string(), 0.0),
+            div21d_beat16: Self::create_param("1/32D Beat 16".to_string(), 0.0),
+            div21d_beat17: Self::create_param("1/32D Beat 17".to_string(), 0.0),
+            div21d_beat18: Self::create_param("1/32D Beat 18".to_string(), 0.0),
+            div21d_beat19: Self::create_param("1/32D Beat 19".to_string(), 0.0),
+            div21d_beat20: Self::create_param("1/32D Beat 20".to_string(), 0.0),
+            div21d_beat21: Self::create_param("1/32D Beat 21".to_string(), 0.0),
         }
     }
 }
