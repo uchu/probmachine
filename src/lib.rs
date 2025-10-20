@@ -181,7 +181,7 @@ impl Plugin for Device {
                                                 ui.add_space(2.0);
                                                 for i in 0..num_sliders {
                                                     ui.vertical(|ui| {
-                                                        let param = params.get_slider_param(i);
+                                                        let param = params.get_division_param(num_sliders, i);
                                                         let mut value =
                                                             param.modulated_plain_value();
                                                         ui.style_mut().spacing.slider_width = 250.0;
