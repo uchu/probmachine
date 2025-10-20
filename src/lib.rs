@@ -173,9 +173,13 @@ impl Plugin for Device {
                                             ui.set_max_width(738.0);
                                             ui.add_space(24.0);
 
+                                            let num_sliders = ui.memory_mut(|mem| {
+                                                *mem.data.get_temp_mut_or(egui::Id::new("num_sliders"), NUM_SLIDERS)
+                                            });
+
                                             ui.horizontal_top(|ui| {
-                                                ui.add_space(3.0);
-                                                for i in 0..NUM_SLIDERS {
+                                                ui.add_space(2.0);
+                                                for i in 0..num_sliders {
                                                     ui.vertical(|ui| {
                                                         let param = params.get_slider_param(i);
                                                         let mut value =
@@ -205,32 +209,44 @@ impl Plugin for Device {
                                                         }
                                                     });
 
-                                                    let space = match NUM_SLIDERS {
+                                                    let space = match num_sliders {
                                                         1 => 0.0,
-                                                        2 => 200.0,
-                                                        4 => 152.5,
-                                                        8 => 63.3,
-                                                        16 => 20.0,
-                                                        32 => 10.0,
+                                                        2 => 332.0,
+                                                        4 => 153.0,
+                                                        8 => 63.5,
+                                                        16 => 18.75,
+                                                        32 => -3.63,
                                                         _ => 0.0,
                                                     };
                                                     ui.add_space(space);
                                                 }
                                             });
                                         });
-                                        ui.horizontal(|ui| {
-                                            ui.label("v0.1.0");
-                                            ui.separator();
-                                            ui.label("Device Audio");
-                                        });
                                     });
                             });
 
                             tui.ui(|ui| {
+                                ui.add_space(16.0);
                                 ui.horizontal(|ui| {
-                                    ui.label("v0.1.0");
-                                    ui.separator();
-                                    ui.label("Device Audio");
+                                    let num_sliders = ui.memory_mut(|mem| {
+                                        *mem.data.get_temp_mut_or(egui::Id::new("num_sliders"), NUM_SLIDERS)
+                                    });
+
+                                    let divisions = [(1, "1/1"), (2, "1/2"), (4, "1/4"), (8, "1/8"), (16, "1/16"), (32, "1/32")];
+
+                                    for (count, label) in divisions.iter() {
+                                        let button = egui::Button::new(
+                                            egui::RichText::new(*label).size(16.0)
+                                        )
+                                        .min_size(egui::vec2(60.0, 32.0))
+                                        .selected(num_sliders == *count);
+
+                                        if ui.add(button).clicked() {
+                                            ui.memory_mut(|mem| {
+                                                mem.data.insert_temp(egui::Id::new("num_sliders"), *count);
+                                            });
+                                        }
+                                    }
                                 });
                             });
                         });
