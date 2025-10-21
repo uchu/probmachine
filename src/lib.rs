@@ -214,11 +214,11 @@ impl Plugin for Device {
                                                         BeatMode::Dotted => {
                                                             let dotted_duration = match num_sliders
                                                             {
-                                                                1 => 24.0,
-                                                                2 => 12.0,
-                                                                5 => 6.0,
-                                                                10 => 3.0,
-                                                                21 => 1.5,
+                                                                2 => 24.0,
+                                                                3 => 12.0,
+                                                                6 => 6.0,
+                                                                11 => 3.0,
+                                                                22 => 1.5,
                                                                 _ => panic!(
                                                                     "Invalid dotted division: {}",
                                                                     num_sliders
@@ -231,9 +231,7 @@ impl Plugin for Device {
                                                     let current_x = ui.cursor().min.x - 31.0;
                                                     let space_needed = target_x - current_x;
 
-
-                                                        ui.add_space(space_needed);
-
+                                                    ui.add_space(space_needed);
 
                                                     ui.vertical(|ui| {
                                                         let param = params.get_division_param(
@@ -267,32 +265,6 @@ impl Plugin for Device {
                                                             setter.end_set_parameter(param);
                                                         }
                                                     });
-
-                                                    // let space = match (beat_mode, num_sliders) {
-                                                    //     (_, 1) => 0.0,
-                                                    //     (BeatMode::Straight, 2) => 332.0,
-                                                    //     (BeatMode::Dotted, 2) => 440.0,
-                                                    //     (_, 3) => 215.0,
-                                                    //     (_, 4) => 153.0,
-                                                    //     (_, 5) => 121.0,
-                                                    //     (_, 6) => 92.0,
-                                                    //     (_, 8) => 63.5,
-                                                    //     (_, 10) => 46.0,
-                                                    //     (_, 12) => 33.5,
-                                                    //     (_, 16) => 18.75,
-                                                    //     (_, 21) => 7.5,
-                                                    //     (_, 24) => 3.4,
-                                                    //     (_, 32) => -3.63,
-                                                    //     _ => {
-                                                    //         panic!(
-                                                    //             "Invalid division: {}",
-                                                    //             num_sliders
-                                                    //         )
-                                                    //     }
-                                                    // };
-                                                    // if i < num_sliders - 1 {
-                                                    //     ui.add_space(space);
-                                                    // }
                                                 }
                                             });
                                         });

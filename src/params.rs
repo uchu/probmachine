@@ -250,88 +250,98 @@ pub struct DeviceParams {
     #[id = "div24t_beat24"]
     pub div24t_beat24: FloatParam,
 
-    #[id = "div1d_beat1"]
-    pub div1d_beat1: FloatParam,
-
     #[id = "div2d_beat1"]
     pub div2d_beat1: FloatParam,
     #[id = "div2d_beat2"]
     pub div2d_beat2: FloatParam,
 
-    #[id = "div5d_beat1"]
-    pub div5d_beat1: FloatParam,
-    #[id = "div5d_beat2"]
-    pub div5d_beat2: FloatParam,
-    #[id = "div5d_beat3"]
-    pub div5d_beat3: FloatParam,
-    #[id = "div5d_beat4"]
-    pub div5d_beat4: FloatParam,
-    #[id = "div5d_beat5"]
-    pub div5d_beat5: FloatParam,
+    #[id = "div3d_beat1"]
+    pub div3d_beat1: FloatParam,
+    #[id = "div3d_beat2"]
+    pub div3d_beat2: FloatParam,
+    #[id = "div3d_beat3"]
+    pub div3d_beat3: FloatParam,
 
-    #[id = "div10d_beat1"]
-    pub div10d_beat1: FloatParam,
-    #[id = "div10d_beat2"]
-    pub div10d_beat2: FloatParam,
-    #[id = "div10d_beat3"]
-    pub div10d_beat3: FloatParam,
-    #[id = "div10d_beat4"]
-    pub div10d_beat4: FloatParam,
-    #[id = "div10d_beat5"]
-    pub div10d_beat5: FloatParam,
-    #[id = "div10d_beat6"]
-    pub div10d_beat6: FloatParam,
-    #[id = "div10d_beat7"]
-    pub div10d_beat7: FloatParam,
-    #[id = "div10d_beat8"]
-    pub div10d_beat8: FloatParam,
-    #[id = "div10d_beat9"]
-    pub div10d_beat9: FloatParam,
-    #[id = "div10d_beat10"]
-    pub div10d_beat10: FloatParam,
+    #[id = "div6d_beat1"]
+    pub div6d_beat1: FloatParam,
+    #[id = "div6d_beat2"]
+    pub div6d_beat2: FloatParam,
+    #[id = "div6d_beat3"]
+    pub div6d_beat3: FloatParam,
+    #[id = "div6d_beat4"]
+    pub div6d_beat4: FloatParam,
+    #[id = "div6d_beat5"]
+    pub div6d_beat5: FloatParam,
+    #[id = "div6d_beat6"]
+    pub div6d_beat6: FloatParam,
 
-    #[id = "div21d_beat1"]
-    pub div21d_beat1: FloatParam,
-    #[id = "div21d_beat2"]
-    pub div21d_beat2: FloatParam,
-    #[id = "div21d_beat3"]
-    pub div21d_beat3: FloatParam,
-    #[id = "div21d_beat4"]
-    pub div21d_beat4: FloatParam,
-    #[id = "div21d_beat5"]
-    pub div21d_beat5: FloatParam,
-    #[id = "div21d_beat6"]
-    pub div21d_beat6: FloatParam,
-    #[id = "div21d_beat7"]
-    pub div21d_beat7: FloatParam,
-    #[id = "div21d_beat8"]
-    pub div21d_beat8: FloatParam,
-    #[id = "div21d_beat9"]
-    pub div21d_beat9: FloatParam,
-    #[id = "div21d_beat10"]
-    pub div21d_beat10: FloatParam,
-    #[id = "div21d_beat11"]
-    pub div21d_beat11: FloatParam,
-    #[id = "div21d_beat12"]
-    pub div21d_beat12: FloatParam,
-    #[id = "div21d_beat13"]
-    pub div21d_beat13: FloatParam,
-    #[id = "div21d_beat14"]
-    pub div21d_beat14: FloatParam,
-    #[id = "div21d_beat15"]
-    pub div21d_beat15: FloatParam,
-    #[id = "div21d_beat16"]
-    pub div21d_beat16: FloatParam,
-    #[id = "div21d_beat17"]
-    pub div21d_beat17: FloatParam,
-    #[id = "div21d_beat18"]
-    pub div21d_beat18: FloatParam,
-    #[id = "div21d_beat19"]
-    pub div21d_beat19: FloatParam,
-    #[id = "div21d_beat20"]
-    pub div21d_beat20: FloatParam,
-    #[id = "div21d_beat21"]
-    pub div21d_beat21: FloatParam,
+    #[id = "div11d_beat1"]
+    pub div11d_beat1: FloatParam,
+    #[id = "div11d_beat2"]
+    pub div11d_beat2: FloatParam,
+    #[id = "div11d_beat3"]
+    pub div11d_beat3: FloatParam,
+    #[id = "div11d_beat4"]
+    pub div11d_beat4: FloatParam,
+    #[id = "div11d_beat5"]
+    pub div11d_beat5: FloatParam,
+    #[id = "div11d_beat6"]
+    pub div11d_beat6: FloatParam,
+    #[id = "div11d_beat7"]
+    pub div11d_beat7: FloatParam,
+    #[id = "div11d_beat8"]
+    pub div11d_beat8: FloatParam,
+    #[id = "div11d_beat9"]
+    pub div11d_beat9: FloatParam,
+    #[id = "div11d_beat10"]
+    pub div11d_beat10: FloatParam,
+    #[id = "div11d_beat11"]
+    pub div11d_beat11: FloatParam,
+
+    #[id = "div22d_beat1"]
+    pub div22d_beat1: FloatParam,
+    #[id = "div22d_beat2"]
+    pub div22d_beat2: FloatParam,
+    #[id = "div22d_beat3"]
+    pub div22d_beat3: FloatParam,
+    #[id = "div22d_beat4"]
+    pub div22d_beat4: FloatParam,
+    #[id = "div22d_beat5"]
+    pub div22d_beat5: FloatParam,
+    #[id = "div22d_beat6"]
+    pub div22d_beat6: FloatParam,
+    #[id = "div22d_beat7"]
+    pub div22d_beat7: FloatParam,
+    #[id = "div22d_beat8"]
+    pub div22d_beat8: FloatParam,
+    #[id = "div22d_beat9"]
+    pub div22d_beat9: FloatParam,
+    #[id = "div22d_beat10"]
+    pub div22d_beat10: FloatParam,
+    #[id = "div22d_beat11"]
+    pub div22d_beat11: FloatParam,
+    #[id = "div22d_beat12"]
+    pub div22d_beat12: FloatParam,
+    #[id = "div22d_beat13"]
+    pub div22d_beat13: FloatParam,
+    #[id = "div22d_beat14"]
+    pub div22d_beat14: FloatParam,
+    #[id = "div22d_beat15"]
+    pub div22d_beat15: FloatParam,
+    #[id = "div22d_beat16"]
+    pub div22d_beat16: FloatParam,
+    #[id = "div22d_beat17"]
+    pub div22d_beat17: FloatParam,
+    #[id = "div22d_beat18"]
+    pub div22d_beat18: FloatParam,
+    #[id = "div22d_beat19"]
+    pub div22d_beat19: FloatParam,
+    #[id = "div22d_beat20"]
+    pub div22d_beat20: FloatParam,
+    #[id = "div22d_beat21"]
+    pub div22d_beat21: FloatParam,
+    #[id = "div22d_beat22"]
+    pub div22d_beat22: FloatParam,
 }
 
 impl DeviceParams {
@@ -482,58 +492,63 @@ impl DeviceParams {
                 _ => panic!("Invalid beat count {} for Triplet mode", beat_count),
             },
             BeatMode::Dotted => match beat_count {
-                1 => match beat_index {
-                    0 => &self.div1d_beat1,
-                    _ => panic!("Invalid beat index {} for 1/2D", beat_index),
-                },
                 2 => match beat_index {
                     0 => &self.div2d_beat1,
                     1 => &self.div2d_beat2,
+                    _ => panic!("Invalid beat index {} for 1/2D", beat_index),
+                },
+                3 => match beat_index {
+                    0 => &self.div3d_beat1,
+                    1 => &self.div3d_beat2,
+                    2 => &self.div3d_beat3,
                     _ => panic!("Invalid beat index {} for 1/4D", beat_index),
                 },
-                5 => match beat_index {
-                    0 => &self.div5d_beat1,
-                    1 => &self.div5d_beat2,
-                    2 => &self.div5d_beat3,
-                    3 => &self.div5d_beat4,
-                    4 => &self.div5d_beat5,
+                6 => match beat_index {
+                    0 => &self.div6d_beat1,
+                    1 => &self.div6d_beat2,
+                    2 => &self.div6d_beat3,
+                    3 => &self.div6d_beat4,
+                    4 => &self.div6d_beat5,
+                    5 => &self.div6d_beat6,
                     _ => panic!("Invalid beat index {} for 1/8D", beat_index),
                 },
-                10 => match beat_index {
-                    0 => &self.div10d_beat1,
-                    1 => &self.div10d_beat2,
-                    2 => &self.div10d_beat3,
-                    3 => &self.div10d_beat4,
-                    4 => &self.div10d_beat5,
-                    5 => &self.div10d_beat6,
-                    6 => &self.div10d_beat7,
-                    7 => &self.div10d_beat8,
-                    8 => &self.div10d_beat9,
-                    9 => &self.div10d_beat10,
+                11 => match beat_index {
+                    0 => &self.div11d_beat1,
+                    1 => &self.div11d_beat2,
+                    2 => &self.div11d_beat3,
+                    3 => &self.div11d_beat4,
+                    4 => &self.div11d_beat5,
+                    5 => &self.div11d_beat6,
+                    6 => &self.div11d_beat7,
+                    7 => &self.div11d_beat8,
+                    8 => &self.div11d_beat9,
+                    9 => &self.div11d_beat10,
+                    10 => &self.div11d_beat11,
                     _ => panic!("Invalid beat index {} for 1/16D", beat_index),
                 },
-                21 => match beat_index {
-                    0 => &self.div21d_beat1,
-                    1 => &self.div21d_beat2,
-                    2 => &self.div21d_beat3,
-                    3 => &self.div21d_beat4,
-                    4 => &self.div21d_beat5,
-                    5 => &self.div21d_beat6,
-                    6 => &self.div21d_beat7,
-                    7 => &self.div21d_beat8,
-                    8 => &self.div21d_beat9,
-                    9 => &self.div21d_beat10,
-                    10 => &self.div21d_beat11,
-                    11 => &self.div21d_beat12,
-                    12 => &self.div21d_beat13,
-                    13 => &self.div21d_beat14,
-                    14 => &self.div21d_beat15,
-                    15 => &self.div21d_beat16,
-                    16 => &self.div21d_beat17,
-                    17 => &self.div21d_beat18,
-                    18 => &self.div21d_beat19,
-                    19 => &self.div21d_beat20,
-                    20 => &self.div21d_beat21,
+                22 => match beat_index {
+                    0 => &self.div22d_beat1,
+                    1 => &self.div22d_beat2,
+                    2 => &self.div22d_beat3,
+                    3 => &self.div22d_beat4,
+                    4 => &self.div22d_beat5,
+                    5 => &self.div22d_beat6,
+                    6 => &self.div22d_beat7,
+                    7 => &self.div22d_beat8,
+                    8 => &self.div22d_beat9,
+                    9 => &self.div22d_beat10,
+                    10 => &self.div22d_beat11,
+                    11 => &self.div22d_beat12,
+                    12 => &self.div22d_beat13,
+                    13 => &self.div22d_beat14,
+                    14 => &self.div22d_beat15,
+                    15 => &self.div22d_beat16,
+                    16 => &self.div22d_beat17,
+                    17 => &self.div22d_beat18,
+                    18 => &self.div22d_beat19,
+                    19 => &self.div22d_beat20,
+                    20 => &self.div22d_beat21,
+                    21 => &self.div22d_beat22,
                     _ => panic!("Invalid beat index {} for 1/32D", beat_index),
                 },
                 _ => panic!("Invalid beat count {} for Dotted mode", beat_count),
@@ -558,11 +573,11 @@ impl DeviceParams {
                 (24, "1/16"),
             ],
             BeatMode::Dotted => &[
-                (1, "1/2"),
-                (2, "1/4"),
-                (5, "1/8"),
-                (10, "1/16"),
-                (21, "1/32"),
+                (2, "1/2"),
+                (3, "1/4"),
+                (6, "1/8"),
+                (11, "1/16"),
+                (22, "1/32"),
             ],
         }
     }
@@ -575,9 +590,9 @@ impl DeviceParams {
 
     pub fn get_default_beat_count(mode: BeatMode) -> usize {
         match mode {
-            BeatMode::Straight => 4,
+            BeatMode::Straight => 8,
             BeatMode::Triplet => 6,
-            BeatMode::Dotted => 2,
+            BeatMode::Dotted => 6,
         }
     }
 
@@ -710,49 +725,54 @@ impl Default for DeviceParams {
             div24t_beat23: Self::create_param("1/16T Beat 23".to_string(), 0.0),
             div24t_beat24: Self::create_param("1/16T Beat 24".to_string(), 0.0),
 
-            div1d_beat1: Self::create_param("1/2D Beat 1".to_string(), 0.0),
+            div2d_beat1: Self::create_param("1/2D Beat 1".to_string(), 0.0),
+            div2d_beat2: Self::create_param("1/2D Beat 2".to_string(), 0.0),
 
-            div2d_beat1: Self::create_param("1/4D Beat 1".to_string(), 0.0),
-            div2d_beat2: Self::create_param("1/4D Beat 2".to_string(), 0.0),
+            div3d_beat1: Self::create_param("1/4D Beat 1".to_string(), 0.0),
+            div3d_beat2: Self::create_param("1/4D Beat 2".to_string(), 0.0),
+            div3d_beat3: Self::create_param("1/4D Beat 3".to_string(), 0.0),
 
-            div5d_beat1: Self::create_param("1/8D Beat 1".to_string(), 0.0),
-            div5d_beat2: Self::create_param("1/8D Beat 2".to_string(), 0.0),
-            div5d_beat3: Self::create_param("1/8D Beat 3".to_string(), 0.0),
-            div5d_beat4: Self::create_param("1/8D Beat 4".to_string(), 0.0),
-            div5d_beat5: Self::create_param("1/8D Beat 5".to_string(), 0.0),
+            div6d_beat1: Self::create_param("1/8D Beat 1".to_string(), 0.0),
+            div6d_beat2: Self::create_param("1/8D Beat 2".to_string(), 0.0),
+            div6d_beat3: Self::create_param("1/8D Beat 3".to_string(), 0.0),
+            div6d_beat4: Self::create_param("1/8D Beat 4".to_string(), 0.0),
+            div6d_beat5: Self::create_param("1/8D Beat 5".to_string(), 0.0),
+            div6d_beat6: Self::create_param("1/8D Beat 6".to_string(), 0.0),
 
-            div10d_beat1: Self::create_param("1/16D Beat 1".to_string(), 0.0),
-            div10d_beat2: Self::create_param("1/16D Beat 2".to_string(), 0.0),
-            div10d_beat3: Self::create_param("1/16D Beat 3".to_string(), 0.0),
-            div10d_beat4: Self::create_param("1/16D Beat 4".to_string(), 0.0),
-            div10d_beat5: Self::create_param("1/16D Beat 5".to_string(), 0.0),
-            div10d_beat6: Self::create_param("1/16D Beat 6".to_string(), 0.0),
-            div10d_beat7: Self::create_param("1/16D Beat 7".to_string(), 0.0),
-            div10d_beat8: Self::create_param("1/16D Beat 8".to_string(), 0.0),
-            div10d_beat9: Self::create_param("1/16D Beat 9".to_string(), 0.0),
-            div10d_beat10: Self::create_param("1/16D Beat 10".to_string(), 0.0),
+            div11d_beat1: Self::create_param("1/16D Beat 1".to_string(), 0.0),
+            div11d_beat2: Self::create_param("1/16D Beat 2".to_string(), 0.0),
+            div11d_beat3: Self::create_param("1/16D Beat 3".to_string(), 0.0),
+            div11d_beat4: Self::create_param("1/16D Beat 4".to_string(), 0.0),
+            div11d_beat5: Self::create_param("1/16D Beat 5".to_string(), 0.0),
+            div11d_beat6: Self::create_param("1/16D Beat 6".to_string(), 0.0),
+            div11d_beat7: Self::create_param("1/16D Beat 7".to_string(), 0.0),
+            div11d_beat8: Self::create_param("1/16D Beat 8".to_string(), 0.0),
+            div11d_beat9: Self::create_param("1/16D Beat 9".to_string(), 0.0),
+            div11d_beat10: Self::create_param("1/16D Beat 10".to_string(), 0.0),
+            div11d_beat11: Self::create_param("1/16D Beat 11".to_string(), 0.0),
 
-            div21d_beat1: Self::create_param("1/32D Beat 1".to_string(), 0.0),
-            div21d_beat2: Self::create_param("1/32D Beat 2".to_string(), 0.0),
-            div21d_beat3: Self::create_param("1/32D Beat 3".to_string(), 0.0),
-            div21d_beat4: Self::create_param("1/32D Beat 4".to_string(), 0.0),
-            div21d_beat5: Self::create_param("1/32D Beat 5".to_string(), 0.0),
-            div21d_beat6: Self::create_param("1/32D Beat 6".to_string(), 0.0),
-            div21d_beat7: Self::create_param("1/32D Beat 7".to_string(), 0.0),
-            div21d_beat8: Self::create_param("1/32D Beat 8".to_string(), 0.0),
-            div21d_beat9: Self::create_param("1/32D Beat 9".to_string(), 0.0),
-            div21d_beat10: Self::create_param("1/32D Beat 10".to_string(), 0.0),
-            div21d_beat11: Self::create_param("1/32D Beat 11".to_string(), 0.0),
-            div21d_beat12: Self::create_param("1/32D Beat 12".to_string(), 0.0),
-            div21d_beat13: Self::create_param("1/32D Beat 13".to_string(), 0.0),
-            div21d_beat14: Self::create_param("1/32D Beat 14".to_string(), 0.0),
-            div21d_beat15: Self::create_param("1/32D Beat 15".to_string(), 0.0),
-            div21d_beat16: Self::create_param("1/32D Beat 16".to_string(), 0.0),
-            div21d_beat17: Self::create_param("1/32D Beat 17".to_string(), 0.0),
-            div21d_beat18: Self::create_param("1/32D Beat 18".to_string(), 0.0),
-            div21d_beat19: Self::create_param("1/32D Beat 19".to_string(), 0.0),
-            div21d_beat20: Self::create_param("1/32D Beat 20".to_string(), 0.0),
-            div21d_beat21: Self::create_param("1/32D Beat 21".to_string(), 0.0),
+            div22d_beat1: Self::create_param("1/32D Beat 1".to_string(), 0.0),
+            div22d_beat2: Self::create_param("1/32D Beat 2".to_string(), 0.0),
+            div22d_beat3: Self::create_param("1/32D Beat 3".to_string(), 0.0),
+            div22d_beat4: Self::create_param("1/32D Beat 4".to_string(), 0.0),
+            div22d_beat5: Self::create_param("1/32D Beat 5".to_string(), 0.0),
+            div22d_beat6: Self::create_param("1/32D Beat 6".to_string(), 0.0),
+            div22d_beat7: Self::create_param("1/32D Beat 7".to_string(), 0.0),
+            div22d_beat8: Self::create_param("1/32D Beat 8".to_string(), 0.0),
+            div22d_beat9: Self::create_param("1/32D Beat 9".to_string(), 0.0),
+            div22d_beat10: Self::create_param("1/32D Beat 10".to_string(), 0.0),
+            div22d_beat11: Self::create_param("1/32D Beat 11".to_string(), 0.0),
+            div22d_beat12: Self::create_param("1/32D Beat 12".to_string(), 0.0),
+            div22d_beat13: Self::create_param("1/32D Beat 13".to_string(), 0.0),
+            div22d_beat14: Self::create_param("1/32D Beat 14".to_string(), 0.0),
+            div22d_beat15: Self::create_param("1/32D Beat 15".to_string(), 0.0),
+            div22d_beat16: Self::create_param("1/32D Beat 16".to_string(), 0.0),
+            div22d_beat17: Self::create_param("1/32D Beat 17".to_string(), 0.0),
+            div22d_beat18: Self::create_param("1/32D Beat 18".to_string(), 0.0),
+            div22d_beat19: Self::create_param("1/32D Beat 19".to_string(), 0.0),
+            div22d_beat20: Self::create_param("1/32D Beat 20".to_string(), 0.0),
+            div22d_beat21: Self::create_param("1/32D Beat 21".to_string(), 0.0),
+            div22d_beat22: Self::create_param("1/32D Beat 22".to_string(), 0.0),
         }
     }
 }
