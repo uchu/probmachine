@@ -154,7 +154,7 @@ impl Plugin for Device {
                                         let painter = ui.painter();
                                         let container_width = 738.0;
                                         let num_v_grid_positions = 33;
-                                        let slider_width = 22.0;
+                                        let slider_width = container_width / 33.0;
 
                                         for i in 0..num_v_grid_positions {
                                             let x = container_rect.min.x
@@ -203,8 +203,38 @@ impl Plugin for Device {
                                             ui.add_space(10.0);
 
                                             ui.horizontal_top(|ui| {
-                                                ui.add_space(2.0);
                                                 for i in 0..num_sliders {
+                                                    let grid_pos = match beat_mode {
+                                                        BeatMode::Straight => {
+                                                            i as f32 * (32.0 / num_sliders as f32)
+                                                        }
+                                                        BeatMode::Triplet => {
+                                                            i as f32 * (32.0 / num_sliders as f32)
+                                                        }
+                                                        BeatMode::Dotted => {
+                                                            let dotted_duration = match num_sliders
+                                                            {
+                                                                1 => 24.0,
+                                                                2 => 12.0,
+                                                                5 => 6.0,
+                                                                10 => 3.0,
+                                                                21 => 1.5,
+                                                                _ => panic!(
+                                                                    "Invalid dotted division: {}",
+                                                                    num_sliders
+                                                                ),
+                                                            };
+                                                            i as f32 * dotted_duration
+                                                        }
+                                                    };
+                                                    let target_x = grid_pos * slider_width;
+                                                    let current_x = ui.cursor().min.x - 31.0;
+                                                    let space_needed = target_x - current_x;
+
+
+                                                        ui.add_space(space_needed);
+
+
                                                     ui.vertical(|ui| {
                                                         let param = params.get_division_param(
                                                             beat_mode,
@@ -237,38 +267,6 @@ impl Plugin for Device {
                                                             setter.end_set_parameter(param);
                                                         }
                                                     });
-
-                                                    let grid_pos = match beat_mode {
-                                                        BeatMode::Straight => {
-                                                            i as f32 * (32.0 / num_sliders as f32)
-                                                        }
-                                                        BeatMode::Triplet => {
-                                                            i as f32 * (32.0 / num_sliders as f32)
-                                                        }
-                                                        BeatMode::Dotted => {
-                                                            let dotted_duration = match num_sliders
-                                                            {
-                                                                1 => 24.0,
-                                                                2 => 12.0,
-                                                                5 => 6.0,
-                                                                10 => 3.0,
-                                                                21 => 1.5,
-                                                                _ => panic!(
-                                                                    "Invalid dotted division: {}",
-                                                                    num_sliders
-                                                                ),
-                                                            };
-                                                            i as f32 * dotted_duration
-                                                        }
-                                                    };
-
-                                                    let target_x = grid_pos * slider_width;
-                                                    let current_x = ui.cursor().min.x;
-                                                    let space_needed = target_x - current_x + 2.0;
-
-                                                    if space_needed > 0.0 {
-                                                        ui.add_space(space_needed);
-                                                    }
 
                                                     // let space = match (beat_mode, num_sliders) {
                                                     //     (_, 1) => 0.0,
