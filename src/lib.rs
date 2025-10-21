@@ -7,7 +7,7 @@ use egui_taffy::taffy::{
 use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
 use nih_plug::prelude::*;
 use nih_plug_egui::egui::style::HandleShape;
-use nih_plug_egui::egui::{Color32};
+use nih_plug_egui::egui::Color32;
 use nih_plug_egui::{create_egui_editor, egui};
 use params::{BeatMode, DeviceParams};
 use std::sync::Arc;
@@ -113,18 +113,13 @@ impl Plugin for Device {
                                         egui::Id::new("beat_mode"),
                                         BeatMode::Straight,
                                     );
-                                    let mut sliders = *mem.data.get_temp_mut_or(
-                                        egui::Id::new("num_sliders"),
-                                        NUM_SLIDERS,
-                                    );
+                                    let mut sliders = *mem
+                                        .data
+                                        .get_temp_mut_or(egui::Id::new("num_sliders"), NUM_SLIDERS);
 
-                                    if !DeviceParams::is_valid_beat_count(mode, sliders)
-                                    {
+                                    if !DeviceParams::is_valid_beat_count(mode, sliders) {
                                         sliders = DeviceParams::get_default_beat_count(mode);
-                                        mem.data.insert_temp(
-                                            egui::Id::new("num_sliders"),
-                                            sliders,
-                                        );
+                                        mem.data.insert_temp(egui::Id::new("num_sliders"), sliders);
                                     }
 
                                     (mode, sliders)
@@ -142,133 +137,169 @@ impl Plugin for Device {
                                 align_items: Some(AlignItems::Stretch),
                                 ..Default::default()
                             })
-                                .ui(|ui| {
-                                    ui.set_min_size(egui::vec2(742.0, container_height));
-                                    ui.set_max_width(742.0);
+                            .ui(|ui| {
+                                ui.set_min_size(egui::vec2(742.0, container_height));
+                                ui.set_max_width(742.0);
 
-                                    egui::Frame::default()
-                                        .fill(ui.visuals().extreme_bg_color)
-                                        .inner_margin(frame_margin)
-                                        .stroke(egui::Stroke::new(
-                                            1.0,
-                                            ui.visuals().window_stroke.color,
-                                        ))
-                                        .corner_radius(15.0)
-                                        .show(ui, |ui| {
-                                            let container_rect = ui.available_rect_before_wrap();
-                                            let painter = ui.painter();
-                                            let container_width = 738.0;
-                                            let num_v_grid_positions = 33;
-                                            let slider_width =
-                                                container_width / num_v_grid_positions as f32;
+                                egui::Frame::default()
+                                    .fill(ui.visuals().extreme_bg_color)
+                                    .inner_margin(frame_margin)
+                                    .stroke(egui::Stroke::new(
+                                        1.0,
+                                        ui.visuals().window_stroke.color,
+                                    ))
+                                    .corner_radius(15.0)
+                                    .show(ui, |ui| {
+                                        let container_rect = ui.available_rect_before_wrap();
+                                        let painter = ui.painter();
+                                        let container_width = 738.0;
+                                        let num_v_grid_positions = 33;
+                                        let slider_width = 22.0;
 
-                                            for i in 0..num_v_grid_positions {
-                                                let x = container_rect.min.x
-                                                    + i as f32 * slider_width
-                                                    + (slider_width / 2.0);
-                                                let line_num = i + 1;
+                                        for i in 0..num_v_grid_positions {
+                                            let x = container_rect.min.x
+                                                + i as f32 * slider_width
+                                                + (slider_width / 2.0);
+                                            let line_num = i + 1;
 
-                                                let color = if (line_num - 1) % 8 == 0 {
-                                                    Color32::from_rgb(40, 40, 40)
-                                                } else if line_num % 4 == 1 {
-                                                    Color32::from_rgb(25, 25, 25)
-                                                } else if line_num % 2 == 1 {
-                                                    Color32::from_rgb(20, 20, 20)
-                                                } else {
-                                                    Color32::from_rgb(15, 15, 15)
-                                                };
+                                            let color = if (line_num - 1) % 8 == 0 {
+                                                Color32::from_rgb(40, 40, 40)
+                                            } else if line_num % 4 == 1 {
+                                                Color32::from_rgb(25, 25, 25)
+                                            } else if line_num % 2 == 1 {
+                                                Color32::from_rgb(20, 20, 20)
+                                            } else {
+                                                Color32::from_rgb(15, 15, 15)
+                                            };
 
-                                                painter.line_segment(
-                                                    [
-                                                        egui::pos2(x, container_rect.min.y),
-                                                        egui::pos2(x, container_rect.max.y),
-                                                    ],
-                                                    egui::Stroke::new(1.0, color),
-                                                );
-                                            }
+                                            painter.line_segment(
+                                                [
+                                                    egui::pos2(x, container_rect.min.y),
+                                                    egui::pos2(x, container_rect.max.y),
+                                                ],
+                                                egui::Stroke::new(1.0, color),
+                                            );
+                                        }
 
-                                            for i in 0..5 {
-                                                let y = container_rect.min.y + 10.0 + i as f32 * (container_height - 20.0) / 4.0;
-                                                painter.line_segment(
-                                                    [
-                                                        egui::pos2(container_rect.min.x, y),
-                                                        egui::pos2(container_rect.max.x, y),
-                                                    ],
-                                                    egui::Stroke::new(1.0, Color32::from_rgb(20, 20, 20)),
-                                                );
-                                            }
+                                        for i in 0..5 {
+                                            let y = container_rect.min.y
+                                                + 10.0
+                                                + i as f32 * (container_height - 20.0) / 4.0;
+                                            painter.line_segment(
+                                                [
+                                                    egui::pos2(container_rect.min.x, y),
+                                                    egui::pos2(container_rect.max.x, y),
+                                                ],
+                                                egui::Stroke::new(
+                                                    1.0,
+                                                    Color32::from_rgb(20, 20, 20),
+                                                ),
+                                            );
+                                        }
 
-                                            ui.vertical(|ui| {
-                                                ui.set_min_size(egui::vec2(738.0, container_height));
-                                                ui.set_max_width(738.0);
-                                                ui.add_space(10.0);
+                                        ui.vertical(|ui| {
+                                            ui.set_min_size(egui::vec2(738.0, container_height));
+                                            ui.set_max_width(738.0);
+                                            ui.add_space(10.0);
 
-                                                ui.horizontal_top(|ui| {
-                                                    ui.add_space(2.0);
-                                                    for i in 0..num_sliders {
-                                                        ui.vertical(|ui| {
-                                                            let param = params.get_division_param(
-                                                                beat_mode,
-                                                                num_sliders,
-                                                                i,
-                                                            );
-                                                            let mut value =
-                                                                param.modulated_plain_value();
-                                                            ui.style_mut().spacing.slider_width = 256.0;
-                                                            ui.style_mut().spacing.slider_rail_height =
-                                                                9.0;
-                                                            if ui
-                                                                .add(
-                                                                    egui::Slider::new(
-                                                                        &mut value,
-                                                                        0.0..=127.0,
-                                                                    )
-                                                                        .vertical()
-                                                                        .trailing_fill(true)
-                                                                        .step_by(1.0)
-                                                                        .handle_shape(HandleShape::Rect {
-                                                                            aspect_ratio: 0.0,
-                                                                        })
-                                                                        .show_value(false),
+                                            ui.horizontal_top(|ui| {
+                                                ui.add_space(2.0);
+                                                for i in 0..num_sliders {
+                                                    ui.vertical(|ui| {
+                                                        let param = params.get_division_param(
+                                                            beat_mode,
+                                                            num_sliders,
+                                                            i,
+                                                        );
+                                                        let mut value =
+                                                            param.modulated_plain_value();
+                                                        ui.style_mut().spacing.slider_width = 256.0;
+                                                        ui.style_mut().spacing.slider_rail_height =
+                                                            9.0;
+                                                        if ui
+                                                            .add(
+                                                                egui::Slider::new(
+                                                                    &mut value,
+                                                                    0.0..=127.0,
                                                                 )
-                                                                .changed()
-                                                            {
-                                                                setter.begin_set_parameter(param);
-                                                                setter.set_parameter(param, value);
-                                                                setter.end_set_parameter(param);
-                                                            }
-                                                        });
-
-                                                        let space = match (beat_mode, num_sliders) {
-                                                            (_, 1) => 0.0,
-                                                            (BeatMode::Straight, 2) => 332.0,
-                                                            (BeatMode::Dotted, 2) => 440.0,
-                                                            (_, 3) => 215.0,
-                                                            (_, 4) => 153.0,
-                                                            (_, 5) => 121.0,
-                                                            (_, 6) => 92.0,
-                                                            (_, 8) => 63.5,
-                                                            (_, 10) => 46.0,
-                                                            (_, 12) => 33.5,
-                                                            (_, 16) => 18.75,
-                                                            (_, 21) => 7.5,
-                                                            (_, 24) => 3.4,
-                                                            (_, 32) => -3.63,
-                                                            _ => {
-                                                                panic!(
-                                                                    "Invalid division: {}",
-                                                                    num_sliders
-                                                                )
-                                                            }
-                                                        };
-                                                        if i < num_sliders - 1 {
-                                                            ui.add_space(space);
+                                                                .vertical()
+                                                                .trailing_fill(true)
+                                                                .step_by(1.0)
+                                                                .handle_shape(HandleShape::Rect {
+                                                                    aspect_ratio: 0.0,
+                                                                })
+                                                                .show_value(false),
+                                                            )
+                                                            .changed()
+                                                        {
+                                                            setter.begin_set_parameter(param);
+                                                            setter.set_parameter(param, value);
+                                                            setter.end_set_parameter(param);
                                                         }
+                                                    });
+
+                                                    let grid_pos = match beat_mode {
+                                                        BeatMode::Straight => {
+                                                            i as f32 * (32.0 / num_sliders as f32)
+                                                        }
+                                                        BeatMode::Triplet => {
+                                                            i as f32 * (32.0 / num_sliders as f32)
+                                                        }
+                                                        BeatMode::Dotted => {
+                                                            let dotted_duration = match num_sliders
+                                                            {
+                                                                1 => 24.0,
+                                                                2 => 12.0,
+                                                                5 => 6.0,
+                                                                10 => 3.0,
+                                                                21 => 1.5,
+                                                                _ => panic!(
+                                                                    "Invalid dotted division: {}",
+                                                                    num_sliders
+                                                                ),
+                                                            };
+                                                            i as f32 * dotted_duration
+                                                        }
+                                                    };
+
+                                                    let target_x = grid_pos * slider_width;
+                                                    let current_x = ui.cursor().min.x;
+                                                    let space_needed = target_x - current_x + 2.0;
+
+                                                    if space_needed > 0.0 {
+                                                        ui.add_space(space_needed);
                                                     }
-                                                });
+
+                                                    // let space = match (beat_mode, num_sliders) {
+                                                    //     (_, 1) => 0.0,
+                                                    //     (BeatMode::Straight, 2) => 332.0,
+                                                    //     (BeatMode::Dotted, 2) => 440.0,
+                                                    //     (_, 3) => 215.0,
+                                                    //     (_, 4) => 153.0,
+                                                    //     (_, 5) => 121.0,
+                                                    //     (_, 6) => 92.0,
+                                                    //     (_, 8) => 63.5,
+                                                    //     (_, 10) => 46.0,
+                                                    //     (_, 12) => 33.5,
+                                                    //     (_, 16) => 18.75,
+                                                    //     (_, 21) => 7.5,
+                                                    //     (_, 24) => 3.4,
+                                                    //     (_, 32) => -3.63,
+                                                    //     _ => {
+                                                    //         panic!(
+                                                    //             "Invalid division: {}",
+                                                    //             num_sliders
+                                                    //         )
+                                                    //     }
+                                                    // };
+                                                    // if i < num_sliders - 1 {
+                                                    //     ui.add_space(space);
+                                                    // }
+                                                }
                                             });
                                         });
-                                });
+                                    });
+                            });
 
                             tui.ui(|ui| {
                                 ui.add_space(16.0);
@@ -297,8 +328,8 @@ impl Plugin for Device {
                                         let button = egui::Button::new(
                                             egui::RichText::new(button_label).size(16.0),
                                         )
-                                            .min_size(egui::vec2(60.0, 32.0))
-                                            .selected(num_sliders == *count);
+                                        .min_size(egui::vec2(60.0, 32.0))
+                                        .selected(num_sliders == *count);
 
                                         if ui.add(button).clicked() {
                                             ui.memory_mut(|mem| {
@@ -324,7 +355,8 @@ impl Plugin for Device {
                                             .min_size(egui::vec2(60.0, 32.0))
                                             .selected(beat_mode == BeatMode::Straight);
 
-                                    if ui.add(button_s).clicked() && beat_mode != BeatMode::Straight {
+                                    if ui.add(button_s).clicked() && beat_mode != BeatMode::Straight
+                                    {
                                         ui.memory_mut(|mem| {
                                             mem.data.insert_temp(
                                                 egui::Id::new("beat_mode"),
@@ -343,7 +375,8 @@ impl Plugin for Device {
                                             .min_size(egui::vec2(60.0, 32.0))
                                             .selected(beat_mode == BeatMode::Triplet);
 
-                                    if ui.add(button_t).clicked() && beat_mode != BeatMode::Triplet {
+                                    if ui.add(button_t).clicked() && beat_mode != BeatMode::Triplet
+                                    {
                                         ui.memory_mut(|mem| {
                                             mem.data.insert_temp(
                                                 egui::Id::new("beat_mode"),
