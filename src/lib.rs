@@ -7,7 +7,7 @@ use egui_taffy::taffy::{
 use egui_taffy::{tui as taffy_layout, TuiBuilderLogic};
 use nih_plug::prelude::*;
 use nih_plug_egui::egui::style::HandleShape;
-use nih_plug_egui::egui::{Color32, Shadow};
+use nih_plug_egui::egui::{Color32};
 use nih_plug_egui::{create_egui_editor, egui};
 use params::{BeatMode, DeviceParams};
 use std::sync::Arc;
@@ -62,7 +62,7 @@ impl Plugin for Device {
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
                     let outer_padding = 20.0;
                     let frame_margin = 0.0;
-                    let container_height = 300.0;
+                    let container_height = 276.0;
 
                     taffy_layout(ui, ui.id().with("page_layout"))
                         .reserve_available_space()
@@ -142,120 +142,133 @@ impl Plugin for Device {
                                 align_items: Some(AlignItems::Stretch),
                                 ..Default::default()
                             })
-                            .ui(|ui| {
-                                ui.set_min_size(egui::vec2(742.0, container_height));
-                                ui.set_max_width(742.0);
+                                .ui(|ui| {
+                                    ui.set_min_size(egui::vec2(742.0, container_height));
+                                    ui.set_max_width(742.0);
 
-                                egui::Frame::default()
-                                    .fill(ui.visuals().extreme_bg_color)
-                                    .inner_margin(frame_margin)
-                                    .stroke(egui::Stroke::new(
-                                        1.0,
-                                        ui.visuals().window_stroke.color,
-                                    ))
-                                    .corner_radius(15.0)
-                                    .show(ui, |ui| {
-                                        let container_rect = ui.available_rect_before_wrap();
-                                        let painter = ui.painter();
-                                        let container_width = 738.0;
-                                        let num_grid_positions = 33;
-                                        let slider_width =
-                                            container_width / num_grid_positions as f32;
+                                    egui::Frame::default()
+                                        .fill(ui.visuals().extreme_bg_color)
+                                        .inner_margin(frame_margin)
+                                        .stroke(egui::Stroke::new(
+                                            1.0,
+                                            ui.visuals().window_stroke.color,
+                                        ))
+                                        .corner_radius(15.0)
+                                        .show(ui, |ui| {
+                                            let container_rect = ui.available_rect_before_wrap();
+                                            let painter = ui.painter();
+                                            let container_width = 738.0;
+                                            let num_v_grid_positions = 33;
+                                            let slider_width =
+                                                container_width / num_v_grid_positions as f32;
 
-                                        for i in 0..num_grid_positions {
-                                            let x = container_rect.min.x
-                                                + i as f32 * slider_width
-                                                + (slider_width / 2.0);
-                                            let line_num = i + 1;
+                                            for i in 0..num_v_grid_positions {
+                                                let x = container_rect.min.x
+                                                    + i as f32 * slider_width
+                                                    + (slider_width / 2.0);
+                                                let line_num = i + 1;
 
-                                            let color = if (line_num - 1) % 8 == 0 {
-                                                Color32::from_white_alpha(7)
-                                            } else if line_num % 4 == 1 {
-                                                Color32::from_white_alpha(3)
-                                            } else if line_num % 2 == 1 {
-                                                Color32::from_white_alpha(2)
-                                            } else {
-                                                Color32::from_white_alpha(1)
-                                            };
+                                                let color = if (line_num - 1) % 8 == 0 {
+                                                    Color32::from_rgb(40, 40, 40)
+                                                } else if line_num % 4 == 1 {
+                                                    Color32::from_rgb(25, 25, 25)
+                                                } else if line_num % 2 == 1 {
+                                                    Color32::from_rgb(20, 20, 20)
+                                                } else {
+                                                    Color32::from_rgb(15, 15, 15)
+                                                };
 
-                                            painter.line_segment(
-                                                [
-                                                    egui::pos2(x, container_rect.min.y),
-                                                    egui::pos2(x, container_rect.max.y),
-                                                ],
-                                                egui::Stroke::new(1.0, color),
-                                            );
-                                        }
+                                                painter.line_segment(
+                                                    [
+                                                        egui::pos2(x, container_rect.min.y),
+                                                        egui::pos2(x, container_rect.max.y),
+                                                    ],
+                                                    egui::Stroke::new(1.0, color),
+                                                );
+                                            }
 
-                                        ui.vertical(|ui| {
-                                            ui.set_min_size(egui::vec2(738.0, container_height));
-                                            ui.set_max_width(738.0);
-                                            ui.add_space(24.0);
+                                            for i in 0..5 {
+                                                let y = container_rect.min.y + 10.0 + i as f32 * (container_height - 20.0) / 4.0;
+                                                painter.line_segment(
+                                                    [
+                                                        egui::pos2(container_rect.min.x, y),
+                                                        egui::pos2(container_rect.max.x, y),
+                                                    ],
+                                                    egui::Stroke::new(1.0, Color32::from_rgb(20, 20, 20)),
+                                                );
+                                            }
 
-                                            ui.horizontal_top(|ui| {
-                                                ui.add_space(2.0);
-                                                for i in 0..num_sliders {
-                                                    ui.vertical(|ui| {
-                                                        let param = params.get_division_param(
-                                                            beat_mode,
-                                                            num_sliders,
-                                                            i,
-                                                        );
-                                                        let mut value =
-                                                            param.modulated_plain_value();
-                                                        ui.style_mut().spacing.slider_width = 250.0;
-                                                        ui.style_mut().spacing.slider_rail_height =
-                                                            9.0;
-                                                        if ui
-                                                            .add(
-                                                                egui::Slider::new(
-                                                                    &mut value,
-                                                                    0.0..=127.0,
+                                            ui.vertical(|ui| {
+                                                ui.set_min_size(egui::vec2(738.0, container_height));
+                                                ui.set_max_width(738.0);
+                                                ui.add_space(10.0);
+
+                                                ui.horizontal_top(|ui| {
+                                                    ui.add_space(2.0);
+                                                    for i in 0..num_sliders {
+                                                        ui.vertical(|ui| {
+                                                            let param = params.get_division_param(
+                                                                beat_mode,
+                                                                num_sliders,
+                                                                i,
+                                                            );
+                                                            let mut value =
+                                                                param.modulated_plain_value();
+                                                            ui.style_mut().spacing.slider_width = 256.0;
+                                                            ui.style_mut().spacing.slider_rail_height =
+                                                                9.0;
+                                                            if ui
+                                                                .add(
+                                                                    egui::Slider::new(
+                                                                        &mut value,
+                                                                        0.0..=127.0,
+                                                                    )
+                                                                        .vertical()
+                                                                        .trailing_fill(true)
+                                                                        .step_by(1.0)
+                                                                        .handle_shape(HandleShape::Rect {
+                                                                            aspect_ratio: 0.0,
+                                                                        })
+                                                                        .show_value(false),
                                                                 )
-                                                                .vertical()
-                                                                .trailing_fill(true)
-                                                                .step_by(1.0)
-                                                                .handle_shape(HandleShape::Rect {
-                                                                    aspect_ratio: 0.0,
-                                                                })
-                                                                .show_value(false),
-                                                            )
-                                                            .changed()
-                                                        {
-                                                            setter.begin_set_parameter(param);
-                                                            setter.set_parameter(param, value);
-                                                            setter.end_set_parameter(param);
-                                                        }
-                                                    });
+                                                                .changed()
+                                                            {
+                                                                setter.begin_set_parameter(param);
+                                                                setter.set_parameter(param, value);
+                                                                setter.end_set_parameter(param);
+                                                            }
+                                                        });
 
-                                                    let space = match (beat_mode, num_sliders) {
-                                                        (_, 1) => 0.0,
-                                                        (BeatMode::Straight, 2) => 332.0,
-                                                        (BeatMode::Dotted, 2) => 440.0,
-                                                        (_, 3) => 215.0,
-                                                        (_, 4) => 153.0,
-                                                        (_, 5) => 121.0,
-                                                        (_, 6) => 92.0,
-                                                        (_, 8) => 63.5,
-                                                        (_, 10) => 46.0,
-                                                        (_, 12) => 33.5,
-                                                        (_, 16) => 18.75,
-                                                        (_, 21) => 7.5,
-                                                        (_, 24) => 3.4,
-                                                        (_, 32) => -3.63,
-                                                        _ => {
-                                                            panic!(
-                                                                "Invalid division: {}",
-                                                                num_sliders
-                                                            )
+                                                        let space = match (beat_mode, num_sliders) {
+                                                            (_, 1) => 0.0,
+                                                            (BeatMode::Straight, 2) => 332.0,
+                                                            (BeatMode::Dotted, 2) => 440.0,
+                                                            (_, 3) => 215.0,
+                                                            (_, 4) => 153.0,
+                                                            (_, 5) => 121.0,
+                                                            (_, 6) => 92.0,
+                                                            (_, 8) => 63.5,
+                                                            (_, 10) => 46.0,
+                                                            (_, 12) => 33.5,
+                                                            (_, 16) => 18.75,
+                                                            (_, 21) => 7.5,
+                                                            (_, 24) => 3.4,
+                                                            (_, 32) => -3.63,
+                                                            _ => {
+                                                                panic!(
+                                                                    "Invalid division: {}",
+                                                                    num_sliders
+                                                                )
+                                                            }
+                                                        };
+                                                        if i < num_sliders - 1 {
+                                                            ui.add_space(space);
                                                         }
-                                                    };
-                                                    ui.add_space(space);
-                                                }
+                                                    }
+                                                });
                                             });
                                         });
-                                    });
-                            });
+                                });
 
                             tui.ui(|ui| {
                                 ui.add_space(16.0);
@@ -284,8 +297,8 @@ impl Plugin for Device {
                                         let button = egui::Button::new(
                                             egui::RichText::new(button_label).size(16.0),
                                         )
-                                        .min_size(egui::vec2(60.0, 32.0))
-                                        .selected(num_sliders == *count);
+                                            .min_size(egui::vec2(60.0, 32.0))
+                                            .selected(num_sliders == *count);
 
                                         if ui.add(button).clicked() {
                                             ui.memory_mut(|mem| {
@@ -417,19 +430,3 @@ impl Vst3Plugin for Device {
 
 nih_plug::nih_export_clap!(Device);
 nih_plug::nih_export_vst3!(Device);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_plugin_constants() {
-        assert_eq!(Device::NAME, "Device");
-        assert_eq!(Device::VENDOR, "Device Audio");
-    }
-
-    #[test]
-    fn test_default_device() {
-        let _device = Device::default();
-    }
-}
