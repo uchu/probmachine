@@ -591,7 +591,7 @@ impl DeviceParams {
     pub fn get_default_beat_count(mode: BeatMode) -> usize {
         match mode {
             BeatMode::Straight => 8,
-            BeatMode::Triplet => 6,
+            BeatMode::Triplet => 12,
             BeatMode::Dotted => 6,
         }
     }
