@@ -345,6 +345,69 @@ pub struct DeviceParams {
 }
 
 impl DeviceParams {
+    pub fn get_beat_time_span(mode: BeatMode, beat_count: usize, beat_index: usize) -> (f32, f32) {
+        match mode {
+            BeatMode::Straight => {
+                let start = beat_index as f32 / beat_count as f32;
+                let end = (beat_index + 1) as f32 / beat_count as f32;
+                (start, end)
+            }
+            BeatMode::Triplet => {
+                let start = beat_index as f32 / beat_count as f32;
+                let end = (beat_index + 1) as f32 / beat_count as f32;
+                (start, end)
+            }
+            BeatMode::Dotted => {
+                let dotted_duration = match beat_count {
+                    2 => 24.0 / 32.0,
+                    3 => 12.0 / 32.0,
+                    6 => 6.0 / 32.0,
+                    11 => 3.0 / 32.0,
+                    22 => 1.5 / 32.0,
+                    _ => panic!("Invalid dotted division: {}", beat_count),
+                };
+                let start = beat_index as f32 * dotted_duration;
+                let end = start + dotted_duration;
+                (start, end)
+            }
+        }
+    }
+
+    fn time_spans_overlap(span1: (f32, f32), span2: (f32, f32)) -> bool {
+        let (start1, end1) = span1;
+        let (start2, end2) = span2;
+        start1 < end2 && start2 < end1
+    }
+
+    pub fn calculate_available_range(
+        &self,
+        mode: BeatMode,
+        beat_count: usize,
+        beat_index: usize,
+    ) -> f32 {
+        let current_span = Self::get_beat_time_span(mode, beat_count, beat_index);
+        let mut used_probability = 0.0f32;
+
+        for other_mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+            for (other_count, _) in Self::get_divisions_for_mode(other_mode).iter() {
+                if other_mode == mode && *other_count == beat_count {
+                    continue;
+                }
+
+                for other_index in 0..*other_count {
+                    let other_span = Self::get_beat_time_span(other_mode, *other_count, other_index);
+
+                    if Self::time_spans_overlap(current_span, other_span) {
+                        let other_param = self.get_division_param(other_mode, *other_count, other_index);
+                        used_probability += other_param.modulated_plain_value();
+                    }
+                }
+            }
+        }
+
+        (127.0 - used_probability).max(0.0)
+    }
+
     pub fn get_division_param(&self, mode: BeatMode, beat_count: usize, beat_index: usize) -> &FloatParam {
         match mode {
             BeatMode::Straight => match beat_count {
