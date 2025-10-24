@@ -6,7 +6,7 @@ use crate::params::DeviceParams;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Page {
     BeatProbability,
-    Page1,
+    Length,
     Page2,
     Page3,
     Page4,
@@ -18,7 +18,7 @@ impl Page {
     pub fn all() -> [Page; 7] {
         [
             Page::BeatProbability,
-            Page::Page1,
+            Page::Length,
             Page::Page2,
             Page::Page3,
             Page::Page4,
@@ -30,7 +30,7 @@ impl Page {
     pub fn label(&self) -> &'static str {
         match self {
             Page::BeatProbability => "Beat Prob",
-            Page::Page1 => "Page 1",
+            Page::Length => "Length",
             Page::Page2 => "Page 2",
             Page::Page3 => "Page 3",
             Page::Page4 => "Page 4",
@@ -48,6 +48,9 @@ impl Page {
         match self {
             Page::BeatProbability => {
                 super::pages::beat_probability::render(tui, params, setter)
+            },
+            Page::Length => {
+                super::pages::length::render(tui, params, setter)
             }
             _ => {
                 tui.ui(|ui| {
