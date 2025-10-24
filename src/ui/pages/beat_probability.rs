@@ -346,6 +346,9 @@ fn render_sliders(
                     ui.style_mut().spacing.slider_width = slider_height;
                     ui.style_mut().spacing.slider_rail_height = 9.0;
 
+                    let division_color = get_division_color(beat_mode, num_sliders, 255);
+                    ui.style_mut().visuals.selection.bg_fill = division_color;
+
                     if max_value > 0.0 {
                         if ui
                             .add(
