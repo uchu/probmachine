@@ -330,7 +330,7 @@ fn render_sliders(
 
                 ui.add_space(space_needed);
 
-                ui.vertical(|ui| {
+                let slider_response = ui.vertical(|ui| {
                     let param = params.get_division_param(beat_mode, num_sliders, i);
                     let available_range = params.calculate_available_range(beat_mode, num_sliders, i);
                     let mut value = param.modulated_plain_value();
@@ -349,20 +349,23 @@ fn render_sliders(
                     let division_color = get_division_color(beat_mode, num_sliders, 127);
                     ui.style_mut().visuals.selection.bg_fill = division_color;
 
+                    let mut slider_response_opt = None;
+
                     if max_value > 0.0 {
-                        if ui
-                            .add(
-                                egui::Slider::new(&mut value, 0.0..=max_value)
-                                    .vertical()
-                                    .trailing_fill(true)
-                                    .step_by(1.0)
-                                    .handle_shape(HandleShape::Rect {
-                                        aspect_ratio: 0.0,
-                                    })
-                                    .show_value(false),
-                            )
-                            .changed()
-                        {
+                        let response = ui.add(
+                            egui::Slider::new(&mut value, 0.0..=max_value)
+                                .vertical()
+                                .trailing_fill(true)
+                                .step_by(1.0)
+                                .handle_shape(HandleShape::Rect {
+                                    aspect_ratio: 0.0,
+                                })
+                                .show_value(false),
+                        );
+
+                        slider_response_opt = Some(response.clone());
+
+                        if response.changed() {
                             setter.begin_set_parameter(param);
                             setter.set_parameter(param, value);
                             setter.end_set_parameter(param);
@@ -376,7 +379,47 @@ fn render_sliders(
                                 .show_value(false),
                         );
                     }
-                });
+
+                    slider_response_opt
+                }).inner;
+
+                if let Some(slider_resp) = slider_response {
+                    if slider_resp.dragged() {
+                        let (beat_start, beat_end) = DeviceParams::get_beat_time_span(beat_mode, num_sliders, i);
+                        let slider_center_x = slider_resp.rect.center().x;
+
+                        let param = params.get_division_param(beat_mode, num_sliders, i);
+                        let current_value = param.modulated_plain_value();
+                        let available_range = params.calculate_available_range(beat_mode, num_sliders, i);
+                        let clamped_value = current_value.min(available_range);
+
+                        let slider_height = slider_resp.rect.height();
+                        let value_ratio = if available_range > 0.0 { clamped_value / available_range } else { 0.0 };
+                        let handle_y = slider_resp.rect.bottom() - (value_ratio * slider_height);
+
+                        let grid_spaces = match beat_mode {
+                            BeatMode::Straight | BeatMode::Dotted => 32.0,
+                            BeatMode::Triplet => 24.0,
+                        };
+                        let slider_width_for_pos = grid_width / grid_spaces;
+
+                        let line_start_x = slider_center_x;
+                        let line_end_time = beat_end.min(1.0);
+                        let line_end_grid_pos = line_end_time * grid_spaces;
+                        let container_left = slider_center_x - (beat_start * grid_spaces * slider_width_for_pos);
+                        let line_end_x = container_left + (line_end_grid_pos * slider_width_for_pos);
+
+                        let painter = ui.painter();
+
+                        painter.line_segment(
+                            [
+                                egui::pos2(line_start_x, handle_y),
+                                egui::pos2(line_end_x, handle_y),
+                            ],
+                            egui::Stroke::new(1.5, Color32::from_rgb(40, 40, 40)),
+                        );
+                    }
+                }
             }
         });
     });
