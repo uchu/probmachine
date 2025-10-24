@@ -2,7 +2,7 @@ use nih_plug::prelude::*;
 use nih_plug_egui::EguiState;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BeatMode {
     Straight,
     Triplet,
@@ -350,12 +350,12 @@ impl DeviceParams {
             BeatMode::Straight => {
                 let start = beat_index as f32 / beat_count as f32;
                 let end = (beat_index + 1) as f32 / beat_count as f32;
-                (start, end)
+                (start, end.min(1.0))
             }
             BeatMode::Triplet => {
                 let start = beat_index as f32 / beat_count as f32;
                 let end = (beat_index + 1) as f32 / beat_count as f32;
-                (start, end)
+                (start, end.min(1.0))
             }
             BeatMode::Dotted => {
                 let dotted_duration = match beat_count {
@@ -368,12 +368,12 @@ impl DeviceParams {
                 };
                 let start = beat_index as f32 * dotted_duration;
                 let end = start + dotted_duration;
-                (start, end)
+                (start, end.min(1.0) - 0.01)
             }
         }
     }
 
-    fn time_spans_overlap(span1: (f32, f32), span2: (f32, f32)) -> bool {
+    pub fn time_spans_overlap(span1: (f32, f32), span2: (f32, f32)) -> bool {
         let (start1, end1) = span1;
         let (start2, end2) = span2;
         start1 < end2 && start2 < end1
@@ -386,7 +386,10 @@ impl DeviceParams {
         beat_index: usize,
     ) -> f32 {
         let current_span = Self::get_beat_time_span(mode, beat_count, beat_index);
-        let mut used_probability = 0.0f32;
+        let mut total_constraint = 0.0f32;
+
+        nih_log!("🔍 Calculating constraint for {:?} count={} beat={}", mode, beat_count, beat_index);
+        nih_log!("   Current span: {:?}", current_span);
 
         for other_mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
             for (other_count, _) in Self::get_divisions_for_mode(other_mode).iter() {
@@ -394,18 +397,32 @@ impl DeviceParams {
                     continue;
                 }
 
+                let mut max_from_this_division = 0.0f32;
+
                 for other_index in 0..*other_count {
                     let other_span = Self::get_beat_time_span(other_mode, *other_count, other_index);
 
                     if Self::time_spans_overlap(current_span, other_span) {
                         let other_param = self.get_division_param(other_mode, *other_count, other_index);
-                        used_probability += other_param.modulated_plain_value();
+                        let value = other_param.modulated_plain_value();
+                        if value > 0.0 {
+                            nih_log!("   Overlap with {:?} count={} beat={}, span={:?}, value={}",
+                                other_mode, *other_count, other_index, other_span, value);
+                        }
+                        max_from_this_division = max_from_this_division.max(value);
                     }
+                }
+
+                if max_from_this_division > 0.0 {
+                    nih_log!("   Max from {:?} count={}: {}", other_mode, other_count, max_from_this_division);
+                    total_constraint += max_from_this_division;
                 }
             }
         }
 
-        (127.0 - used_probability).max(0.0)
+        let available = (127.0 - total_constraint).max(0.0);
+        nih_log!("   Total constraint: {}, Available: {}", total_constraint, available);
+        available
     }
 
     pub fn get_division_param(&self, mode: BeatMode, beat_count: usize, beat_index: usize) -> &FloatParam {
