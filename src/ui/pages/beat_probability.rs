@@ -160,14 +160,16 @@ fn get_division_color(mode: BeatMode, beat_count: usize) -> Color32 {
         _ => 6,
     };
 
+    let alpha = 100;
+
     match color_by_note_value {
-        0 => Color32::from_rgba_unmultiplied(255, 100, 100, 120),
-        1 => Color32::from_rgba_unmultiplied(255, 150, 100, 120),
-        2 => Color32::from_rgba_unmultiplied(255, 200, 100, 120),
-        3 => Color32::from_rgba_unmultiplied(150, 255, 150, 120),
-        4 => Color32::from_rgba_unmultiplied(100, 200, 255, 120),
-        5 => Color32::from_rgba_unmultiplied(200, 100, 255, 120),
-        _ => Color32::from_rgba_unmultiplied(150, 150, 150, 120),
+        0 => Color32::from_rgba_unmultiplied(255, 100, 100, alpha),
+        1 => Color32::from_rgba_unmultiplied(255, 150, 100, alpha),
+        2 => Color32::from_rgba_unmultiplied(255, 255, 100, alpha),
+        3 => Color32::from_rgba_unmultiplied(100, 255, 100, alpha),
+        4 => Color32::from_rgba_unmultiplied(100, 100, 255, alpha),
+        5 => Color32::from_rgba_unmultiplied(150, 100, 255, alpha),
+        _ => Color32::from_rgba_unmultiplied(150, 150, 150, alpha),
     }
 }
 
@@ -418,7 +420,17 @@ fn render_division_buttons(ui: &mut egui::Ui, beat_mode: BeatMode, num_sliders: 
                 .min_size(egui::vec2(60.0, 32.0))
                 .selected(num_sliders == *count);
 
-            if ui.add(button).clicked() {
+            let response = ui.add(button);
+
+            let color = get_division_color(beat_mode, *count);
+            let button_rect = response.rect;
+            let circle_center = egui::pos2(
+                button_rect.right() - 6.0,
+                button_rect.bottom() - 6.0
+            );
+            ui.painter().circle_filled(circle_center, 3.5, color);
+
+            if response.clicked() {
                 ui.memory_mut(|mem| {
                     mem.data.insert_temp(egui::Id::new("num_sliders"), *count);
                 });
