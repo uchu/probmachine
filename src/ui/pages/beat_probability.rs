@@ -149,7 +149,7 @@ fn render_grid_lines(
     }
 }
 
-fn get_division_color(mode: BeatMode, beat_count: usize) -> Color32 {
+fn get_division_color(mode: BeatMode, beat_count: usize, alpha: u8) -> Color32 {
     let color_by_note_value = match (mode, beat_count) {
         (BeatMode::Straight, 1) => 0,
         (BeatMode::Straight, 2) | (BeatMode::Triplet, 3) | (BeatMode::Dotted, 2) => 1,
@@ -159,8 +159,6 @@ fn get_division_color(mode: BeatMode, beat_count: usize) -> Color32 {
         (BeatMode::Straight, 32) | (BeatMode::Dotted, 22) => 5,
         _ => 6,
     };
-
-    let alpha = 100;
 
     match color_by_note_value {
         0 => Color32::from_rgba_unmultiplied(255, 100, 100, alpha),
@@ -264,7 +262,7 @@ fn render_occupied_space(
 
         for beat in active_beats {
             let height = max_height * (beat.value / 127.0);
-            let color = get_division_color(beat.mode, beat.count);
+            let color = get_division_color(beat.mode, beat.count, 10);
 
             painter.rect_filled(
                 egui::Rect::from_min_size(
@@ -422,13 +420,14 @@ fn render_division_buttons(ui: &mut egui::Ui, beat_mode: BeatMode, num_sliders: 
 
             let response = ui.add(button);
 
-            let color = get_division_color(beat_mode, *count);
+            let color = get_division_color(beat_mode, *count, 127);
+            let opaque_color = Color32::from_rgb(color.r(), color.g(), color.b());
             let button_rect = response.rect;
             let circle_center = egui::pos2(
                 button_rect.right() - 6.0,
                 button_rect.bottom() - 6.0
             );
-            ui.painter().circle_filled(circle_center, 3.5, color);
+            ui.painter().circle_filled(circle_center, 3.5, opaque_color);
 
             if response.clicked() {
                 ui.memory_mut(|mem| {
