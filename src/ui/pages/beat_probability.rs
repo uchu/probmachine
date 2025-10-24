@@ -150,31 +150,24 @@ fn render_grid_lines(
 }
 
 fn get_division_color(mode: BeatMode, beat_count: usize) -> Color32 {
-    match mode {
-        BeatMode::Straight => match beat_count {
-            1 => Color32::from_rgba_unmultiplied(255, 100, 100, 120),
-            2 => Color32::from_rgba_unmultiplied(255, 150, 100, 120),
-            4 => Color32::from_rgba_unmultiplied(255, 200, 100, 120),
-            8 => Color32::from_rgba_unmultiplied(200, 255, 100, 120),
-            16 => Color32::from_rgba_unmultiplied(100, 255, 150, 120),
-            32 => Color32::from_rgba_unmultiplied(100, 200, 255, 120),
-            _ => Color32::from_rgba_unmultiplied(150, 150, 150, 120),
-        },
-        BeatMode::Triplet => match beat_count {
-            3 => Color32::from_rgba_unmultiplied(255, 100, 200, 120),
-            6 => Color32::from_rgba_unmultiplied(200, 100, 255, 120),
-            12 => Color32::from_rgba_unmultiplied(150, 100, 255, 120),
-            24 => Color32::from_rgba_unmultiplied(100, 150, 255, 120),
-            _ => Color32::from_rgba_unmultiplied(150, 150, 200, 120),
-        },
-        BeatMode::Dotted => match beat_count {
-            2 => Color32::from_rgba_unmultiplied(255, 200, 150, 120),
-            3 => Color32::from_rgba_unmultiplied(200, 255, 150, 120),
-            6 => Color32::from_rgba_unmultiplied(150, 255, 200, 120),
-            11 => Color32::from_rgba_unmultiplied(150, 200, 255, 120),
-            22 => Color32::from_rgba_unmultiplied(200, 150, 255, 120),
-            _ => Color32::from_rgba_unmultiplied(200, 200, 150, 120),
-        },
+    let color_by_note_value = match (mode, beat_count) {
+        (BeatMode::Straight, 1) => 0,
+        (BeatMode::Straight, 2) | (BeatMode::Triplet, 3) | (BeatMode::Dotted, 2) => 1,
+        (BeatMode::Straight, 4) | (BeatMode::Triplet, 6) | (BeatMode::Dotted, 3) => 2,
+        (BeatMode::Straight, 8) | (BeatMode::Triplet, 12) | (BeatMode::Dotted, 6) => 3,
+        (BeatMode::Straight, 16) | (BeatMode::Triplet, 24) | (BeatMode::Dotted, 11) => 4,
+        (BeatMode::Straight, 32) | (BeatMode::Dotted, 22) => 5,
+        _ => 6,
+    };
+
+    match color_by_note_value {
+        0 => Color32::from_rgba_unmultiplied(255, 100, 100, 120),
+        1 => Color32::from_rgba_unmultiplied(255, 150, 100, 120),
+        2 => Color32::from_rgba_unmultiplied(255, 200, 100, 120),
+        3 => Color32::from_rgba_unmultiplied(150, 255, 150, 120),
+        4 => Color32::from_rgba_unmultiplied(100, 200, 255, 120),
+        5 => Color32::from_rgba_unmultiplied(200, 100, 255, 120),
+        _ => Color32::from_rgba_unmultiplied(150, 150, 150, 120),
     }
 }
 
