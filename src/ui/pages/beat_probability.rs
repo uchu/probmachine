@@ -252,7 +252,7 @@ fn render_occupied_space(
             continue;
         }
 
-        active_beats.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(std::cmp::Ordering::Equal));
+        active_beats.sort_by(|a, b| a.count.cmp(&b.count));
 
         let segment_start_x = container_rect.min.x + grid_padding + (segment_start * grid_width);
         let segment_end_x = container_rect.min.x + grid_padding + (segment_end * grid_width);
