@@ -32,7 +32,7 @@ pub fn render(
 
     tui.ui(|ui| {
         ui.add_space(12.0);
-        render_controls(ui, beat_mode, num_sliders);
+        render_controls(ui, params, beat_mode, num_sliders);
     });
 }
 
@@ -346,7 +346,7 @@ fn render_sliders(
                     ui.style_mut().spacing.slider_width = slider_height;
                     ui.style_mut().spacing.slider_rail_height = 9.0;
 
-                    let division_color = get_division_color(beat_mode, num_sliders, 255);
+                    let division_color = get_division_color(beat_mode, num_sliders, 127);
                     ui.style_mut().visuals.selection.bg_fill = division_color;
 
                     if max_value > 0.0 {
@@ -382,7 +382,7 @@ fn render_sliders(
     });
 }
 
-fn render_controls(ui: &mut egui::Ui, beat_mode: BeatMode, num_sliders: usize) {
+fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode: BeatMode, num_sliders: usize) {
     egui::Frame::default()
         .fill(Color32::from_rgb(30, 30, 30))
         .inner_margin(8.0)
@@ -390,14 +390,14 @@ fn render_controls(ui: &mut egui::Ui, beat_mode: BeatMode, num_sliders: usize) {
         .corner_radius(15.0)
         .show(ui, |ui| {
             ui.vertical_centered(|ui| {
-                render_division_buttons(ui, beat_mode, num_sliders);
+                render_division_buttons(ui, params, beat_mode, num_sliders);
                 ui.add_space(5.0);
-                render_mode_buttons(ui, beat_mode);
+                render_mode_buttons(ui, params, beat_mode);
             });
         });
 }
 
-fn render_division_buttons(ui: &mut egui::Ui, beat_mode: BeatMode, num_sliders: usize) {
+fn render_division_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode: BeatMode, num_sliders: usize) {
     ui.horizontal(|ui| {
         ui.add_space(5.0);
         let divisions = DeviceParams::get_divisions_for_mode(beat_mode);
@@ -423,14 +423,21 @@ fn render_division_buttons(ui: &mut egui::Ui, beat_mode: BeatMode, num_sliders: 
 
             let response = ui.add(button);
 
-            let color = get_division_color(beat_mode, *count, 127);
-            let opaque_color = Color32::from_rgb(color.r(), color.g(), color.b());
-            let button_rect = response.rect;
-            let circle_center = egui::pos2(
-                button_rect.right() - 6.0,
-                button_rect.bottom() - 6.0
-            );
-            ui.painter().circle_filled(circle_center, 3.5, opaque_color);
+            let has_values = (0..*count).any(|i| {
+                let param = params.get_division_param(beat_mode, *count, i);
+                param.modulated_plain_value() > 0.0
+            });
+
+            if has_values {
+                let color = get_division_color(beat_mode, *count, 127);
+                let opaque_color = Color32::from_rgb(color.r(), color.g(), color.b());
+                let button_rect = response.rect;
+                let circle_center = egui::pos2(
+                    button_rect.right() - 6.0,
+                    button_rect.bottom() - 6.0
+                );
+                ui.painter().circle_filled(circle_center, 3.5, opaque_color);
+            }
 
             if response.clicked() {
                 ui.memory_mut(|mem| {
@@ -446,7 +453,18 @@ fn render_division_buttons(ui: &mut egui::Ui, beat_mode: BeatMode, num_sliders: 
     });
 }
 
-fn render_mode_buttons(ui: &mut egui::Ui, beat_mode: BeatMode) {
+fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode: BeatMode) {
+    let mode_has_values = |mode: BeatMode| -> bool {
+        DeviceParams::get_divisions_for_mode(mode)
+            .iter()
+            .any(|(count, _)| {
+                (0..*count).any(|i| {
+                    let param = params.get_division_param(mode, *count, i);
+                    param.modulated_plain_value() > 0.0
+                })
+            })
+    };
+
     ui.horizontal(|ui| {
         ui.add_space(102.0);
 
@@ -454,7 +472,19 @@ fn render_mode_buttons(ui: &mut egui::Ui, beat_mode: BeatMode) {
             .min_size(egui::vec2(60.0, 32.0))
             .selected(beat_mode == BeatMode::Straight);
 
-        if ui.add(button_s).clicked() && beat_mode != BeatMode::Straight {
+        let response_s = ui.add(button_s);
+
+        if mode_has_values(BeatMode::Straight) {
+            let circle_color = Color32::from_rgba_unmultiplied(255, 255, 255, 127);
+            let button_rect = response_s.rect;
+            let circle_center = egui::pos2(
+                button_rect.right() - 6.0,
+                button_rect.bottom() - 6.0
+            );
+            ui.painter().circle_filled(circle_center, 3.5, circle_color);
+        }
+
+        if response_s.clicked() && beat_mode != BeatMode::Straight {
             ui.memory_mut(|mem| {
                 mem.data.insert_temp(egui::Id::new("beat_mode"), BeatMode::Straight);
                 mem.data.insert_temp(egui::Id::new("num_sliders"), 4);
@@ -465,7 +495,19 @@ fn render_mode_buttons(ui: &mut egui::Ui, beat_mode: BeatMode) {
             .min_size(egui::vec2(60.0, 32.0))
             .selected(beat_mode == BeatMode::Triplet);
 
-        if ui.add(button_t).clicked() && beat_mode != BeatMode::Triplet {
+        let response_t = ui.add(button_t);
+
+        if mode_has_values(BeatMode::Triplet) {
+            let circle_color = Color32::from_rgba_unmultiplied(255, 255, 255, 127);
+            let button_rect = response_t.rect;
+            let circle_center = egui::pos2(
+                button_rect.right() - 6.0,
+                button_rect.bottom() - 6.0
+            );
+            ui.painter().circle_filled(circle_center, 3.5, circle_color);
+        }
+
+        if response_t.clicked() && beat_mode != BeatMode::Triplet {
             ui.memory_mut(|mem| {
                 mem.data.insert_temp(egui::Id::new("beat_mode"), BeatMode::Triplet);
                 mem.data.insert_temp(egui::Id::new("num_sliders"), 6);
@@ -476,7 +518,19 @@ fn render_mode_buttons(ui: &mut egui::Ui, beat_mode: BeatMode) {
             .min_size(egui::vec2(60.0, 32.0))
             .selected(beat_mode == BeatMode::Dotted);
 
-        if ui.add(button_d).clicked() && beat_mode != BeatMode::Dotted {
+        let response_d = ui.add(button_d);
+
+        if mode_has_values(BeatMode::Dotted) {
+            let circle_color = Color32::from_rgba_unmultiplied(255, 255, 255, 127);
+            let button_rect = response_d.rect;
+            let circle_center = egui::pos2(
+                button_rect.right() - 6.0,
+                button_rect.bottom() - 6.0
+            );
+            ui.painter().circle_filled(circle_center, 3.5, circle_color);
+        }
+
+        if response_d.clicked() && beat_mode != BeatMode::Dotted {
             ui.memory_mut(|mem| {
                 mem.data.insert_temp(egui::Id::new("beat_mode"), BeatMode::Dotted);
                 mem.data.insert_temp(egui::Id::new("num_sliders"), 2);
