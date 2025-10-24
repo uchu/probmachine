@@ -194,89 +194,87 @@ fn render_occupied_space(
     let max_height = 256.0;
     let top_y = container_rect.min.y + 10.0;
 
-    for i in 0..num_sliders {
-        let current_span = DeviceParams::get_beat_time_span(beat_mode, num_sliders, i);
+    #[derive(Clone, Debug)]
+    struct Beat {
+        mode: BeatMode,
+        count: usize,
+        index: usize,
+        value: f32,
+        start_time: f32,
+        end_time: f32,
+    }
 
-        let mut time_points = vec![current_span.0, current_span.1];
-        for other_mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
-            for (other_count, _) in DeviceParams::get_divisions_for_mode(other_mode).iter() {
-                if other_mode == beat_mode && *other_count == num_sliders {
-                    continue;
-                }
-                for other_index in 0..*other_count {
-                    let other_span = DeviceParams::get_beat_time_span(other_mode, *other_count, other_index);
-                    if DeviceParams::time_spans_overlap(current_span, other_span) {
-                        if other_span.0 > current_span.0 && other_span.0 < current_span.1 {
-                            time_points.push(other_span.0);
-                        }
-                        if other_span.1 > current_span.0 && other_span.1 < current_span.1 {
-                            time_points.push(other_span.1);
-                        }
-                    }
+    let mut all_beats = Vec::new();
+
+    for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+        for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
+            if mode == beat_mode && *count == num_sliders {
+                continue;
+            }
+
+            for index in 0..*count {
+                let param = params.get_division_param(mode, *count, index);
+                let value = param.modulated_plain_value();
+
+                if value > 0.0 {
+                    let (start_time, end_time) = DeviceParams::get_beat_time_span(mode, *count, index);
+                    all_beats.push(Beat {
+                        mode,
+                        count: *count,
+                        index,
+                        value,
+                        start_time,
+                        end_time,
+                    });
                 }
             }
         }
-        time_points.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        time_points.dedup();
+    }
 
-        let mut max_total_constraint = 0.0f32;
-        let mut best_division_constraints = std::collections::HashMap::new();
+    if all_beats.is_empty() {
+        return;
+    }
 
-        for time_idx in 0..time_points.len().saturating_sub(1) {
-            let sample_time = (time_points[time_idx] + time_points[time_idx + 1]) / 2.0;
-            let mut division_constraints_at_point = std::collections::HashMap::new();
+    let mut time_points = vec![0.0, 1.0];
 
-            for other_mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
-                for (other_count, _) in DeviceParams::get_divisions_for_mode(other_mode).iter() {
-                    if other_mode == beat_mode && *other_count == num_sliders {
-                        continue;
-                    }
+    for beat in &all_beats {
+        time_points.push(beat.start_time);
+        time_points.push(beat.end_time);
+    }
 
-                    let mut max_value_for_division = 0.0f32;
-                    for other_index in 0..*other_count {
-                        let other_span = DeviceParams::get_beat_time_span(other_mode, *other_count, other_index);
-                        if sample_time >= other_span.0 && sample_time < other_span.1 {
-                            let param = params.get_division_param(other_mode, *other_count, other_index);
-                            let value = param.modulated_plain_value();
-                            max_value_for_division = max_value_for_division.max(value);
-                        }
-                    }
+    time_points.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    time_points.dedup();
 
-                    if max_value_for_division > 0.0 {
-                        division_constraints_at_point.insert((other_mode, *other_count), max_value_for_division);
-                    }
-                }
-            }
+    for segment_idx in 0..time_points.len().saturating_sub(1) {
+        let segment_start = time_points[segment_idx];
+        let segment_end = time_points[segment_idx + 1];
+        let segment_mid = (segment_start + segment_end) / 2.0;
 
-            let total_at_point: f32 = division_constraints_at_point.values().sum();
-            if total_at_point > max_total_constraint {
-                max_total_constraint = total_at_point;
-                best_division_constraints = division_constraints_at_point;
-            }
-        }
+        let mut active_beats: Vec<&Beat> = all_beats
+            .iter()
+            .filter(|beat| segment_mid >= beat.start_time && segment_mid < beat.end_time)
+            .collect();
 
-        if best_division_constraints.is_empty() {
+        if active_beats.is_empty() {
             continue;
         }
 
-        let (start_time, end_time) = current_span;
-        let start_x = container_rect.min.x + grid_padding + (start_time * grid_width);
-        let end_x = container_rect.min.x + grid_padding + (end_time * grid_width);
-        let width = end_x - start_x;
+        active_beats.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(std::cmp::Ordering::Equal));
 
-        let mut sorted_divisions: Vec<_> = best_division_constraints.into_iter().collect();
-        sorted_divisions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let segment_start_x = container_rect.min.x + grid_padding + (segment_start * grid_width);
+        let segment_end_x = container_rect.min.x + grid_padding + (segment_end * grid_width);
+        let segment_width = segment_end_x - segment_start_x;
 
         let mut current_y = top_y;
 
-        for ((other_mode, other_count), value) in sorted_divisions {
-            let height = max_height * (value / 127.0);
-            let color = get_division_color(other_mode, other_count);
+        for beat in active_beats {
+            let height = max_height * (beat.value / 127.0);
+            let color = get_division_color(beat.mode, beat.count);
 
             painter.rect_filled(
                 egui::Rect::from_min_size(
-                    egui::pos2(start_x, current_y),
-                    egui::vec2(width, height),
+                    egui::pos2(segment_start_x, current_y),
+                    egui::vec2(segment_width, height),
                 ),
                 0.0,
                 color,
@@ -372,6 +370,7 @@ fn render_sliders(
                             setter.begin_set_parameter(param);
                             setter.set_parameter(param, value);
                             setter.end_set_parameter(param);
+                            params.log_all_values();
                         }
                     } else {
                         ui.style_mut().spacing.slider_width = 0.0;

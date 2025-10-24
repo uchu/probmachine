@@ -368,7 +368,7 @@ impl DeviceParams {
                 };
                 let start = beat_index as f32 * dotted_duration;
                 let end = start + dotted_duration;
-                (start, end.min(1.0) - 0.01)
+                (start, end.min(1.0))
             }
         }
     }
@@ -386,10 +386,8 @@ impl DeviceParams {
         beat_index: usize,
     ) -> f32 {
         let current_span = Self::get_beat_time_span(mode, beat_count, beat_index);
-        let mut total_constraint = 0.0f32;
 
-        nih_log!("🔍 Calculating constraint for {:?} count={} beat={}", mode, beat_count, beat_index);
-        nih_log!("   Current span: {:?}", current_span);
+        let mut time_points = vec![current_span.0, current_span.1];
 
         for other_mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
             for (other_count, _) in Self::get_divisions_for_mode(other_mode).iter() {
@@ -397,31 +395,52 @@ impl DeviceParams {
                     continue;
                 }
 
-                let mut max_from_this_division = 0.0f32;
-
                 for other_index in 0..*other_count {
                     let other_span = Self::get_beat_time_span(other_mode, *other_count, other_index);
 
                     if Self::time_spans_overlap(current_span, other_span) {
-                        let other_param = self.get_division_param(other_mode, *other_count, other_index);
-                        let value = other_param.modulated_plain_value();
-                        if value > 0.0 {
-                            nih_log!("   Overlap with {:?} count={} beat={}, span={:?}, value={}",
-                                other_mode, *other_count, other_index, other_span, value);
+                        if other_span.0 > current_span.0 && other_span.0 < current_span.1 {
+                            time_points.push(other_span.0);
                         }
-                        max_from_this_division = max_from_this_division.max(value);
+                        if other_span.1 > current_span.0 && other_span.1 < current_span.1 {
+                            time_points.push(other_span.1);
+                        }
                     }
-                }
-
-                if max_from_this_division > 0.0 {
-                    nih_log!("   Max from {:?} count={}: {}", other_mode, other_count, max_from_this_division);
-                    total_constraint += max_from_this_division;
                 }
             }
         }
 
-        let available = (127.0 - total_constraint).max(0.0);
-        nih_log!("   Total constraint: {}, Available: {}", total_constraint, available);
+        time_points.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        time_points.dedup();
+
+        let mut max_constraint = 0.0f32;
+
+        for time_idx in 0..time_points.len().saturating_sub(1) {
+            let sample_time = (time_points[time_idx] + time_points[time_idx + 1]) / 2.0;
+            let mut constraint_at_point = 0.0f32;
+
+            for other_mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+                for (other_count, _) in Self::get_divisions_for_mode(other_mode).iter() {
+                    if other_mode == mode && *other_count == beat_count {
+                        continue;
+                    }
+
+                    for other_index in 0..*other_count {
+                        let other_span = Self::get_beat_time_span(other_mode, *other_count, other_index);
+
+                        if sample_time >= other_span.0 && sample_time < other_span.1 {
+                            let other_param = self.get_division_param(other_mode, *other_count, other_index);
+                            let value = other_param.modulated_plain_value();
+                            constraint_at_point += value;
+                        }
+                    }
+                }
+            }
+
+            max_constraint = max_constraint.max(constraint_at_point);
+        }
+
+        let available = (127.0 - max_constraint).max(0.0);
         available
     }
 
@@ -673,6 +692,28 @@ impl DeviceParams {
             BeatMode::Straight => 8,
             BeatMode::Triplet => 12,
             BeatMode::Dotted => 6,
+        }
+    }
+
+    pub fn log_all_values(&self) {
+        let mut values = Vec::new();
+
+        for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+            for (count, label) in Self::get_divisions_for_mode(mode).iter() {
+                for index in 0..*count {
+                    let param = self.get_division_param(mode, *count, index);
+                    let value = param.modulated_plain_value();
+                    if value > 0.0 {
+                        values.push(format!("{}[{}]={:.0}", label, index, value));
+                    }
+                }
+            }
+        }
+
+        if !values.is_empty() {
+            nih_log!("All set values: {}", values.join(", "));
+        } else {
+            nih_log!("All set values: (none)");
         }
     }
 
