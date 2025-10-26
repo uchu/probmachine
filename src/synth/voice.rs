@@ -41,9 +41,11 @@ impl Voice {
         let mut oversampling = Oversampling::<4>::new();
         oversampling.set_sample_rate(sample_rate);
 
+        // Oscillator runs at 4x sample rate due to oversampling
+        let oversampled_rate = sample_rate * 4.0;
         Self {
-            oscillator: Oscillator::new(sample_rate),
-            filter: MoogFilter::new(sample_rate),
+            oscillator: Oscillator::new(oversampled_rate),
+            filter: MoogFilter::new(oversampled_rate),
             volume_env: Envelope::new(sample_rate),
             filter_env: Envelope::new(sample_rate),
             oversampling,
