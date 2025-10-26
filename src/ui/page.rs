@@ -8,7 +8,7 @@ pub enum Page {
     BeatProbability,
     Length,
     Notes,
-    Page3,
+    Strength,
     Page4,
     Page5,
     Page6,
@@ -20,7 +20,7 @@ impl Page {
             Page::BeatProbability,
             Page::Length,
             Page::Notes,
-            Page::Page3,
+            Page::Strength,
             Page::Page4,
             Page::Page5,
             Page::Page6,
@@ -32,7 +32,7 @@ impl Page {
             Page::BeatProbability => "Beats",
             Page::Length => "Length",
             Page::Notes => "Notes",
-            Page::Page3 => "Page 3",
+            Page::Strength => "Strength",
             Page::Page4 => "Page 4",
             Page::Page5 => "Page 5",
             Page::Page6 => "Page 6",
@@ -54,6 +54,9 @@ impl Page {
             },
             Page::Notes => {
                 super::pages::notes::render(tui, params, setter)
+            },
+            Page::Strength => {
+                super::pages::strength::render(tui, params, setter)
             }
             _ => {
                 tui.ui(|ui| {

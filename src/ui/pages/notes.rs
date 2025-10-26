@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use egui_taffy::TuiBuilderLogic;
 use nih_plug_egui::egui::{self, Color32};
 use crate::params::DeviceParams;
+use nih_plug::prelude::*;
 
 #[derive(Clone, PartialEq)]
 struct NoteState {
@@ -10,6 +11,8 @@ struct NoteState {
     root_note: u8,
     note_chances: HashMap<u8, u8>,
     note_beats: HashMap<u8, u8>,
+    note_beat_lengths: HashMap<u8, u8>,
+    scroll_offset: f32,
 }
 
 impl Default for NoteState {
@@ -19,6 +22,8 @@ impl Default for NoteState {
             root_note: 24,
             note_chances: HashMap::new(),
             note_beats: HashMap::new(),
+            note_beat_lengths: HashMap::new(),
+            scroll_offset: 14.0,
         }
     }
 }
@@ -34,13 +39,41 @@ pub fn render(
         ui.add_space(12.0);
         ui.heading(egui::RichText::new("    Note Probability").size(14.0));
         ui.add_space(8.0);
+    });
 
+    tui.ui(|ui| {
         let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
+        let state_before = state.clone();
 
         render_piano_container(ui, &mut state);
+
+        if state != state_before {
+            ui.ctx().data_mut(|d| d.insert_temp(state_id, state.clone()));
+            if (state.scroll_offset - state_before.scroll_offset).abs() > 0.01 {
+                ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
+            }
+        }
+    });
+
+    tui.ui(|ui| {
+        let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
+        let state_before = state.clone();
+
         render_selected_note_info(ui, &mut state);
 
-        ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
+        if state != state_before {
+            let chances_changed = state.note_chances != state_before.note_chances;
+            let beats_changed = state.note_beats != state_before.note_beats;
+            let beat_lengths_changed = state.note_beat_lengths != state_before.note_beat_lengths;
+            let root_changed = state.root_note != state_before.root_note;
+
+            if chances_changed || beats_changed || beat_lengths_changed || root_changed {
+                log_note_values(&state);
+            }
+
+            ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
+        }
     });
 }
 
@@ -57,6 +90,64 @@ fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
         .corner_radius(15.0)
         .show(ui, |ui| {
             render_piano_keys(ui, state);
+
+            ui.add_space(10.0);
+
+            let total_white_keys = 43.0;
+            let visible_white_keys = 15.0;
+            let max_scroll = total_white_keys - visible_white_keys;
+
+            let scrollbar_width = 720.0;
+            let scrollbar_height = 16.0;
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(scrollbar_width, scrollbar_height),
+                egui::Sense::click_and_drag()
+            );
+
+            if response.dragged() || response.clicked() {
+                if let Some(pos) = response.interact_pointer_pos() {
+                    let relative_x = (pos.x - rect.left()).max(0.0).min(rect.width());
+                    let ratio = relative_x / rect.width();
+                    let new_scroll = (ratio * max_scroll).clamp(0.0, max_scroll);
+                    let new_scroll_int = new_scroll.round();
+
+                    if (new_scroll_int - state.scroll_offset).abs() >= 0.9 {
+                        state.scroll_offset = new_scroll_int;
+                    }
+                }
+            }
+
+            let painter = ui.painter();
+
+            let bg_color = ui.visuals().extreme_bg_color;
+            painter.rect_filled(rect, 2.0, bg_color);
+
+            let handle_ratio = visible_white_keys / total_white_keys;
+            let handle_width = rect.width() * handle_ratio;
+            let scroll_ratio = state.scroll_offset / max_scroll;
+            let handle_x_offset = scroll_ratio * (rect.width() - handle_width);
+
+            let handle_rect = egui::Rect::from_min_size(
+                egui::pos2(rect.left() + handle_x_offset, rect.top()),
+                egui::vec2(handle_width, scrollbar_height)
+            );
+
+            let handle_color = if response.dragged() {
+                Color32::from_rgb(100, 100, 100)
+            } else if response.hovered() {
+                Color32::from_rgb(120, 120, 120)
+            } else {
+                Color32::from_rgb(140, 140, 140)
+            };
+
+            painter.rect_filled(handle_rect, 2.0, handle_color);
+            painter.rect_stroke(
+                handle_rect,
+                2.0,
+                egui::Stroke::new(1.0, Color32::from_rgb(80, 80, 80)),
+                egui::epaint::StrokeKind::Outside,
+            );
         });
 }
 
@@ -86,74 +177,58 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
         let mut keys = Vec::new();
         let start_pos = ui.cursor().min;
 
-        let mut white_key_index = 0;
-        let mut octave_number = 2;
+        let scroll_offset_int = state.scroll_offset as usize;
 
-        for octave in 0..2 {
-            for (note_idx, &note) in white_key_pattern.iter().enumerate() {
-                let x = start_pos.x + (white_key_index as f32 * white_key_width);
-                let y = start_pos.y;
+        for local_white_key_idx in 0..num_white_keys {
+            let global_white_key_idx = scroll_offset_int + local_white_key_idx;
+            let octave = global_white_key_idx / 7;
+            let note_in_octave = global_white_key_idx % 7;
 
-                let key_rect = egui::Rect::from_min_size(
-                    egui::pos2(x, y),
-                    egui::vec2(white_key_width - 1.0, white_key_height),
-                );
+            let x = start_pos.x + (local_white_key_idx as f32 * white_key_width);
+            let y = start_pos.y;
 
-                let response = ui.allocate_rect(key_rect, egui::Sense::click());
+            let key_rect = egui::Rect::from_min_size(
+                egui::pos2(x, y),
+                egui::vec2(white_key_width - 1.0, white_key_height),
+            );
 
-                let label = if note_idx == 0 {
-                    Some(format!("C{}", octave_number))
-                } else {
-                    None
-                };
+            let response = ui.allocate_rect(key_rect, egui::Sense::click());
 
-                let midi_note = 24 + (octave * 12) + note;
+            let note_offset = white_key_pattern[note_in_octave];
+            let midi_note = (octave * 12) as u8 + note_offset;
 
-                keys.push(KeyInfo {
-                    rect: key_rect,
-                    is_black: false,
-                    hovered: response.hovered(),
-                    clicked: response.clicked(),
-                    label,
-                    midi_note,
-                });
+            let label = if note_in_octave == 0 {
+                Some(format!("C{}", octave))
+            } else {
+                None
+            };
 
-                white_key_index += 1;
-            }
-            octave_number += 1;
+            keys.push(KeyInfo {
+                rect: key_rect,
+                is_black: false,
+                hovered: response.hovered(),
+                clicked: response.clicked(),
+                label,
+                midi_note,
+            });
         }
 
-        let x = start_pos.x + (white_key_index as f32 * white_key_width);
-        let y = start_pos.y;
+        for local_white_key_idx in 0..num_white_keys {
+            let global_white_key_idx = scroll_offset_int + local_white_key_idx;
+            let octave = global_white_key_idx / 7;
+            let note_in_octave = global_white_key_idx % 7;
 
-        let key_rect = egui::Rect::from_min_size(
-            egui::pos2(x, y),
-            egui::vec2(white_key_width - 1.0, white_key_height),
-        );
+            let white_note = white_key_pattern[note_in_octave];
+            let has_black_key_after = black_key_pattern.iter().any(|&black| black == white_note + 1);
 
-        let response = ui.allocate_rect(key_rect, egui::Sense::click());
+            let is_last_white_key = local_white_key_idx == num_white_keys - 1;
 
-        let midi_note = 24 + (2 * 12);
+            if has_black_key_after && !is_last_white_key {
+                let black_note = white_note + 1;
+                let midi_note = (octave * 12) as u8 + black_note;
 
-        keys.push(KeyInfo {
-            rect: key_rect,
-            is_black: false,
-            hovered: response.hovered(),
-            clicked: response.clicked(),
-            label: Some(format!("C{}", octave_number)),
-            midi_note,
-        });
-
-        white_key_index = 0;
-
-        for octave in 0..2 {
-            for i in 0..white_key_pattern.len() {
-                let white_note = white_key_pattern[i];
-
-                let has_black_key_after = black_key_pattern.iter().any(|&black| black == white_note + 1);
-
-                if has_black_key_after {
-                    let x = start_pos.x + (white_key_index as f32 * white_key_width) + white_key_width - (black_key_width / 2.0);
+                if midi_note <= 72 {
+                    let x = start_pos.x + (local_white_key_idx as f32 * white_key_width) + white_key_width - (black_key_width / 2.0);
                     let y = start_pos.y;
 
                     let key_rect = egui::Rect::from_min_size(
@@ -162,9 +237,6 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
                     );
 
                     let response = ui.allocate_rect(key_rect, egui::Sense::click());
-
-                    let black_note = white_note + 1;
-                    let midi_note = 24 + (octave * 12) + black_note;
 
                     keys.push(KeyInfo {
                         rect: key_rect,
@@ -175,8 +247,6 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
                         midi_note,
                     });
                 }
-
-                white_key_index += 1;
             }
         }
 
@@ -212,6 +282,9 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
 
             painter.rect_filled(key.rect, 2.0, fill_color);
 
+            let key_width = key.rect.width();
+            let section_width = key_width / 3.0;
+
             let chance_value = if is_root {
                 127
             } else {
@@ -223,7 +296,7 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
                 let gray_height = key.rect.height() * chance_ratio;
                 let gray_rect = egui::Rect::from_min_size(
                     egui::pos2(key.rect.left(), key.rect.bottom() - gray_height),
-                    egui::vec2(key.rect.width(), gray_height),
+                    egui::vec2(section_width, gray_height),
                 );
 
                 let gray_color = if key.is_black {
@@ -250,8 +323,8 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
 
                 let blue_height = key.rect.height() * beat_ratio;
                 let blue_rect = egui::Rect::from_min_size(
-                    egui::pos2(key.rect.left(), key.rect.bottom() - blue_height),
-                    egui::vec2(key.rect.width(), blue_height),
+                    egui::pos2(key.rect.left() + section_width, key.rect.bottom() - blue_height),
+                    egui::vec2(section_width, blue_height),
                 );
 
                 let blue_color = if beat_value < 64 {
@@ -261,6 +334,34 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
                 };
 
                 painter.rect_filled(blue_rect, 2.0, blue_color);
+            }
+
+            let beat_length_value = if is_root {
+                64
+            } else {
+                *state.note_beat_lengths.get(&key.midi_note).unwrap_or(&64)
+            };
+
+            if beat_length_value != 64 {
+                let beat_length_ratio = if beat_length_value < 64 {
+                    (64 - beat_length_value) as f32 / 64.0
+                } else {
+                    (beat_length_value - 64) as f32 / 63.0
+                };
+
+                let green_height = key.rect.height() * beat_length_ratio;
+                let green_rect = egui::Rect::from_min_size(
+                    egui::pos2(key.rect.left() + section_width * 2.0, key.rect.bottom() - green_height),
+                    egui::vec2(section_width, green_height),
+                );
+
+                let green_color = if beat_length_value < 64 {
+                    Color32::from_rgba_unmultiplied(100, 200, 100, 120)
+                } else {
+                    Color32::from_rgba_unmultiplied(50, 150, 50, 120)
+                };
+
+                painter.rect_filled(green_rect, 2.0, green_color);
             }
 
             let stroke_width = if is_root { 2.0 } else { 1.0 };
@@ -287,7 +388,7 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
                     egui::Align2::CENTER_CENTER,
                     label,
                     egui::FontId::proportional(10.0),
-                    Color32::from_rgb(100, 100, 100),
+                    Color32::from_rgb(80, 80, 80),
                 );
             }
         }
@@ -301,10 +402,47 @@ fn midi_note_to_name(midi_note: u8) -> String {
     format!("{}{}", note_names[note_index], octave)
 }
 
-fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
-    ui.add_space(8.0);
-    ui.set_max_width(742.0);
+fn log_note_values(state: &NoteState) {
+    let mut values = Vec::new();
 
+    for midi_note in 0..=127 {
+        let chance = state.note_chances.get(&midi_note).copied().unwrap_or(0);
+        let beat = state.note_beats.get(&midi_note).copied().unwrap_or(64);
+        let beat_length = state.note_beat_lengths.get(&midi_note).copied().unwrap_or(64);
+        let is_root = midi_note == state.root_note;
+
+        let has_non_default = if is_root {
+            false
+        } else {
+            chance != 0 || beat != 64 || beat_length != 64
+        };
+
+        if is_root || has_non_default {
+            let note_name = midi_note_to_name(midi_note);
+            if is_root {
+                values.push(format!("{}(root)", note_name));
+            } else {
+                let mut parts = Vec::new();
+                if chance != 0 {
+                    parts.push(format!("chance={}", chance));
+                }
+                if beat != 64 {
+                    parts.push(format!("beat={}", beat));
+                }
+                if beat_length != 64 {
+                    parts.push(format!("beat_length={}", beat_length));
+                }
+                values.push(format!("{}[{}]", note_name, parts.join(", ")));
+            }
+        }
+    }
+
+    if !values.is_empty() {
+        nih_log!("Notes: {}", values.join(", "));
+    }
+}
+
+fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
         .inner_margin(10.0)
@@ -314,6 +452,7 @@ fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
         ))
         .corner_radius(15.0)
         .show(ui, |ui| {
+            ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 let selected_note_name = if let Some(note) = state.selected_note {
                     midi_note_to_name(note)
@@ -401,6 +540,45 @@ fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
                         ui.label(egui::RichText::new("Strong (127)").size(10.0).color(Color32::from_gray(150)));
                     });
                 });
+
+                ui.add_space(8.0);
+
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("Beat Length:").size(12.0));
+                        ui.add_space(8.0);
+
+                        let is_root = selected == state.root_note;
+                        let mut beat_length_value = if is_root {
+                            64
+                        } else {
+                            *state.note_beat_lengths.get(&selected).unwrap_or(&64)
+                        };
+
+                        let slider = egui::Slider::new(&mut beat_length_value, 0..=127)
+                            .show_value(true);
+
+                        let slider_response = if is_root {
+                            ui.add_enabled(false, slider)
+                        } else {
+                            ui.add(slider)
+                        };
+
+                        if slider_response.changed() && !is_root {
+                            state.note_beat_lengths.insert(selected, beat_length_value);
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.add_space(78.0);
+                        ui.label(egui::RichText::new("Long (0)").size(10.0).color(Color32::from_gray(150)));
+                        ui.add_space(60.0);
+                        ui.label(egui::RichText::new("Any (64)").size(10.0).color(Color32::from_gray(150)));
+                        ui.add_space(60.0);
+                        ui.label(egui::RichText::new("Short (127)").size(10.0).color(Color32::from_gray(150)));
+                    });
+                });
             }
+            });
         });
 }
