@@ -342,6 +342,56 @@ pub struct DeviceParams {
     pub div22d_beat21: FloatParam,
     #[id = "div22d_beat22"]
     pub div22d_beat22: FloatParam,
+
+    #[id = "synth_osc_d"]
+    pub synth_osc_d: FloatParam,
+    #[id = "synth_osc_v"]
+    pub synth_osc_v: FloatParam,
+
+    #[id = "synth_distortion_amount"]
+    pub synth_distortion_amount: FloatParam,
+    #[id = "synth_distortion_threshold"]
+    pub synth_distortion_threshold: FloatParam,
+
+    #[id = "synth_filter_cutoff"]
+    pub synth_filter_cutoff: FloatParam,
+    #[id = "synth_filter_resonance"]
+    pub synth_filter_resonance: FloatParam,
+    #[id = "synth_filter_env_amount"]
+    pub synth_filter_env_amount: FloatParam,
+
+    #[id = "synth_volume"]
+    pub synth_volume: FloatParam,
+
+    #[id = "synth_vol_attack"]
+    pub synth_vol_attack: FloatParam,
+    #[id = "synth_vol_attack_shape"]
+    pub synth_vol_attack_shape: FloatParam,
+    #[id = "synth_vol_decay"]
+    pub synth_vol_decay: FloatParam,
+    #[id = "synth_vol_decay_shape"]
+    pub synth_vol_decay_shape: FloatParam,
+    #[id = "synth_vol_sustain"]
+    pub synth_vol_sustain: FloatParam,
+    #[id = "synth_vol_release"]
+    pub synth_vol_release: FloatParam,
+    #[id = "synth_vol_release_shape"]
+    pub synth_vol_release_shape: FloatParam,
+
+    #[id = "synth_filt_attack"]
+    pub synth_filt_attack: FloatParam,
+    #[id = "synth_filt_attack_shape"]
+    pub synth_filt_attack_shape: FloatParam,
+    #[id = "synth_filt_decay"]
+    pub synth_filt_decay: FloatParam,
+    #[id = "synth_filt_decay_shape"]
+    pub synth_filt_decay_shape: FloatParam,
+    #[id = "synth_filt_sustain"]
+    pub synth_filt_sustain: FloatParam,
+    #[id = "synth_filt_release"]
+    pub synth_filt_release: FloatParam,
+    #[id = "synth_filt_release_shape"]
+    pub synth_filt_release_shape: FloatParam,
 }
 
 impl DeviceParams {
@@ -894,6 +944,122 @@ impl Default for DeviceParams {
             div22d_beat20: Self::create_param("1/32D Beat 20".to_string(), 0.0),
             div22d_beat21: Self::create_param("1/32D Beat 21".to_string(), 0.0),
             div22d_beat22: Self::create_param("1/32D Beat 22".to_string(), 0.0),
+
+            synth_osc_d: FloatParam::new(
+                "Oscillator D".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_osc_v: FloatParam::new(
+                "Oscillator V".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_distortion_amount: FloatParam::new(
+                "Distortion Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_distortion_threshold: FloatParam::new(
+                "Distortion Threshold".to_string(),
+                0.9,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_filter_cutoff: FloatParam::new(
+                "Filter Cutoff".to_string(),
+                1000.0,
+                FloatRange::Skewed { min: 20.0, max: 20000.0, factor: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filter_resonance: FloatParam::new(
+                "Filter Resonance".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.99 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filter_env_amount: FloatParam::new(
+                "Filter Env Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: -10000.0, max: 10000.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_volume: FloatParam::new(
+                "Volume".to_string(),
+                0.8,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_vol_attack: FloatParam::new(
+                "Vol Attack".to_string(),
+                10.0,
+                FloatRange::Linear { min: 0.0, max: 1000.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_vol_attack_shape: FloatParam::new(
+                "Vol Attack Shape".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_vol_decay: FloatParam::new(
+                "Vol Decay".to_string(),
+                100.0,
+                FloatRange::Linear { min: 0.0, max: 1000.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_vol_decay_shape: FloatParam::new(
+                "Vol Decay Shape".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_vol_sustain: FloatParam::new(
+                "Vol Sustain".to_string(),
+                0.7,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_vol_release: FloatParam::new(
+                "Vol Release".to_string(),
+                200.0,
+                FloatRange::Linear { min: 0.0, max: 1000.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_vol_release_shape: FloatParam::new(
+                "Vol Release Shape".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_filt_attack: FloatParam::new(
+                "Filt Attack".to_string(),
+                10.0,
+                FloatRange::Linear { min: 0.0, max: 1000.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filt_attack_shape: FloatParam::new(
+                "Filt Attack Shape".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filt_decay: FloatParam::new(
+                "Filt Decay".to_string(),
+                100.0,
+                FloatRange::Linear { min: 0.0, max: 1000.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filt_decay_shape: FloatParam::new(
+                "Filt Decay Shape".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filt_sustain: FloatParam::new(
+                "Filt Sustain".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filt_release: FloatParam::new(
+                "Filt Release".to_string(),
+                200.0,
+                FloatRange::Linear { min: 0.0, max: 1000.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filt_release_shape: FloatParam::new(
+                "Filt Release Shape".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
         }
     }
 }

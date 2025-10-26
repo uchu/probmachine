@@ -1,5 +1,6 @@
 mod params;
 mod ui;
+mod synth;
 
 use egui_taffy::taffy::{
     prelude::*,
@@ -11,15 +12,18 @@ use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
 use ui::Page;
+use synth::SynthEngine;
 
 pub struct Device {
     params: Arc<DeviceParams>,
+    synth_engine: Option<SynthEngine>,
 }
 
 impl Default for Device {
     fn default() -> Self {
         Self {
             params: Arc::new(DeviceParams::default()),
+            synth_engine: None,
         }
     }
 }
@@ -104,9 +108,10 @@ impl Plugin for Device {
     fn initialize(
         &mut self,
         _audio_io_layout: &AudioIOLayout,
-        _buffer_config: &BufferConfig,
+        buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
+        self.synth_engine = Some(SynthEngine::new(buffer_config.sample_rate));
         true
     }
 
@@ -118,9 +123,64 @@ impl Plugin for Device {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
-        for channel_samples in buffer.iter_samples() {
-            for sample_out in channel_samples {
-                *sample_out = 0.0;
+        if let Some(synth) = &mut self.synth_engine {
+            synth.set_osc_params(
+                self.params.synth_osc_d.modulated_plain_value(),
+                self.params.synth_osc_v.modulated_plain_value(),
+            );
+
+            synth.set_distortion_params(
+                self.params.synth_distortion_amount.modulated_plain_value(),
+                self.params.synth_distortion_threshold.modulated_plain_value(),
+            );
+
+            synth.set_filter_params(
+                self.params.synth_filter_cutoff.modulated_plain_value(),
+                self.params.synth_filter_resonance.modulated_plain_value(),
+                self.params.synth_filter_env_amount.modulated_plain_value(),
+            );
+
+            synth.set_volume(self.params.synth_volume.modulated_plain_value());
+
+            synth.set_volume_envelope(
+                self.params.synth_vol_attack.modulated_plain_value(),
+                self.params.synth_vol_attack_shape.modulated_plain_value(),
+                self.params.synth_vol_decay.modulated_plain_value(),
+                self.params.synth_vol_decay_shape.modulated_plain_value(),
+                self.params.synth_vol_sustain.modulated_plain_value(),
+                self.params.synth_vol_release.modulated_plain_value(),
+                self.params.synth_vol_release_shape.modulated_plain_value(),
+            );
+
+            synth.set_filter_envelope(
+                self.params.synth_filt_attack.modulated_plain_value(),
+                self.params.synth_filt_attack_shape.modulated_plain_value(),
+                self.params.synth_filt_decay.modulated_plain_value(),
+                self.params.synth_filt_decay_shape.modulated_plain_value(),
+                self.params.synth_filt_sustain.modulated_plain_value(),
+                self.params.synth_filt_release.modulated_plain_value(),
+                self.params.synth_filt_release_shape.modulated_plain_value(),
+            );
+
+            let mut output_l = vec![0.0; buffer.samples()];
+            let mut output_r = vec![0.0; buffer.samples()];
+
+            synth.process_block(&mut output_l, &mut output_r);
+
+            for (i, channel_samples) in buffer.iter_samples().enumerate() {
+                let mut iter = channel_samples.into_iter();
+                if let Some(left) = iter.next() {
+                    *left = output_l[i];
+                }
+                if let Some(right) = iter.next() {
+                    *right = output_r[i];
+                }
+            }
+        } else {
+            for channel_samples in buffer.iter_samples() {
+                for sample_out in channel_samples {
+                    *sample_out = 0.0;
+                }
             }
         }
 
