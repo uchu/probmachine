@@ -32,7 +32,7 @@ pub fn render(
 
     tui.ui(|ui| {
         ui.add_space(12.0);
-        render_controls(ui, params, beat_mode, num_sliders);
+        render_controls(ui, params, setter, beat_mode, num_sliders);
     });
 }
 
@@ -425,7 +425,7 @@ fn render_sliders(
     });
 }
 
-fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode: BeatMode, num_sliders: usize) {
+fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter, beat_mode: BeatMode, num_sliders: usize) {
     egui::Frame::default()
         .fill(Color32::from_rgb(30, 30, 30))
         .inner_margin(8.0)
@@ -436,6 +436,8 @@ fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode: Bea
                 render_division_buttons(ui, params, beat_mode, num_sliders);
                 ui.add_space(5.0);
                 render_mode_buttons(ui, params, beat_mode);
+                ui.add_space(5.0);
+                render_clear_button(ui, params, setter);
             });
         });
 }
@@ -578,6 +580,28 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
                 mem.data.insert_temp(egui::Id::new("beat_mode"), BeatMode::Dotted);
                 mem.data.insert_temp(egui::Id::new("num_sliders"), 2);
             });
+        }
+    });
+}
+
+fn render_clear_button(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter) {
+    ui.horizontal(|ui| {
+        ui.add_space(275.0);
+
+        let clear_button = egui::Button::new(egui::RichText::new("Clear").size(14.0))
+            .min_size(egui::vec2(80.0, 32.0));
+
+        if ui.add(clear_button).clicked() {
+            for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+                for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
+                    for index in 0..*count {
+                        let param = params.get_division_param(mode, *count, index);
+                        setter.begin_set_parameter(param);
+                        setter.set_parameter(param, 0.0);
+                        setter.end_set_parameter(param);
+                    }
+                }
+            }
         }
     });
 }

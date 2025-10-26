@@ -125,7 +125,9 @@ impl Sequencer {
                         if random_value < cumulative {
                             let (start, end) = DeviceParams::get_beat_time_span(mode, count, index);
                             let duration_normalized = end - start;
-                            let duration_samples = (duration_normalized * total_samples as f32) as usize;
+                            let note_length_percent = params.note_length_percent.modulated_plain_value();
+                            let duration_multiplier = note_length_percent / 100.0;
+                            let duration_samples = ((duration_normalized * total_samples as f32) * duration_multiplier) as usize;
                             let sample_position = (start_time * total_samples as f32) as usize;
 
                             events.push(NoteEvent {

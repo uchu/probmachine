@@ -392,6 +392,9 @@ pub struct DeviceParams {
     pub synth_filt_release: FloatParam,
     #[id = "synth_filt_release_shape"]
     pub synth_filt_release_shape: FloatParam,
+
+    #[id = "note_length_percent"]
+    pub note_length_percent: FloatParam,
 }
 
 impl DeviceParams {
@@ -1059,6 +1062,12 @@ impl Default for DeviceParams {
                 "Filt Release Shape".to_string(),
                 0.5,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            note_length_percent: FloatParam::new(
+                "Note Length %".to_string(),
+                100.0,
+                FloatRange::Linear { min: 0.0, max: 200.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
         }
     }
