@@ -19,10 +19,6 @@ impl Oscillator {
         }
     }
 
-    pub fn set_sample_rate(&mut self, sample_rate: f32) {
-        self.sample_rate = sample_rate;
-    }
-
     pub fn set_frequency(&mut self, freq: f32) {
         self.freq = freq;
     }
@@ -36,9 +32,5 @@ impl Oscillator {
         let israte = 1.0 / self.sample_rate;
         let v_limited = VPSOscillator::limit_v(d, v);
         self.osc.next(self.freq, israte, d, v_limited)
-    }
-
-    pub fn reset(&mut self) {
-        self.osc.reset();
     }
 }

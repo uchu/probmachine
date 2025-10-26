@@ -20,10 +20,6 @@ impl Envelope {
         }
     }
 
-    pub fn set_sample_rate(&mut self, sample_rate: f32) {
-        self.adsr.set_sample_rate(sample_rate);
-    }
-
     pub fn trigger(&mut self, attack_ms: f32, attack_shape: f32, decay_ms: f32, decay_shape: f32, sustain: f32, release_ms: f32, release_shape: f32) {
         self.params = EnvADSRParams {
             attack_ms,
@@ -45,9 +41,5 @@ impl Envelope {
             self.triggered = false;
         }
         env
-    }
-
-    pub fn is_running(&self) -> bool {
-        self.gate > 0.0
     }
 }

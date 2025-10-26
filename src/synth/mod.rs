@@ -23,11 +23,6 @@ impl SynthEngine {
         }
     }
 
-    pub fn set_sample_rate(&mut self, sample_rate: f32) {
-        self.sample_rate = sample_rate;
-        self.voice.set_sample_rate(sample_rate);
-    }
-
     pub fn set_osc_params(&mut self, d: f32, v: f32) {
         self.voice.set_osc_params(d, v);
     }

@@ -9,7 +9,6 @@ pub struct Voice {
     volume_env: Envelope,
     filter_env: Envelope,
     oversampling: Oversampling<4>,
-    sample_rate: f32,
 
     osc_d: f32,
     osc_v: f32,
@@ -48,7 +47,6 @@ impl Voice {
             volume_env: Envelope::new(sample_rate),
             filter_env: Envelope::new(sample_rate),
             oversampling,
-            sample_rate,
 
             osc_d: 0.5,
             osc_v: 0.5,
@@ -75,15 +73,6 @@ impl Voice {
             filter_release: 200.0,
             filter_release_shape: 0.5,
         }
-    }
-
-    pub fn set_sample_rate(&mut self, sample_rate: f32) {
-        self.sample_rate = sample_rate;
-        self.oscillator.set_sample_rate(sample_rate);
-        self.filter.set_sample_rate(sample_rate);
-        self.volume_env.set_sample_rate(sample_rate);
-        self.filter_env.set_sample_rate(sample_rate);
-        self.oversampling.set_sample_rate(sample_rate);
     }
 
     pub fn set_frequency(&mut self, freq: f32) {
@@ -151,10 +140,6 @@ impl Voice {
             self.filter_release,
             self.filter_release_shape,
         );
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.volume_env.is_running() || self.filter_env.is_running()
     }
 
     pub fn process(&mut self) -> f32 {
