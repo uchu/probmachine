@@ -1,6 +1,7 @@
 mod params;
 mod ui;
 mod synth;
+mod sequencer;
 
 use egui_taffy::taffy::{
     prelude::*,
@@ -165,7 +166,7 @@ impl Plugin for Device {
             let mut output_l = vec![0.0; buffer.samples()];
             let mut output_r = vec![0.0; buffer.samples()];
 
-            synth.process_block(&mut output_l, &mut output_r);
+            synth.process_block(&mut output_l, &mut output_r, &self.params);
 
             for (i, channel_samples) in buffer.iter_samples().enumerate() {
                 let mut iter = channel_samples.into_iter();

@@ -34,6 +34,11 @@ impl Envelope {
         self.triggered = true;
     }
 
+    pub fn release(&mut self) {
+        self.gate = 0.0;
+        self.triggered = false;
+    }
+
     pub fn next(&mut self) -> f32 {
         let (env, _) = self.adsr.tick(self.gate, &mut self.params);
         if self.triggered {

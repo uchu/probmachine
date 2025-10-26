@@ -11,6 +11,7 @@ nih_plug = { path = "../nih-plug-patched", features = ["standalone"] }
 nih_plug_egui = { path = "../nih-plug-patched/nih_plug_egui" }
 egui_taffy = "0.7"
 synfx-dsp = "0.5"
+rand = "0.8"
 
 [lib]
 crate-type = ["cdylib", "lib"]

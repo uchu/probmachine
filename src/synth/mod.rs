@@ -4,11 +4,13 @@ mod envelope;
 mod voice;
 
 pub use voice::Voice;
+use crate::sequencer::Sequencer;
+use crate::params::DeviceParams;
 
 pub struct SynthEngine {
     voice: Voice,
     sample_rate: f32,
-    retrigger_timer: f32,
+    sequencer: Sequencer,
 }
 
 impl SynthEngine {
@@ -19,7 +21,7 @@ impl SynthEngine {
         Self {
             voice,
             sample_rate,
-            retrigger_timer: 0.0,
+            sequencer: Sequencer::new(sample_rate, 120.0),
         }
     }
 
@@ -47,21 +49,21 @@ impl SynthEngine {
         self.voice.set_filter_envelope(attack, attack_shape, decay, decay_shape, sustain, release, release_shape);
     }
 
-    pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32]) {
-        let samples_per_second = self.sample_rate;
-        let retrigger_interval = samples_per_second;
-
+    pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams) {
         for (l, r) in output_l.iter_mut().zip(output_r.iter_mut()) {
-            if self.retrigger_timer >= retrigger_interval {
+            let (should_trigger, should_release) = self.sequencer.update(params);
+
+            if should_trigger {
                 self.voice.trigger();
-                self.retrigger_timer = 0.0;
+            }
+
+            if should_release {
+                self.voice.release();
             }
 
             let sample = self.voice.process();
             *l = sample;
             *r = sample;
-
-            self.retrigger_timer += 1.0;
         }
     }
 }

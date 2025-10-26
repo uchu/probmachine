@@ -144,6 +144,11 @@ impl Voice {
         );
     }
 
+    pub fn release(&mut self) {
+        self.volume_env.release();
+        self.filter_env.release();
+    }
+
     pub fn process(&mut self) -> f32 {
         // Get envelope values at 1x rate (they're slow-moving control signals)
         let vol_env = self.volume_env.next();
