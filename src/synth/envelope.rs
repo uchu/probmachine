@@ -4,7 +4,7 @@ pub struct Envelope {
     adsr: EnvRetrigADSR,
     params: EnvADSRParams,
     gate: f32,
-    triggered: bool,
+    retrigger_countdown: u8,
 }
 
 impl Envelope {
@@ -16,7 +16,7 @@ impl Envelope {
             adsr,
             params: EnvADSRParams::default(),
             gate: 0.0,
-            triggered: false,
+            retrigger_countdown: 0,
         }
     }
 
@@ -30,21 +30,30 @@ impl Envelope {
             release_ms,
             release_shape,
         };
-        self.gate = 1.0;
-        self.triggered = true;
+
+        if self.gate > 0.0 {
+            self.retrigger_countdown = 2;
+        } else {
+            self.gate = 1.0;
+        }
     }
 
     pub fn release(&mut self) {
         self.gate = 0.0;
-        self.triggered = false;
+        self.retrigger_countdown = 0;
     }
 
     pub fn next(&mut self) -> f32 {
-        let (env, _) = self.adsr.tick(self.gate, &mut self.params);
-        if self.triggered {
-            self.gate = 0.0;
-            self.triggered = false;
+        if self.retrigger_countdown > 0 {
+            if self.retrigger_countdown == 2 {
+                self.gate = 0.0;
+            } else if self.retrigger_countdown == 1 {
+                self.gate = 1.0;
+            }
+            self.retrigger_countdown -= 1;
         }
+
+        let (env, _) = self.adsr.tick(self.gate, &mut self.params);
         env
     }
 }

@@ -68,21 +68,36 @@ impl Sequencer {
 
         let total_samples = self.bar_length_samples;
 
-        let highest_resolution = 32;
-        let samples_per_step = total_samples / highest_resolution;
+        use nih_plug::nih_log;
 
-        for step in 0..highest_resolution {
-            let step_start_sample = step * samples_per_step;
-            let step_time_normalized = step as f32 / highest_resolution as f32;
+        use std::collections::HashSet;
+        let mut unique_start_times: HashSet<(u32, u32)> = HashSet::new();
 
+        for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+            for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
+                for index in 0..*count {
+                    let (start, _) = DeviceParams::get_beat_time_span(mode, *count, index);
+                    let start_fixed = (start * 1000000.0) as u32;
+                    unique_start_times.insert((start_fixed, 1000000));
+                }
+            }
+        }
+
+        let mut start_times: Vec<f32> = unique_start_times
+            .iter()
+            .map(|(num, denom)| *num as f32 / *denom as f32)
+            .collect();
+        start_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        for &start_time in &start_times {
             let mut candidates: Vec<(BeatMode, usize, usize, f32)> = Vec::new();
 
             for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
                 for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
                     for index in 0..*count {
-                        let (start, end) = DeviceParams::get_beat_time_span(mode, *count, index);
+                        let (start, _end) = DeviceParams::get_beat_time_span(mode, *count, index);
 
-                        if step_time_normalized >= start && step_time_normalized < end {
+                        if (start - start_time).abs() < 0.0001 {
                             let param = params.get_division_param(mode, *count, index);
                             let probability = param.modulated_plain_value();
 
@@ -108,12 +123,13 @@ impl Sequencer {
                     for (mode, count, index, probability) in candidates {
                         cumulative += probability;
                         if random_value < cumulative {
-                            let (_, end) = DeviceParams::get_beat_time_span(mode, count, index);
-                            let duration_normalized = end - step_time_normalized;
+                            let (start, end) = DeviceParams::get_beat_time_span(mode, count, index);
+                            let duration_normalized = end - start;
                             let duration_samples = (duration_normalized * total_samples as f32) as usize;
+                            let sample_position = (start_time * total_samples as f32) as usize;
 
                             events.push(NoteEvent {
-                                sample_position: step_start_sample,
+                                sample_position,
                                 frequency: 220.0,
                                 duration_samples,
                             });
@@ -122,6 +138,18 @@ impl Sequencer {
                     }
                 }
             }
+        }
+
+        if !events.is_empty() {
+            let event_descriptions: Vec<String> = events
+                .iter()
+                .map(|e| {
+                    let time_in_bar = e.sample_position as f32 / total_samples as f32;
+                    let duration_in_bar = e.duration_samples as f32 / total_samples as f32;
+                    format!("t={:.3} dur={:.3}", time_in_bar, duration_in_bar)
+                })
+                .collect();
+            nih_log!("Generated {} events: {}", events.len(), event_descriptions.join(", "));
         }
 
         events
@@ -139,13 +167,6 @@ impl Sequencer {
         let mut should_trigger = false;
         let mut should_release = false;
 
-        if let Some((_start_pos, end_pos)) = self.current_note {
-            if self.bar_position_samples >= end_pos {
-                should_release = true;
-                self.current_note = None;
-            }
-        }
-
         for event in &self.current_bar {
             if event.sample_position == self.bar_position_samples {
                 should_trigger = true;
@@ -154,6 +175,15 @@ impl Sequencer {
                     event.sample_position + event.duration_samples,
                 ));
                 break;
+            }
+        }
+
+        if !should_trigger {
+            if let Some((_start_pos, end_pos)) = self.current_note {
+                if self.bar_position_samples >= end_pos {
+                    should_release = true;
+                    self.current_note = None;
+                }
             }
         }
 
