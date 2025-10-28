@@ -29,6 +29,18 @@ impl SynthEngine {
         self.voice.set_osc_params(d, v);
     }
 
+    pub fn set_osc_volume(&mut self, volume: f32) {
+        self.voice.set_osc_volume(volume);
+    }
+
+    pub fn set_polyblep_params(&mut self, volume: f32, pulse_width: f32) {
+        self.voice.set_polyblep_params(volume, pulse_width);
+    }
+
+    pub fn set_sub_volume(&mut self, volume: f32) {
+        self.voice.set_sub_volume(volume);
+    }
+
     pub fn set_distortion_params(&mut self, amount: f32, threshold: f32) {
         self.voice.set_distortion_params(amount, threshold);
     }

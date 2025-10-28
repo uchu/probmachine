@@ -1,3 +1,5 @@
+#![feature(portable_simd)]
+
 mod params;
 mod ui;
 mod synth;
@@ -128,6 +130,15 @@ impl Plugin for Device {
             synth.set_osc_params(
                 self.params.synth_osc_d.modulated_plain_value(),
                 self.params.synth_osc_v.modulated_plain_value(),
+            );
+
+            synth.set_osc_volume(self.params.synth_osc_volume.modulated_plain_value());
+
+            synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
+
+            synth.set_polyblep_params(
+                self.params.synth_polyblep_volume.modulated_plain_value(),
+                self.params.synth_polyblep_pulse_width.modulated_plain_value(),
             );
 
             synth.set_distortion_params(

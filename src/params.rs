@@ -347,6 +347,15 @@ pub struct DeviceParams {
     pub synth_osc_d: FloatParam,
     #[id = "synth_osc_v"]
     pub synth_osc_v: FloatParam,
+    #[id = "synth_osc_volume"]
+    pub synth_osc_volume: FloatParam,
+    #[id = "synth_sub_volume"]
+    pub synth_sub_volume: FloatParam,
+
+    #[id = "synth_polyblep_volume"]
+    pub synth_polyblep_volume: FloatParam,
+    #[id = "synth_polyblep_pulse_width"]
+    pub synth_polyblep_pulse_width: FloatParam,
 
     #[id = "synth_distortion_amount"]
     pub synth_distortion_amount: FloatParam,
@@ -958,6 +967,27 @@ impl Default for DeviceParams {
                 0.5,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_osc_volume: FloatParam::new(
+                "VPS Volume".to_string(),
+                1.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_sub_volume: FloatParam::new(
+                "Sub Volume".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_polyblep_volume: FloatParam::new(
+                "PolyBlep Volume".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_polyblep_pulse_width: FloatParam::new(
+                "PolyBlep Pulse Width".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_distortion_amount: FloatParam::new(
                 "Distortion Amount".to_string(),
@@ -983,7 +1013,7 @@ impl Default for DeviceParams {
             synth_filter_env_amount: FloatParam::new(
                 "Filter Env Amount".to_string(),
                 0.0,
-                FloatRange::Linear { min: -10000.0, max: 10000.0 }
+                FloatRange::Linear { min: -5000.0, max: 5000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_volume: FloatParam::new(

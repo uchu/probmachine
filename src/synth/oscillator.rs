@@ -1,4 +1,4 @@
-use synfx_dsp::{VPSOscillator, rand_01};
+use synfx_dsp::{VPSOscillator, PolyBlepOscillator, rand_01};
 
 pub struct Oscillator {
     osc: VPSOscillator,
@@ -32,5 +32,30 @@ impl Oscillator {
         let israte = 1.0 / self.sample_rate;
         let v_limited = VPSOscillator::limit_v(d, v);
         self.osc.next(self.freq, israte, d, v_limited)
+    }
+}
+
+pub struct PolyBlepWrapper {
+    osc: PolyBlepOscillator,
+    sample_rate: f32,
+    freq: f32,
+}
+
+impl PolyBlepWrapper {
+    pub fn new(sample_rate: f32) -> Self {
+        Self {
+            osc: PolyBlepOscillator::new(rand_01() * 0.25),
+            sample_rate,
+            freq: 220.0,
+        }
+    }
+
+    pub fn set_frequency(&mut self, freq: f32) {
+        self.freq = freq;
+    }
+
+    pub fn next(&mut self, pulse_width: f32) -> f32 {
+        let israte = 1.0 / self.sample_rate;
+        self.osc.next_pulse(self.freq, israte, pulse_width)
     }
 }

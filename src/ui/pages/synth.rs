@@ -22,186 +22,184 @@ pub fn render(
         ..Default::default()
     })
     .ui(|ui| {
-        egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 8.0;
+        ui.horizontal(|ui| {
+            ui.add_space(4.0);
 
-            ui.label(egui::RichText::new("Oscillator").strong());
-            ui.separator();
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("OSC").size(10.0).strong());
+                ui.add_space(2.0);
+                ui.horizontal(|ui| {
+                    render_vertical_slider(ui, params, setter, &params.synth_osc_d, "D", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                    ui.add_space(3.0);
+                    render_vertical_slider(ui, params, setter, &params.synth_osc_v, "V", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                    ui.add_space(3.0);
+                    render_vertical_slider(ui, params, setter, &params.synth_osc_volume, "Vol", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                    ui.add_space(3.0);
+                    render_vertical_slider(ui, params, setter, &params.synth_sub_volume, "Sub", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                });
+            });
 
-            ui.label("D:");
-            let mut value = params.synth_osc_d.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-                .custom_formatter(|v, _| format!("{:.2}", v)))
-                .changed() {
-                setter.set_parameter(&params.synth_osc_d, value);
-            }
+            ui.add_space(8.0);
 
-            ui.label("V:");
-            let mut value = params.synth_osc_v.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-                .custom_formatter(|v, _| format!("{:.2}", v)))
-                .changed() {
-                setter.set_parameter(&params.synth_osc_v, value);
-            }
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("POLYBLEP").size(10.0).strong());
+                ui.add_space(2.0);
+                ui.horizontal(|ui| {
+                    render_vertical_slider(ui, params, setter, &params.synth_polyblep_volume, "Vol", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                    ui.add_space(3.0);
+                    render_vertical_slider(ui, params, setter, &params.synth_polyblep_pulse_width, "PW", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                });
+            });
 
-            ui.add_space(15.0);
-            ui.label(egui::RichText::new("Distortion").strong());
-            ui.separator();
+            ui.add_space(8.0);
 
-            ui.label("Amount:");
-            let mut value = params.synth_distortion_amount.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-                .custom_formatter(|v, _| format!("{:.2}", v)))
-                .changed() {
-                setter.set_parameter(&params.synth_distortion_amount, value);
-            }
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("DIST").size(10.0).strong());
+                ui.add_space(2.0);
+                ui.horizontal(|ui| {
+                    render_vertical_slider(ui, params, setter, &params.synth_distortion_amount, "Amt", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                    ui.add_space(3.0);
+                    render_vertical_slider(ui, params, setter, &params.synth_distortion_threshold, "Thr", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+                });
+            });
 
-            ui.label("Threshold:");
-            let mut value = params.synth_distortion_threshold.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-                .custom_formatter(|v, _| format!("{:.2}", v)))
-                .changed() {
-                setter.set_parameter(&params.synth_distortion_threshold, value);
-            }
+            ui.add_space(8.0);
 
-            ui.add_space(15.0);
-            ui.label(egui::RichText::new("Filter").strong());
-            ui.separator();
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("FILT").size(10.0).strong());
+                ui.add_space(2.0);
+                ui.horizontal(|ui| {
+                    render_vertical_slider(ui, params, setter, &params.synth_filter_cutoff, "Cut", 20.0, 20000.0, SliderScale::Logarithmic, |v| format!("{:.0}", v));
+                    ui.add_space(3.0);
+                    render_vertical_slider(ui, params, setter, &params.synth_filter_resonance, "Res", 0.0, 0.99, SliderScale::Linear, |v| format!("{:.2}", v));
+                    ui.add_space(3.0);
+                    render_vertical_slider(ui, params, setter, &params.synth_filter_env_amount, "Env", -5000.0, 5000.0, SliderScale::Linear, |v| format!("{:.0}", v));
+                });
+            });
 
-            ui.label("Cutoff:");
-            let mut value = params.synth_filter_cutoff.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 20.0..=20000.0)
-                .logarithmic(true)
-                .custom_formatter(|v, _| format!("{:.0} Hz", v)))
-                .changed() {
-                setter.set_parameter(&params.synth_filter_cutoff, value);
-            }
+            ui.add_space(8.0);
 
-            ui.label("Resonance:");
-            let mut value = params.synth_filter_resonance.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 0.0..=0.99)
-                .custom_formatter(|v, _| format!("{:.2}", v)))
-                .changed() {
-                setter.set_parameter(&params.synth_filter_resonance, value);
-            }
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("VOL ENV").size(10.0).strong());
+                ui.add_space(2.0);
+                render_envelope_controls_compact(ui, params, setter, "vol");
+            });
 
-            ui.label("Env Amount:");
-            let mut value = params.synth_filter_env_amount.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, -10000.0..=10000.0)
-                .custom_formatter(|v, _| format!("{:.0}", v)))
-                .changed() {
-                setter.set_parameter(&params.synth_filter_env_amount, value);
-            }
+            ui.add_space(8.0);
 
-            ui.add_space(15.0);
-            ui.label(egui::RichText::new("Volume Envelope").strong());
-            ui.separator();
-            render_envelope_controls(ui, params, setter, "vol");
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("FILT ENV").size(10.0).strong());
+                ui.add_space(2.0);
+                render_envelope_controls_compact(ui, params, setter, "filt");
+            });
 
-            ui.add_space(15.0);
-            ui.label(egui::RichText::new("Filter Envelope").strong());
-            ui.separator();
-            render_envelope_controls(ui, params, setter, "filt");
+            ui.add_space(8.0);
 
-            ui.add_space(15.0);
-            ui.label(egui::RichText::new("Volume").strong());
-            ui.separator();
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("VOL").size(10.0).strong());
+                ui.add_space(2.0);
+                render_vertical_slider(ui, params, setter, &params.synth_volume, "Lvl", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.0}%", v * 100.0));
+            });
 
-            ui.label("Level:");
-            let mut value = params.synth_volume.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-                .custom_formatter(|v, _| format!("{:.0}%", v * 100.0)))
-                .changed() {
-                setter.set_parameter(&params.synth_volume, value);
-            }
-
-            ui.add_space(20.0);
+            ui.add_space(4.0);
         });
     });
 }
 
-fn render_envelope_controls(
+enum SliderScale {
+    Linear,
+    Logarithmic,
+    Exponential(f32),
+}
+
+fn render_vertical_slider<P: Param>(
+    ui: &mut egui::Ui,
+    _params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+    param: &P,
+    label: &str,
+    min: f32,
+    max: f32,
+    scale: SliderScale,
+    formatter: impl Fn(f32) -> String,
+) where
+    P::Plain: Into<f32>,
+    f32: Into<P::Plain>,
+{
+    ui.vertical(|ui| {
+        ui.set_width(28.0);
+        let plain_value = param.modulated_plain_value();
+        let mut value: f32 = plain_value.into();
+
+        match scale {
+            SliderScale::Linear => {
+                let slider = egui::Slider::new(&mut value, min..=max)
+                    .vertical()
+                    .show_value(false);
+                if ui.add(slider).changed() {
+                    setter.set_parameter(param, value.into());
+                }
+            }
+            SliderScale::Logarithmic => {
+                let slider = egui::Slider::new(&mut value, min..=max)
+                    .vertical()
+                    .logarithmic(true)
+                    .show_value(false);
+                if ui.add(slider).changed() {
+                    setter.set_parameter(param, value.into());
+                }
+            }
+            SliderScale::Exponential(exponent) => {
+                let normalized = (value - min) / (max - min);
+                let mut slider_value = normalized.powf(1.0 / exponent);
+
+                let slider = egui::Slider::new(&mut slider_value, 0.0..=1.0)
+                    .vertical()
+                    .show_value(false);
+
+                if ui.add(slider).changed() {
+                    let new_normalized = slider_value.powf(exponent);
+                    value = min + new_normalized * (max - min);
+                    setter.set_parameter(param, value.into());
+                }
+            }
+        }
+
+        ui.add_space(1.0);
+        ui.label(egui::RichText::new(label).size(9.0));
+        ui.label(egui::RichText::new(formatter(value)).size(8.0).weak());
+    });
+}
+
+fn render_envelope_controls_compact(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
     prefix: &str,
 ) {
-    let (attack_param, attack_shape_param, decay_param, decay_shape_param,
-         sustain_param, release_param, release_shape_param) = match prefix {
+    let (attack_param, decay_param, sustain_param, release_param) = match prefix {
         "vol" => (
             &params.synth_vol_attack,
-            &params.synth_vol_attack_shape,
             &params.synth_vol_decay,
-            &params.synth_vol_decay_shape,
             &params.synth_vol_sustain,
             &params.synth_vol_release,
-            &params.synth_vol_release_shape,
         ),
         "filt" => (
             &params.synth_filt_attack,
-            &params.synth_filt_attack_shape,
             &params.synth_filt_decay,
-            &params.synth_filt_decay_shape,
             &params.synth_filt_sustain,
             &params.synth_filt_release,
-            &params.synth_filt_release_shape,
         ),
         _ => panic!("Invalid prefix"),
     };
 
-    ui.label("Attack:");
-    let mut value = attack_param.modulated_plain_value();
-    if ui.add(egui::Slider::new(&mut value, 0.0..=1000.0)
-        .custom_formatter(|v, _| format!("{:.0} ms", v)))
-        .changed() {
-        setter.set_parameter(attack_param, value);
-    }
-
-    ui.label("Attack Shape:");
-    let mut value = attack_shape_param.modulated_plain_value();
-    if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-        .custom_formatter(|v, _| format!("{:.2}", v)))
-        .changed() {
-        setter.set_parameter(attack_shape_param, value);
-    }
-
-    ui.label("Decay:");
-    let mut value = decay_param.modulated_plain_value();
-    if ui.add(egui::Slider::new(&mut value, 0.0..=1000.0)
-        .custom_formatter(|v, _| format!("{:.0} ms", v)))
-        .changed() {
-        setter.set_parameter(decay_param, value);
-    }
-
-    ui.label("Decay Shape:");
-    let mut value = decay_shape_param.modulated_plain_value();
-    if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-        .custom_formatter(|v, _| format!("{:.2}", v)))
-        .changed() {
-        setter.set_parameter(decay_shape_param, value);
-    }
-
-    ui.label("Sustain:");
-    let mut value = sustain_param.modulated_plain_value();
-    if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-        .custom_formatter(|v, _| format!("{:.2}", v)))
-        .changed() {
-        setter.set_parameter(sustain_param, value);
-    }
-
-    ui.label("Release:");
-    let mut value = release_param.modulated_plain_value();
-    if ui.add(egui::Slider::new(&mut value, 0.0..=1000.0)
-        .custom_formatter(|v, _| format!("{:.0} ms", v)))
-        .changed() {
-        setter.set_parameter(release_param, value);
-    }
-
-    ui.label("Release Shape:");
-    let mut value = release_shape_param.modulated_plain_value();
-    if ui.add(egui::Slider::new(&mut value, 0.0..=1.0)
-        .custom_formatter(|v, _| format!("{:.2}", v)))
-        .changed() {
-        setter.set_parameter(release_shape_param, value);
-    }
+    ui.horizontal(|ui| {
+        render_vertical_slider(ui, params, setter, attack_param, "A", 0.0, 1000.0, SliderScale::Exponential(2.0), |v| format!("{:.0}", v));
+        ui.add_space(2.0);
+        render_vertical_slider(ui, params, setter, decay_param, "D", 0.0, 1000.0, SliderScale::Exponential(2.0), |v| format!("{:.0}", v));
+        ui.add_space(2.0);
+        render_vertical_slider(ui, params, setter, sustain_param, "S", 0.0, 1.0, SliderScale::Exponential(2.0), |v| format!("{:.2}", v));
+        ui.add_space(2.0);
+        render_vertical_slider(ui, params, setter, release_param, "R", 0.0, 1000.0, SliderScale::Exponential(2.0), |v| format!("{:.0}", v));
+    });
 }

@@ -1,23 +1,32 @@
-use synfx_dsp::{Oversampling, apply_distortion};
-use super::oscillator::Oscillator;
+use synfx_dsp::{Oversampling, f_distort};
+use super::oscillator::{Oscillator, PolyBlepWrapper};
 use super::filter::MoogFilter;
 use super::envelope::Envelope;
 
 pub struct Voice {
     oscillator: Oscillator,
+    polyblep: PolyBlepWrapper,
+    sub_phase: f32,
     filter: MoogFilter,
     volume_env: Envelope,
+    sub_env: Envelope,
     filter_env: Envelope,
     oversampling: Oversampling<4>,
 
     osc_d: f32,
     osc_v: f32,
+    osc_volume: f32,
+    polyblep_volume: f32,
+    polyblep_pulse_width: f32,
+    sub_volume: f32,
+    sub_frequency: f32,
     distortion_amount: f32,
     distortion_threshold: f32,
     filter_cutoff: f32,
     filter_resonance: f32,
     filter_env_amount: f32,
     volume: f32,
+    sample_rate: f32,
 
     volume_attack: f32,
     volume_attack_shape: f32,
@@ -41,23 +50,31 @@ impl Voice {
         let mut oversampling = Oversampling::<4>::new();
         oversampling.set_sample_rate(sample_rate);
 
-        // Oscillator runs at 4x sample rate due to oversampling
         let oversampled_rate = sample_rate * 4.0;
         Self {
             oscillator: Oscillator::new(oversampled_rate),
+            polyblep: PolyBlepWrapper::new(oversampled_rate),
+            sub_phase: 0.0,
             filter: MoogFilter::new(oversampled_rate),
             volume_env: Envelope::new(sample_rate),
+            sub_env: Envelope::new(sample_rate),
             filter_env: Envelope::new(sample_rate),
             oversampling,
 
             osc_d: 0.5,
             osc_v: 0.5,
+            osc_volume: 1.0,
+            polyblep_volume: 0.0,
+            polyblep_pulse_width: 0.5,
+            sub_volume: 0.0,
+            sub_frequency: 110.0,
             distortion_amount: 0.0,
             distortion_threshold: 0.9,
             filter_cutoff: 1000.0,
             filter_resonance: 0.0,
             filter_env_amount: 0.0,
             volume: 0.8,
+            sample_rate,
 
             volume_attack: 10.0,
             volume_attack_shape: 0.5,
@@ -79,12 +96,27 @@ impl Voice {
 
     pub fn set_frequency(&mut self, freq: f32) {
         self.oscillator.set_frequency(freq);
+        self.polyblep.set_frequency(freq);
+        self.sub_frequency = freq * 0.5;
     }
 
     pub fn set_osc_params(&mut self, d: f32, v: f32) {
         self.osc_d = d;
         self.osc_v = v;
         self.oscillator.set_params(d, v);
+    }
+
+    pub fn set_osc_volume(&mut self, volume: f32) {
+        self.osc_volume = volume;
+    }
+
+    pub fn set_polyblep_params(&mut self, volume: f32, pulse_width: f32) {
+        self.polyblep_volume = volume;
+        self.polyblep_pulse_width = pulse_width;
+    }
+
+    pub fn set_sub_volume(&mut self, volume: f32) {
+        self.sub_volume = volume;
     }
 
     pub fn set_distortion_params(&mut self, amount: f32, threshold: f32) {
@@ -133,6 +165,16 @@ impl Voice {
             self.volume_release_shape,
         );
 
+        self.sub_env.trigger(
+            self.volume_attack,
+            self.volume_attack_shape,
+            self.volume_decay,
+            self.volume_decay_shape,
+            self.volume_sustain,
+            self.volume_release,
+            self.volume_release_shape,
+        );
+
         self.filter_env.trigger(
             self.filter_attack,
             self.filter_attack_shape,
@@ -146,35 +188,51 @@ impl Voice {
 
     pub fn release(&mut self) {
         self.volume_env.release();
+        self.sub_env.release();
         self.filter_env.release();
     }
 
     pub fn process(&mut self) -> f32 {
-        // Get envelope values at 1x rate (they're slow-moving control signals)
         let vol_env = self.volume_env.next();
+        let sub_env = self.sub_env.next();
         let filt_env = self.filter_env.next();
 
-        // Calculate filter cutoff modulation at 1x rate
         let modulated_cutoff = self.filter_cutoff + (filt_env * self.filter_env_amount);
         let modulated_cutoff = modulated_cutoff.clamp(20.0, 20000.0);
 
-        // Follow the exact pattern from synfx-dsp VPSOscillator documentation
         let overbuf = self.oversampling.resample_buffer();
         for sample in overbuf.iter_mut() {
-            // Generate oscillator sample (called 4 times with base israte per the example)
             let osc_sample = self.oscillator.next(self.osc_d, self.osc_v);
-            // Apply distortion as shown in the example (amount 0.0-1.0, threshold typically 0.9)
-            // Note: amount parameter is u8, so we convert the 0.0-1.0 range to 0-1
-            let distorted = apply_distortion(osc_sample, self.distortion_threshold, (self.distortion_amount.round() as u8).min(1));
-            // Apply volume envelope
-            let enveloped = distorted * vol_env;
-            // Process through Moog filter
-            *sample = self.filter.process(enveloped, modulated_cutoff, self.filter_resonance);
+            let gain = 0.1 + self.distortion_amount * 4.9;
+            let distorted = f_distort(gain, self.distortion_threshold, osc_sample);
+            let enveloped = distorted * self.osc_volume * vol_env;
+
+            let polyblep_sample = if self.polyblep_volume > 0.0 {
+                self.polyblep.next(self.polyblep_pulse_width)
+            } else {
+                0.0
+            };
+            let polyblep_enveloped = polyblep_sample * self.polyblep_volume * vol_env;
+
+            *sample = enveloped + polyblep_enveloped;
         }
 
-        // Downsample using Butterworth filters (4-stage cascade)
-        let output = self.oversampling.downsample();
+        self.filter.process_buffer(overbuf, modulated_cutoff, self.filter_resonance);
 
-        output * self.volume
+        let main_output = self.oversampling.downsample();
+
+        let sub_sample = if self.sub_volume > 0.0 {
+            use std::f32::consts::PI;
+            let phase_increment = 2.0 * PI * self.sub_frequency / self.sample_rate;
+            self.sub_phase += phase_increment;
+            if self.sub_phase >= 2.0 * PI {
+                self.sub_phase -= 2.0 * PI;
+            }
+            self.sub_phase.sin() * self.sub_volume * sub_env
+        } else {
+            0.0
+        };
+
+        (main_output + sub_sample) * self.volume
     }
 }
