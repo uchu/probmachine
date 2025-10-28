@@ -1,15 +1,11 @@
-use std::sync::Arc;
-use nih_plug_egui::egui;
-use egui_taffy::TuiBuilderLogic;
-use egui_taffy::taffy::{prelude::*, style::AlignItems};
 use crate::params::DeviceParams;
-use nih_plug::prelude::{ParamSetter, Param};
+use egui_taffy::taffy::{prelude::*, style::AlignItems};
+use egui_taffy::TuiBuilderLogic;
+use nih_plug::prelude::{Param, ParamSetter};
+use nih_plug_egui::egui;
+use std::sync::Arc;
 
-pub fn render(
-    tui: &mut egui_taffy::Tui,
-    params: &Arc<DeviceParams>,
-    setter: &ParamSetter,
-) {
+pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &ParamSetter) {
     tui.ui(|ui| {
         ui.add_space(12.0);
         ui.heading(egui::RichText::new("    Synth").size(14.0));
@@ -25,43 +21,143 @@ pub fn render(
         ui.horizontal(|ui| {
             ui.add_space(4.0);
 
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new("OSC").size(10.0).strong());
-                ui.add_space(2.0);
-                ui.horizontal(|ui| {
-                    render_vertical_slider(ui, params, setter, &params.synth_osc_d, "D", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
-                    ui.add_space(3.0);
-                    render_vertical_slider(ui, params, setter, &params.synth_osc_v, "V", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
-                    ui.add_space(3.0);
-                    render_vertical_slider(ui, params, setter, &params.synth_osc_volume, "Vol", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
-                    ui.add_space(3.0);
-                    render_vertical_slider(ui, params, setter, &params.synth_sub_volume, "Sub", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
+            egui::Frame::default()
+                .fill(ui.visuals().extreme_bg_color)
+                .inner_margin(10.0)
+                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                .corner_radius(15.0)
+                .show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.label(
+                            egui::RichText::new("             Vector Phase Shaping OSC")
+                                .size(10.0)
+                                .strong(),
+                        );
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_osc_d,
+                                "D",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_osc_v,
+                                "V",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_distortion_amount,
+                                "Amt",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_distortion_threshold,
+                                "Thr",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_osc_volume,
+                                "Vol",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                        });
+                    });
                 });
-            });
+
+            egui::Frame::default()
+                .fill(ui.visuals().extreme_bg_color)
+                .inner_margin(10.0)
+                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                .corner_radius(15.0)
+                .show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new("    Saw / Pulse").size(10.0).strong());
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_polyblep_pulse_width,
+                                "S/P",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_polyblep_volume,
+                                "Vol",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                        });
+                    });
+                });
+
+            egui::Frame::default()
+                .fill(ui.visuals().extreme_bg_color)
+                .inner_margin(10.0)
+                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                .corner_radius(15.0)
+                .show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new(" Sub").size(10.0).strong());
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_sub_volume,
+                                "Vol",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+
+                        });
+                    });
+                    ui.add_space(-30.0);
+                });
 
             ui.add_space(8.0);
-
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new("POLYBLEP").size(10.0).strong());
-                ui.add_space(2.0);
-                ui.horizontal(|ui| {
-                    render_vertical_slider(ui, params, setter, &params.synth_polyblep_volume, "Vol", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
-                    ui.add_space(3.0);
-                    render_vertical_slider(ui, params, setter, &params.synth_polyblep_pulse_width, "PW", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
-                });
-            });
-
-            ui.add_space(8.0);
-
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new("DIST").size(10.0).strong());
-                ui.add_space(2.0);
-                ui.horizontal(|ui| {
-                    render_vertical_slider(ui, params, setter, &params.synth_distortion_amount, "Amt", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
-                    ui.add_space(3.0);
-                    render_vertical_slider(ui, params, setter, &params.synth_distortion_threshold, "Thr", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.2}", v));
-                });
-            });
 
             ui.add_space(8.0);
 
@@ -69,16 +165,46 @@ pub fn render(
                 ui.label(egui::RichText::new("FILT").size(10.0).strong());
                 ui.add_space(2.0);
                 ui.horizontal(|ui| {
-                    render_vertical_slider(ui, params, setter, &params.synth_filter_cutoff, "Cut", 20.0, 20000.0, SliderScale::Logarithmic, |v| format!("{:.0}", v));
+                    render_vertical_slider(
+                        ui,
+                        params,
+                        setter,
+                        &params.synth_filter_cutoff,
+                        "Cut",
+                        20.0,
+                        20000.0,
+                        SliderScale::Logarithmic,
+                        |v| format!("{:.0}", v),
+                    );
                     ui.add_space(3.0);
-                    render_vertical_slider(ui, params, setter, &params.synth_filter_resonance, "Res", 0.0, 0.99, SliderScale::Linear, |v| format!("{:.2}", v));
+                    render_vertical_slider(
+                        ui,
+                        params,
+                        setter,
+                        &params.synth_filter_resonance,
+                        "Res",
+                        0.0,
+                        0.99,
+                        SliderScale::Linear,
+                        |v| format!("{:.2}", v),
+                    );
                     ui.add_space(3.0);
-                    render_vertical_slider(ui, params, setter, &params.synth_filter_env_amount, "Env", -5000.0, 5000.0, SliderScale::Linear, |v| format!("{:.0}", v));
+                    render_vertical_slider(
+                        ui,
+                        params,
+                        setter,
+                        &params.synth_filter_env_amount,
+                        "Env",
+                        -5000.0,
+                        5000.0,
+                        SliderScale::Linear,
+                        |v| format!("{:.0}", v),
+                    );
                 });
             });
+        });
 
-            ui.add_space(8.0);
-
+        ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(egui::RichText::new("VOL ENV").size(10.0).strong());
                 ui.add_space(2.0);
@@ -98,10 +224,18 @@ pub fn render(
             ui.vertical(|ui| {
                 ui.label(egui::RichText::new("VOL").size(10.0).strong());
                 ui.add_space(2.0);
-                render_vertical_slider(ui, params, setter, &params.synth_volume, "Lvl", 0.0, 1.0, SliderScale::Linear, |v| format!("{:.0}%", v * 100.0));
+                render_vertical_slider(
+                    ui,
+                    params,
+                    setter,
+                    &params.synth_volume,
+                    "Lvl",
+                    0.0,
+                    1.0,
+                    SliderScale::Linear,
+                    |v| format!("{:.0}%", v * 100.0),
+                );
             });
-
-            ui.add_space(4.0);
         });
     });
 }
@@ -165,7 +299,6 @@ fn render_vertical_slider<P: Param>(
             }
         }
 
-        ui.add_space(1.0);
         ui.label(egui::RichText::new(label).size(9.0));
         ui.label(egui::RichText::new(formatter(value)).size(8.0).weak());
     });
@@ -194,12 +327,52 @@ fn render_envelope_controls_compact(
     };
 
     ui.horizontal(|ui| {
-        render_vertical_slider(ui, params, setter, attack_param, "A", 0.0, 1000.0, SliderScale::Exponential(2.0), |v| format!("{:.0}", v));
+        render_vertical_slider(
+            ui,
+            params,
+            setter,
+            attack_param,
+            "A",
+            0.0,
+            1000.0,
+            SliderScale::Exponential(2.0),
+            |v| format!("{:.0}", v),
+        );
         ui.add_space(2.0);
-        render_vertical_slider(ui, params, setter, decay_param, "D", 0.0, 1000.0, SliderScale::Exponential(2.0), |v| format!("{:.0}", v));
+        render_vertical_slider(
+            ui,
+            params,
+            setter,
+            decay_param,
+            "D",
+            0.0,
+            1000.0,
+            SliderScale::Exponential(2.0),
+            |v| format!("{:.0}", v),
+        );
         ui.add_space(2.0);
-        render_vertical_slider(ui, params, setter, sustain_param, "S", 0.0, 1.0, SliderScale::Exponential(2.0), |v| format!("{:.2}", v));
+        render_vertical_slider(
+            ui,
+            params,
+            setter,
+            sustain_param,
+            "S",
+            0.0,
+            1.0,
+            SliderScale::Exponential(2.0),
+            |v| format!("{:.2}", v),
+        );
         ui.add_space(2.0);
-        render_vertical_slider(ui, params, setter, release_param, "R", 0.0, 1000.0, SliderScale::Exponential(2.0), |v| format!("{:.0}", v));
+        render_vertical_slider(
+            ui,
+            params,
+            setter,
+            release_param,
+            "R",
+            0.0,
+            1000.0,
+            SliderScale::Exponential(2.0),
+            |v| format!("{:.0}", v),
+        );
     });
 }
