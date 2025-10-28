@@ -9,6 +9,7 @@ use crate::params::DeviceParams;
 
 pub struct SynthEngine {
     voice: Voice,
+    #[allow(dead_code)]
     sample_rate: f32,
     sequencer: Sequencer,
 }

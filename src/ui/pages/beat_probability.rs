@@ -191,6 +191,7 @@ fn render_occupied_space(
     struct Beat {
         mode: BeatMode,
         count: usize,
+        #[allow(dead_code)]
         index: usize,
         value: f32,
         start_time: f32,

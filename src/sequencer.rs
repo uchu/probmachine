@@ -5,11 +5,13 @@ use nih_plug::prelude::Param;
 #[derive(Clone, Debug)]
 struct NoteEvent {
     sample_position: usize,
+    #[allow(dead_code)]
     frequency: f32,
     duration_samples: usize,
 }
 
 pub struct Sequencer {
+    #[allow(dead_code)]
     sample_rate: f32,
     current_bar: Vec<NoteEvent>,
     next_bar: Vec<NoteEvent>,
@@ -17,6 +19,7 @@ pub struct Sequencer {
     bar_length_samples: usize,
     current_note: Option<(usize, usize)>,
     params_hash: u64,
+    #[allow(dead_code)]
     tempo_bpm: f32,
 }
 
