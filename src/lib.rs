@@ -134,12 +134,48 @@ impl Plugin for Device {
 
             synth.set_osc_volume(self.params.synth_osc_volume.modulated_plain_value());
 
-            synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
+            synth.set_osc_octave(self.params.synth_osc_octave.value());
+
+            synth.set_sub_params(
+                self.params.synth_sub_volume.modulated_plain_value(),
+                self.params.synth_sub_octave.value(),
+            );
 
             synth.set_polyblep_params(
                 self.params.synth_polyblep_volume.modulated_plain_value(),
                 self.params.synth_polyblep_pulse_width.modulated_plain_value(),
+                self.params.synth_polyblep_octave.value(),
             );
+
+            synth.set_pll_ref_params(
+                self.params.synth_pll_ref_octave.value(),
+                self.params.synth_pll_ref_tune.value(),
+                self.params.synth_pll_ref_fine_tune.modulated_plain_value(),
+                self.params.synth_pll_ref_pulse_width.modulated_plain_value(),
+            );
+
+            let pll_range = self.params.synth_pll_range.modulated_plain_value();
+            let pll_mult = match self.params.synth_pll_mult.value() {
+                0 => 1.0,
+                1 => 2.0,
+                2 => 4.0,
+                3 => 8.0,
+                4 => 16.0,
+                _ => 1.0,
+            };
+
+            synth.set_pll_params(
+                self.params.synth_pll_track_speed.modulated_plain_value(),
+                self.params.synth_pll_damping.modulated_plain_value(),
+                pll_mult,
+                pll_range,
+                self.params.synth_pll_colored.value(),
+                self.params.synth_pll_mode.value(),
+            );
+
+            synth.set_pll_volume(self.params.synth_pll_volume.modulated_plain_value());
+
+            synth.set_pll_ki_multiplier(self.params.synth_pll_ki_multiplier.modulated_plain_value());
 
             synth.set_distortion_params(
                 self.params.synth_distortion_amount.modulated_plain_value(),
@@ -177,7 +213,10 @@ impl Plugin for Device {
             let mut output_l = vec![0.0; buffer.samples()];
             let mut output_r = vec![0.0; buffer.samples()];
 
-            synth.process_block(&mut output_l, &mut output_r, &self.params);
+            let pll_feedback_amt = self.params.synth_pll_feedback.modulated_plain_value();
+            let base_freq = 220.0;
+
+            synth.process_block(&mut output_l, &mut output_r, &self.params, pll_feedback_amt, base_freq);
 
             for (i, channel_samples) in buffer.iter_samples().enumerate() {
                 let mut iter = channel_samples.into_iter();

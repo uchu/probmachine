@@ -12,17 +12,19 @@ pub struct SynthEngine {
     #[allow(dead_code)]
     sample_rate: f32,
     sequencer: Sequencer,
+    pll_feedback: f32,
 }
 
 impl SynthEngine {
     pub fn new(sample_rate: f32) -> Self {
         let mut voice = Voice::new(sample_rate);
-        voice.set_frequency(220.0);
+        voice.set_frequency(220.0, 0.0, 0.0);
 
         Self {
             voice,
             sample_rate,
             sequencer: Sequencer::new(sample_rate, 120.0),
+            pll_feedback: 0.0,
         }
     }
 
@@ -34,12 +36,32 @@ impl SynthEngine {
         self.voice.set_osc_volume(volume);
     }
 
-    pub fn set_polyblep_params(&mut self, volume: f32, pulse_width: f32) {
-        self.voice.set_polyblep_params(volume, pulse_width);
+    pub fn set_osc_octave(&mut self, octave: i32) {
+        self.voice.set_osc_octave(octave);
     }
 
-    pub fn set_sub_volume(&mut self, volume: f32) {
-        self.voice.set_sub_volume(volume);
+    pub fn set_polyblep_params(&mut self, volume: f32, pulse_width: f32, octave: i32) {
+        self.voice.set_polyblep_params(volume, pulse_width, octave);
+    }
+
+    pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f32, pulse_width: f32) {
+        self.voice.set_pll_ref_params(octave, tune, fine_tune, pulse_width);
+    }
+
+    pub fn set_pll_params(&mut self, track: f32, damp: f32, mult: f32, range: f32, colored: bool, edge_mode: bool) {
+        self.voice.set_pll_params(track, damp, mult, range, colored, edge_mode);
+    }
+
+    pub fn set_pll_volume(&mut self, volume: f32) {
+        self.voice.set_pll_volume(volume);
+    }
+
+    pub fn set_pll_ki_multiplier(&mut self, ki_mult: f32) {
+        self.voice.set_pll_ki_multiplier(ki_mult);
+    }
+
+    pub fn set_sub_params(&mut self, volume: f32, octave: i32) {
+        self.voice.set_sub_params(volume, octave);
     }
 
     pub fn set_distortion_params(&mut self, amount: f32, threshold: f32) {
@@ -62,11 +84,12 @@ impl SynthEngine {
         self.voice.set_filter_envelope(attack, attack_shape, decay, decay_shape, sustain, release, release_shape);
     }
 
-    pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams) {
+    pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams, feedback_amount: f32, base_freq: f32) {
         for (l, r) in output_l.iter_mut().zip(output_r.iter_mut()) {
             let (should_trigger, should_release) = self.sequencer.update(params);
 
             if should_trigger {
+                self.voice.set_frequency(base_freq, self.pll_feedback, feedback_amount);
                 self.voice.trigger();
             }
 
@@ -74,7 +97,9 @@ impl SynthEngine {
                 self.voice.release();
             }
 
-            let sample = self.voice.process();
+            let (sample, feedback) = self.voice.process(self.pll_feedback);
+            self.pll_feedback = feedback;
+
             *l = sample;
             *r = sample;
         }

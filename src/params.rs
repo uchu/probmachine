@@ -349,13 +349,46 @@ pub struct DeviceParams {
     pub synth_osc_v: FloatParam,
     #[id = "synth_osc_volume"]
     pub synth_osc_volume: FloatParam,
+    #[id = "synth_osc_octave"]
+    pub synth_osc_octave: IntParam,
     #[id = "synth_sub_volume"]
     pub synth_sub_volume: FloatParam,
+    #[id = "synth_sub_octave"]
+    pub synth_sub_octave: IntParam,
 
     #[id = "synth_polyblep_volume"]
     pub synth_polyblep_volume: FloatParam,
     #[id = "synth_polyblep_pulse_width"]
     pub synth_polyblep_pulse_width: FloatParam,
+    #[id = "synth_polyblep_octave"]
+    pub synth_polyblep_octave: IntParam,
+
+    #[id = "synth_pll_track_speed"]
+    pub synth_pll_track_speed: FloatParam,
+    #[id = "synth_pll_damping"]
+    pub synth_pll_damping: FloatParam,
+    #[id = "synth_pll_range"]
+    pub synth_pll_range: FloatParam,
+    #[id = "synth_pll_mult"]
+    pub synth_pll_mult: IntParam,
+    #[id = "synth_pll_colored"]
+    pub synth_pll_colored: BoolParam,
+    #[id = "synth_pll_mode"]
+    pub synth_pll_mode: BoolParam,
+    #[id = "synth_pll_ref_octave"]
+    pub synth_pll_ref_octave: IntParam,
+    #[id = "synth_pll_ref_tune"]
+    pub synth_pll_ref_tune: IntParam,
+    #[id = "synth_pll_ref_fine_tune"]
+    pub synth_pll_ref_fine_tune: FloatParam,
+    #[id = "synth_pll_ref_pulse_width"]
+    pub synth_pll_ref_pulse_width: FloatParam,
+    #[id = "synth_pll_feedback"]
+    pub synth_pll_feedback: FloatParam,
+    #[id = "synth_pll_ki_multiplier"]
+    pub synth_pll_ki_multiplier: FloatParam,
+    #[id = "synth_pll_volume"]
+    pub synth_pll_volume: FloatParam,
 
     #[id = "synth_distortion_amount"]
     pub synth_distortion_amount: FloatParam,
@@ -972,11 +1005,21 @@ impl Default for DeviceParams {
                 1.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_osc_octave: IntParam::new(
+                "VPS Octave".to_string(),
+                0,
+                IntRange::Linear { min: -2, max: 2 }
+            ),
             synth_sub_volume: FloatParam::new(
                 "Sub Volume".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_sub_octave: IntParam::new(
+                "Sub Octave".to_string(),
+                -1,
+                IntRange::Linear { min: -2, max: 2 }
+            ),
 
             synth_polyblep_volume: FloatParam::new(
                 "PolyBlep Volume".to_string(),
@@ -986,6 +1029,75 @@ impl Default for DeviceParams {
             synth_polyblep_pulse_width: FloatParam::new(
                 "PolyBlep Pulse Width".to_string(),
                 0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_polyblep_octave: IntParam::new(
+                "PolyBlep Octave".to_string(),
+                0,
+                IntRange::Linear { min: -2, max: 2 }
+            ),
+
+            synth_pll_track_speed: FloatParam::new(
+                "PLL Track Speed".to_string(),
+                3.0,
+                FloatRange::Skewed { min: 0.2, max: 10.0, factor: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_damping: FloatParam::new(
+                "PLL Damping".to_string(),
+                0.2,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_range: FloatParam::new(
+                "PLL Range".to_string(),
+                1.0,
+                FloatRange::Skewed { min: 0.1, max: 100.0, factor: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_mult: IntParam::new(
+                "PLL Multiplier".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 4 }
+            ),
+            synth_pll_colored: BoolParam::new(
+                "PLL Colored".to_string(),
+                false
+            ),
+            synth_pll_mode: BoolParam::new(
+                "PLL Edge Mode".to_string(),
+                true
+            ),
+            synth_pll_ref_octave: IntParam::new(
+                "PLL Ref Octave".to_string(),
+                0,
+                IntRange::Linear { min: -2, max: 2 }
+            ),
+            synth_pll_ref_tune: IntParam::new(
+                "PLL Ref Tune".to_string(),
+                0,
+                IntRange::Linear { min: -12, max: 12 }
+            ),
+            synth_pll_ref_fine_tune: FloatParam::new(
+                "PLL Ref Fine Tune".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_ref_pulse_width: FloatParam::new(
+                "PLL Ref Pulse Width".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.01, max: 0.99 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_feedback: FloatParam::new(
+                "PLL Feedback".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.1 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_ki_multiplier: FloatParam::new(
+                "PLL Ki Multiplier".to_string(),
+                10000.0,
+                FloatRange::Skewed { min: 1.0, max: 50000.0, factor: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_volume: FloatParam::new(
+                "PLL Volume".to_string(),
+                0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
