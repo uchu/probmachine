@@ -355,6 +355,8 @@ pub struct DeviceParams {
     pub synth_sub_volume: FloatParam,
     #[id = "synth_sub_octave"]
     pub synth_sub_octave: IntParam,
+    #[id = "synth_sub_shape"]
+    pub synth_sub_shape: FloatParam,
 
     #[id = "synth_polyblep_volume"]
     pub synth_polyblep_volume: FloatParam,
@@ -389,6 +391,10 @@ pub struct DeviceParams {
     pub synth_pll_ki_multiplier: FloatParam,
     #[id = "synth_pll_volume"]
     pub synth_pll_volume: FloatParam,
+    #[id = "synth_pll_distortion_amount"]
+    pub synth_pll_distortion_amount: FloatParam,
+    #[id = "synth_pll_distortion_threshold"]
+    pub synth_pll_distortion_threshold: FloatParam,
 
     #[id = "synth_distortion_amount"]
     pub synth_distortion_amount: FloatParam,
@@ -1020,6 +1026,11 @@ impl Default for DeviceParams {
                 -1,
                 IntRange::Linear { min: -2, max: 2 }
             ),
+            synth_sub_shape: FloatParam::new(
+                "Sub Shape".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_polyblep_volume: FloatParam::new(
                 "PolyBlep Volume".to_string(),
@@ -1098,6 +1109,16 @@ impl Default for DeviceParams {
             synth_pll_volume: FloatParam::new(
                 "PLL Volume".to_string(),
                 0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_distortion_amount: FloatParam::new(
+                "PLL Distortion Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_distortion_threshold: FloatParam::new(
+                "PLL Distortion Threshold".to_string(),
+                0.9,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 

@@ -29,6 +29,248 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
                         ui.label(
+                            egui::RichText::new("   Phase Locked Loop OSC")
+                                .size(10.0)
+                                .strong(),
+                        );
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_ref_octave,
+                                "Oct",
+                                &["-2", "-1", "0", "+1", "+2"],
+                            );
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_ref_tune,
+                                "Tune",
+                                &[
+                                    "-12", "-11", "-10", "-9", "-8", "-7", "-6", "-5", "-4", "-3",
+                                    "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7",
+                                    "+8", "+9", "+10", "+11", "+12",
+                                ],
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_ref_fine_tune,
+                                "Fine",
+                                -1.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_ref_pulse_width,
+                                "PW",
+                                0.01,
+                                0.99,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_track_speed,
+                                "Trk",
+                                0.01,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_damping,
+                                "Dmp",
+                                0.001,
+                                0.3,
+                                SliderScale::Linear,
+                                |v| format!("{:.3}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_range,
+                                "Rng",
+                                0.1,
+                                100.0,
+                                SliderScale::Logarithmic,
+                                |v| {
+                                    if v >= 10.0 {
+                                        format!("{:.0}", v)
+                                    } else if v >= 1.0 {
+                                        format!("{:.1}", v)
+                                    } else {
+                                        format!("{:.2}", v)
+                                    }
+                                },
+                            );
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_mult,
+                                "Mlt",
+                                &["×1", "×2", "×4", "×8", "×16"],
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_feedback,
+                                "FB",
+                                0.0,
+                                0.1,
+                                SliderScale::Linear,
+                                |v| format!("{:.3}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_ki_multiplier,
+                                "Ki",
+                                1.0,
+                                100000.0,
+                                SliderScale::Logarithmic,
+                                |v| {
+                                    if v >= 1000.0 {
+                                        format!("{:.0}k", v / 1000.0)
+                                    } else {
+                                        format!("{:.0}", v)
+                                    }
+                                },
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_distortion_amount,
+                                "Dist",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_distortion_threshold,
+                                "Thrs",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_volume,
+                                "Vol",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+
+                            ui.vertical(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("Color").size(8.0));
+                                    let mut colored = params.synth_pll_colored.value();
+                                    if ui.checkbox(&mut colored, "").changed() {
+                                        setter.set_parameter(&params.synth_pll_colored, colored);
+                                    }
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("Edge").size(8.0));
+                                    let mut edge_mode = params.synth_pll_mode.value();
+                                    if ui.checkbox(&mut edge_mode, "").changed() {
+                                        setter.set_parameter(&params.synth_pll_mode, edge_mode);
+                                    }
+                                });
+                            });
+                        });
+                    });
+                });
+
+            egui::Frame::default()
+                .fill(ui.visuals().extreme_bg_color)
+                .inner_margin(10.0)
+                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                .corner_radius(15.0)
+                .show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new(" Sub OSC").size(10.0).strong());
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_sub_octave,
+                                "Oct",
+                                &[" -2", " -1", " 0", " +1", " +2"],
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_sub_shape,
+                                "Shp",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| {
+                                    if v < 0.1 {
+                                        "Sine".to_string()
+                                    } else if v > 0.9 {
+                                        "Sqr".to_string()
+                                    } else {
+                                        format!("{:.2}", v)
+                                    }
+                                },
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_sub_volume,
+                                "Vol",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                            );
+                        });
+                    });
+                    ui.add_space(-30.0);
+                });
+        });
+
+        ui.horizontal(|ui| {
+            egui::Frame::default()
+                .fill(ui.visuals().extreme_bg_color)
+                .inner_margin(10.0)
+                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                .corner_radius(15.0)
+                .show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.label(
                             egui::RichText::new("             Vector Phase Shaping OSC")
                                 .size(10.0)
                                 .strong(),
@@ -146,199 +388,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                     });
                 });
 
-            egui::Frame::default()
-                .fill(ui.visuals().extreme_bg_color)
-                .inner_margin(10.0)
-                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-                .corner_radius(15.0)
-                .show(ui, |ui| {
-                    ui.vertical(|ui| {
-                        ui.label(egui::RichText::new(" Sub").size(10.0).strong());
-                        ui.add_space(8.0);
-                        ui.horizontal(|ui| {
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_sub_volume,
-                                "Vol",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                            );
-                            render_int_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_sub_octave,
-                                "Oct",
-                                &["-2", "-1", "0", "+1", "+2"],
-                            );
-                        });
-                    });
-                    ui.add_space(-30.0);
-                });
 
-            egui::Frame::default()
-                .fill(ui.visuals().extreme_bg_color)
-                .inner_margin(10.0)
-                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-                .corner_radius(15.0)
-                .show(ui, |ui| {
-                    ui.vertical(|ui| {
-                        ui.label(egui::RichText::new("      PLL Synth").size(10.0).strong());
-                        ui.add_space(8.0);
-                        ui.horizontal(|ui| {
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_track_speed,
-                                "Trk",
-                                0.01,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_damping,
-                                "Dmp",
-                                0.001,
-                                0.3,
-                                SliderScale::Linear,
-                                |v| format!("{:.3}", v),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_range,
-                                "Rng",
-                                0.1,
-                                100.0,
-                                SliderScale::Logarithmic,
-                                |v| {
-                                    if v >= 10.0 {
-                                        format!("{:.0}", v)
-                                    } else if v >= 1.0 {
-                                        format!("{:.1}", v)
-                                    } else {
-                                        format!("{:.2}", v)
-                                    }
-                                },
-                            );
-                            render_int_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_mult,
-                                "Mlt",
-                                &["×1", "×2", "×4", "×8", "×16"],
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_feedback,
-                                "FB",
-                                0.0,
-                                0.1,
-                                SliderScale::Linear,
-                                |v| format!("{:.3}", v),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_volume,
-                                "Vol",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_ki_multiplier,
-                                "Ki",
-                                1.0,
-                                50000.0,
-                                SliderScale::Logarithmic,
-                                |v| {
-                                    if v >= 1000.0 {
-                                        format!("{:.0}k", v / 1000.0)
-                                    } else {
-                                        format!("{:.0}", v)
-                                    }
-                                },
-                            );
-                        });
-                        ui.add_space(3.0);
-                        ui.label(egui::RichText::new("      PLL Ref").size(9.0).weak());
-                        ui.add_space(2.0);
-                        ui.horizontal(|ui| {
-                            render_int_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_ref_octave,
-                                "Oct",
-                                &["-2", "-1", "0", "+1", "+2"],
-                            );
-                            render_int_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_ref_tune,
-                                "Tune",
-                                &["-12", "-11", "-10", "-9", "-8", "-7", "-6", "-5", "-4", "-3", "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12"],
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_ref_fine_tune,
-                                "Fine",
-                                -1.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_ref_pulse_width,
-                                "PW",
-                                0.01,
-                                0.99,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                            );
-                        });
-                        ui.add_space(5.0);
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("Color").size(8.0));
-                            let mut colored = params.synth_pll_colored.value();
-                            if ui.checkbox(&mut colored, "").changed() {
-                                setter.set_parameter(&params.synth_pll_colored, colored);
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("Edge").size(8.0));
-                            let mut edge_mode = params.synth_pll_mode.value();
-                            if ui.checkbox(&mut edge_mode, "").changed() {
-                                setter.set_parameter(&params.synth_pll_mode, edge_mode);
-                            }
-                        });
-                    });
-                });
 
             ui.add_space(8.0);
 
@@ -385,9 +435,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                     );
                 });
             });
-        });
 
-        ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(egui::RichText::new("VOL ENV").size(10.0).strong());
                 ui.add_space(2.0);
@@ -501,12 +549,10 @@ fn render_int_vertical_slider(
 
         let (min, max) = match param.range() {
             nih_plug::prelude::IntRange::Linear { min, max } => (min, max),
-            nih_plug::prelude::IntRange::Reversed(inner) => {
-                match inner {
-                    nih_plug::prelude::IntRange::Linear { min, max } => (*min, *max),
-                    _ => (0, 0),
-                }
-            }
+            nih_plug::prelude::IntRange::Reversed(inner) => match inner {
+                nih_plug::prelude::IntRange::Linear { min, max } => (*min, *max),
+                _ => (0, 0),
+            },
         };
 
         let slider = egui::Slider::new(&mut value, min..=max)

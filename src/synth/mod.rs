@@ -60,8 +60,12 @@ impl SynthEngine {
         self.voice.set_pll_ki_multiplier(ki_mult);
     }
 
-    pub fn set_sub_params(&mut self, volume: f32, octave: i32) {
-        self.voice.set_sub_params(volume, octave);
+    pub fn set_pll_distortion_params(&mut self, amount: f32, threshold: f32) {
+        self.voice.set_pll_distortion_params(amount, threshold);
+    }
+
+    pub fn set_sub_params(&mut self, volume: f32, octave: i32, shape: f32) {
+        self.voice.set_sub_params(volume, octave, shape);
     }
 
     pub fn set_distortion_params(&mut self, amount: f32, threshold: f32) {
