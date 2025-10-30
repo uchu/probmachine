@@ -3,6 +3,7 @@ use egui_taffy::taffy::{prelude::*, style::AlignItems};
 use egui_taffy::TuiBuilderLogic;
 use nih_plug::prelude::{Param, ParamSetter};
 use nih_plug_egui::egui;
+use nih_plug_egui::egui::Color32;
 use std::sync::Arc;
 
 pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &ParamSetter) {
@@ -19,8 +20,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
     })
     .ui(|ui| {
         ui.horizontal(|ui| {
-            ui.add_space(4.0);
-
             egui::Frame::default()
                 .fill(ui.visuals().extreme_bg_color)
                 .inner_margin(10.0)
@@ -42,6 +41,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 &params.synth_pll_ref_octave,
                                 "Oct",
                                 &["-2", "-1", "0", "+1", "+2"],
+                                Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_int_vertical_slider(
                                 ui,
@@ -54,6 +54,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                     "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7",
                                     "+8", "+9", "+10", "+11", "+12",
                                 ],
+                                Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -65,6 +66,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -76,6 +78,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 0.99,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -87,6 +90,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -98,6 +102,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 0.3,
                                 SliderScale::Linear,
                                 |v| format!("{:.3}", v),
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -117,6 +122,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                         format!("{:.2}", v)
                                     }
                                 },
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_int_vertical_slider(
                                 ui,
@@ -125,6 +131,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 &params.synth_pll_mult,
                                 "Mlt",
                                 &["×1", "×2", "×4", "×8", "×16"],
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -136,6 +143,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 0.1,
                                 SliderScale::Linear,
                                 |v| format!("{:.3}", v),
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -153,6 +161,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                         format!("{:.0}", v)
                                     }
                                 },
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -164,6 +173,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 40, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -175,6 +185,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 40, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -186,6 +197,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(40, 80, 40)),
                             );
 
                             ui.vertical(|ui| {
@@ -210,12 +222,12 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
 
             egui::Frame::default()
                 .fill(ui.visuals().extreme_bg_color)
-                .inner_margin(10.0)
+                .inner_margin(egui::Margin { left: 10, right: 0, top: 10, bottom: 10 })
                 .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
                 .corner_radius(15.0)
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
-                        ui.label(egui::RichText::new(" Sub OSC").size(10.0).strong());
+                        ui.label(egui::RichText::new("   Sub OSC").size(10.0).strong());
                         ui.add_space(8.0);
                         ui.horizontal(|ui| {
                             render_int_vertical_slider(
@@ -225,6 +237,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 &params.synth_sub_octave,
                                 "Oct",
                                 &[" -2", " -1", " 0", " +1", " +2"],
+                                Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -244,6 +257,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                         format!("{:.2}", v)
                                     }
                                 },
+                                Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -255,28 +269,39 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(40, 80, 40)),
                             );
                         });
                     });
-                    ui.add_space(-30.0);
                 });
         });
+
+        ui.add_space(10.0);
 
         ui.horizontal(|ui| {
             egui::Frame::default()
                 .fill(ui.visuals().extreme_bg_color)
-                .inner_margin(10.0)
+                .inner_margin(egui::Margin { left: 10, right: 0, top: 10, bottom: 10 })
                 .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
                 .corner_radius(15.0)
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
                         ui.label(
-                            egui::RichText::new("             Vector Phase Shaping OSC")
+                            egui::RichText::new("   Vector Phase Shaping OSC")
                                 .size(10.0)
                                 .strong(),
                         );
                         ui.add_space(8.0);
                         ui.horizontal(|ui| {
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_osc_octave,
+                                "Oct",
+                                &["-2", "-1", "0", "+1", "+2"],
+                                Some(Color32::from_rgb(80, 80, 40)),
+                            );
                             render_vertical_slider(
                                 ui,
                                 params,
@@ -287,6 +312,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -298,6 +324,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -309,6 +336,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 40, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -320,6 +348,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 40, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -331,14 +360,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
-                            );
-                            render_int_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_osc_octave,
-                                "Oct",
-                                &["-2", "-1", "0", "+1", "+2"],
+                                Some(Color32::from_rgb(40, 80, 40)),
                             );
                         });
                     });
@@ -346,14 +368,23 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
 
             egui::Frame::default()
                 .fill(ui.visuals().extreme_bg_color)
-                .inner_margin(10.0)
+                .inner_margin(egui::Margin { left: 10, right: 0, top: 10, bottom: 10 })
                 .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
                 .corner_radius(15.0)
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
-                        ui.label(egui::RichText::new("    Saw / Pulse").size(10.0).strong());
+                        ui.label(egui::RichText::new("   Saw / Pulse OSC").size(10.0).strong());
                         ui.add_space(8.0);
                         ui.horizontal(|ui| {
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_polyblep_octave,
+                                "Oct",
+                                &["-2", "-1", "0", "+1", "+2"],
+                                Some(Color32::from_rgb(80, 80, 40)),
+                            );
                             render_vertical_slider(
                                 ui,
                                 params,
@@ -364,6 +395,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_vertical_slider(
                                 ui,
@@ -375,20 +407,11 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
-                            );
-                            render_int_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_polyblep_octave,
-                                "Oct",
-                                &["-2", "-1", "0", "+1", "+2"],
+                                Some(Color32::from_rgb(40, 80, 40)),
                             );
                         });
                     });
                 });
-
-
 
             ui.add_space(8.0);
 
@@ -408,6 +431,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                         20000.0,
                         SliderScale::Logarithmic,
                         |v| format!("{:.0}", v),
+                        None,
                     );
                     ui.add_space(3.0);
                     render_vertical_slider(
@@ -420,6 +444,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                         0.99,
                         SliderScale::Linear,
                         |v| format!("{:.2}", v),
+                        None,
                     );
                     ui.add_space(3.0);
                     render_vertical_slider(
@@ -432,6 +457,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                         5000.0,
                         SliderScale::Linear,
                         |v| format!("{:.0}", v),
+                        None,
                     );
                 });
             });
@@ -465,6 +491,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                     1.0,
                     SliderScale::Linear,
                     |v| format!("{:.0}%", v * 100.0),
+                    Some(Color32::from_rgb(50, 180, 80)),
                 );
             });
         });
@@ -487,6 +514,7 @@ fn render_vertical_slider<P: Param>(
     max: f32,
     scale: SliderScale,
     formatter: impl Fn(f32) -> String,
+    color: Option<Color32>,
 ) where
     P::Plain: Into<f32>,
     f32: Into<P::Plain>,
@@ -495,6 +523,13 @@ fn render_vertical_slider<P: Param>(
         ui.set_width(28.0);
         let plain_value = param.modulated_plain_value();
         let mut value: f32 = plain_value.into();
+
+        // Apply color styling if provided
+        if let Some(fill_color) = color {
+            ui.style_mut().visuals.widgets.inactive.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.hovered.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.active.bg_fill = fill_color;
+        }
 
         match scale {
             SliderScale::Linear => {
@@ -542,10 +577,18 @@ fn render_int_vertical_slider(
     param: &nih_plug::prelude::IntParam,
     label: &str,
     labels: &[&str],
+    color: Option<Color32>,
 ) {
     ui.vertical(|ui| {
         ui.set_width(28.0);
         let mut value = param.value();
+
+        // Apply color styling if provided
+        if let Some(fill_color) = color {
+            ui.style_mut().visuals.widgets.inactive.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.hovered.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.active.bg_fill = fill_color;
+        }
 
         let (min, max) = match param.range() {
             nih_plug::prelude::IntRange::Linear { min, max } => (min, max),
@@ -603,6 +646,7 @@ fn render_envelope_controls_compact(
             1000.0,
             SliderScale::Exponential(2.0),
             |v| format!("{:.0}", v),
+            None,
         );
         ui.add_space(2.0);
         render_vertical_slider(
@@ -615,6 +659,7 @@ fn render_envelope_controls_compact(
             1000.0,
             SliderScale::Exponential(2.0),
             |v| format!("{:.0}", v),
+            None,
         );
         ui.add_space(2.0);
         render_vertical_slider(
@@ -627,6 +672,7 @@ fn render_envelope_controls_compact(
             1.0,
             SliderScale::Exponential(2.0),
             |v| format!("{:.2}", v),
+            None,
         );
         ui.add_space(2.0);
         render_vertical_slider(
@@ -639,6 +685,7 @@ fn render_envelope_controls_compact(
             1000.0,
             SliderScale::Exponential(2.0),
             |v| format!("{:.0}", v),
+            None,
         );
     });
 }
