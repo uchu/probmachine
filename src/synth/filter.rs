@@ -58,4 +58,35 @@ impl MoogFilter {
         let output = self.filter.tick_pivotal(input);
         *buffer = output.to_array();
     }
+
+    pub fn process_stereo(
+        &mut self,
+        left: &mut [f32],
+        right: &mut [f32],
+        cutoff: f32,
+        resonance: f32,
+        drive: f32,
+        mode: i32,
+    ) {
+        debug_assert_eq!(left.len(), 4);
+        debug_assert_eq!(right.len(), 4);
+
+        unsafe {
+            self.process_buffer(
+                &mut *(left.as_mut_ptr() as *mut [f32; 4]),
+                cutoff,
+                resonance,
+                drive,
+                mode,
+            );
+            self.process_buffer(
+                &mut *(right.as_mut_ptr() as *mut [f32; 4]),
+                cutoff,
+                resonance,
+                drive,
+                mode,
+            );
+        }
+    }
+
 }
