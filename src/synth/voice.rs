@@ -9,11 +9,13 @@ pub struct Voice {
     polyblep_oscillator: PolyBlepWrapper,
     sub_oscillator_sine: PolyBlepWrapper,
     sub_oscillator_square: PolyBlepWrapper,
-    pll_oscillator: PLLOscillator,
+    pll_oscillator_left: PLLOscillator,
+    pll_oscillator_right: PLLOscillator,
     pll_reference_oscillator: PolyBlepWrapper,
 
     // ===== Processing =====
-    filter: MoogFilter,
+    filter_left: MoogFilter,
+    filter_right: MoogFilter,
     volume_envelope: Envelope,
     filter_envelope: Envelope,
     oversampling_left: Oversampling<4>,
@@ -107,10 +109,12 @@ impl Voice {
             polyblep_oscillator: PolyBlepWrapper::new(oversampled_rate),
             sub_oscillator_sine: PolyBlepWrapper::new(sample_rate),
             sub_oscillator_square: PolyBlepWrapper::new(sample_rate),
-            pll_oscillator: PLLOscillator::new(oversampled_rate),
+            pll_oscillator_left: PLLOscillator::new(oversampled_rate),
+            pll_oscillator_right: PLLOscillator::new(oversampled_rate),
             pll_reference_oscillator: PolyBlepWrapper::new(oversampled_rate),
 
-            filter: MoogFilter::new(oversampled_rate),
+            filter_left: MoogFilter::new(oversampled_rate),
+            filter_right: MoogFilter::new(oversampled_rate),
             volume_envelope: Envelope::new(sample_rate),
             filter_envelope: Envelope::new(sample_rate),
             oversampling_left,
@@ -234,7 +238,8 @@ impl Voice {
         self.pll_colored = colored;
 
         let mode = if edge_mode { PllMode::EdgePFD } else { PllMode::AnalogLikePD };
-        self.pll_oscillator.set_params(track, damp, mult, range, colored, mode);
+        self.pll_oscillator_left.set_params(track, damp, mult, range, colored, mode);
+        self.pll_oscillator_right.set_params(track, damp, mult, range, colored, mode);
     }
 
     pub fn set_pll_volume(&mut self, volume: f32) {
@@ -242,7 +247,8 @@ impl Voice {
     }
 
     pub fn set_pll_ki_multiplier(&mut self, ki_mult: f32) {
-        self.pll_oscillator.set_ki_multiplier(ki_mult);
+        self.pll_oscillator_left.set_ki_multiplier(ki_mult);
+        self.pll_oscillator_right.set_ki_multiplier(ki_mult);
     }
 
     pub fn set_pll_distortion_params(&mut self, amount: f32, threshold: f32) {
@@ -326,7 +332,8 @@ impl Voice {
             self.filt_env_release_shape,
         );
 
-        self.pll_oscillator.trigger();
+        self.pll_oscillator_left.trigger();
+        self.pll_oscillator_right.trigger();
     }
 
     pub fn release(&mut self) {
@@ -342,7 +349,8 @@ impl Voice {
         let cutoff = (self.filter_cutoff + filter_env * self.filter_envelope_amount)
             .clamp(20.0, 20000.0);
 
-        self.pll_oscillator.prepare_block();
+        self.pll_oscillator_left.prepare_block();
+        self.pll_oscillator_right.prepare_block();
 
         let buf_l = self.oversampling_left.resample_buffer();
         let buf_r = self.oversampling_right.resample_buffer();
@@ -404,11 +412,11 @@ impl Voice {
                     super::oscillator::PllMode::AnalogLikePD
                 };
 
-                self.pll_oscillator.set_params(self.pll_track_speed, damp_left, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
-                let pll_raw_l = self.pll_oscillator.next(ref_phase, ref_mod, ref_pulse);
+                self.pll_oscillator_left.set_params(self.pll_track_speed, damp_left, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
+                let pll_raw_l = self.pll_oscillator_left.next(ref_phase, ref_mod, ref_pulse);
 
-                self.pll_oscillator.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
-                let pll_raw_r = self.pll_oscillator.next(ref_phase, ref_mod, ref_pulse);
+                self.pll_oscillator_right.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
+                let pll_raw_r = self.pll_oscillator_right.next(ref_phase, ref_mod, ref_pulse);
 
                 let pll_dist_gain = 0.1 + self.pll_distortion_amount * 4.9;
                 let pll_out_l = f_distort(pll_dist_gain, self.pll_distortion_threshold, pll_raw_l);
@@ -424,9 +432,20 @@ impl Voice {
             buf_r[i] = r;
         }
 
-        // Stereo filter
-        self.filter
-            .process_stereo(buf_l, buf_r, cutoff, self.filter_resonance, self.filter_drive, self.filter_mode);
+        self.filter_left.process_buffer(
+            unsafe { &mut *(buf_l.as_mut_ptr() as *mut [f32; 4]) },
+            cutoff,
+            self.filter_resonance,
+            self.filter_drive,
+            self.filter_mode,
+        );
+        self.filter_right.process_buffer(
+            unsafe { &mut *(buf_r.as_mut_ptr() as *mut [f32; 4]) },
+            cutoff,
+            self.filter_resonance,
+            self.filter_drive,
+            self.filter_mode,
+        );
 
         self.pll_feedback_state = feedback;
 

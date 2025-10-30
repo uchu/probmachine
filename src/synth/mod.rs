@@ -105,11 +105,10 @@ impl SynthEngine {
                 self.voice.release();
             }
 
-            let (sample, feedback) = self.voice.process(self.pll_feedback);
-            self.pll_feedback = feedback;
+            let (left_sample, right_sample) = self.voice.process(self.pll_feedback);
 
-            *l = sample;
-            *r = sample;
+            *l = left_sample;
+            *r = right_sample;
         }
     }
 }

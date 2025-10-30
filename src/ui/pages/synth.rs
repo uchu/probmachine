@@ -108,6 +108,18 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
+                                &params.synth_pll_stereo_damp_offset,
+                                "StΔ",
+                                0.0,
+                                0.3,
+                                SliderScale::Linear,
+                                |v| format!("{:.3}", v),
+                                Some(Color32::from_rgb(80, 40, 80)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
                                 &params.synth_pll_range,
                                 "Rng",
                                 0.1,
