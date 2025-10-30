@@ -178,6 +178,8 @@ impl Plugin for Device {
 
             synth.set_pll_ki_multiplier(self.params.synth_pll_ki_multiplier.modulated_plain_value());
 
+            synth.set_pll_stereo_damp_offset(self.params.synth_pll_stereo_damp_offset.modulated_plain_value());
+
             synth.set_pll_distortion_params(
                 self.params.synth_pll_distortion_amount.modulated_plain_value(),
                 self.params.synth_pll_distortion_threshold.modulated_plain_value(),

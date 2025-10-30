@@ -60,6 +60,10 @@ impl SynthEngine {
         self.voice.set_pll_ki_multiplier(ki_mult);
     }
 
+    pub fn set_pll_stereo_damp_offset(&mut self, offset: f32) {
+        self.voice.set_pll_stereo_damp_offset(offset);
+    }
+
     pub fn set_pll_distortion_params(&mut self, amount: f32, threshold: f32) {
         self.voice.set_pll_distortion_params(amount, threshold);
     }

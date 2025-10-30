@@ -395,6 +395,8 @@ pub struct DeviceParams {
     pub synth_pll_distortion_amount: FloatParam,
     #[id = "synth_pll_distortion_threshold"]
     pub synth_pll_distortion_threshold: FloatParam,
+    #[id = "synth_pll_stereo_damp_offset"]
+    pub synth_pll_stereo_damp_offset: FloatParam,
 
     #[id = "synth_distortion_amount"]
     pub synth_distortion_amount: FloatParam,
@@ -1124,6 +1126,11 @@ impl Default for DeviceParams {
                 "PLL Distortion Threshold".to_string(),
                 0.9,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_stereo_damp_offset: FloatParam::new(
+                "PLL Stereo Damp Δ".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.3 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_distortion_amount: FloatParam::new(

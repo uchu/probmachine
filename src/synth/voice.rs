@@ -25,7 +25,8 @@ pub struct Voice {
     sample_rate: f32,
 
     // ===== Stereo =====
-    stereo_width: f32, // 0.0 = mono, 1.0 = full width
+    stereo_width: f32,
+    pll_damping_stereo_offset: f32,
 
     // ===== VPS Oscillator =====
     vps_octave: i32,
@@ -53,6 +54,8 @@ pub struct Voice {
     pll_feedback_state: f32,
     pll_distortion_amount: f32,
     pll_distortion_threshold: f32,
+    pll_mode_is_edge: bool,
+    pll_colored: bool,
 
     // ===== PLL Reference =====
     pll_ref_octave: i32,
@@ -116,7 +119,8 @@ impl Voice {
             base_frequency: 220.0,
             master_volume: 0.8,
             sample_rate,
-            stereo_width: 0.0, // start mono-centered
+            stereo_width: 0.0,
+            pll_damping_stereo_offset: 0.0,
 
             vps_octave: 0,
             vps_d_param: 0.5,
@@ -140,6 +144,8 @@ impl Voice {
             pll_feedback_state: 0.0,
             pll_distortion_amount: 0.0,
             pll_distortion_threshold: 0.9,
+            pll_mode_is_edge: false,
+            pll_colored: false,
 
             pll_ref_octave: 0,
             pll_ref_tune_semitones: 0,
@@ -175,6 +181,10 @@ impl Voice {
 
     pub fn set_stereo_width(&mut self, width: f32) {
         self.stereo_width = width.clamp(0.0, 1.0);
+    }
+
+    pub fn set_pll_stereo_damp_offset(&mut self, offset: f32) {
+        self.pll_damping_stereo_offset = offset.clamp(0.0, 1.0);
     }
 
     pub fn set_frequency(&mut self, freq: f32, _pll_feedback: f32, feedback_amount: f32) {
@@ -220,6 +230,8 @@ impl Voice {
         self.pll_damping = damp;
         self.pll_multiplier = mult;
         self.pll_range = range;
+        self.pll_mode_is_edge = edge_mode;
+        self.pll_colored = colored;
 
         let mode = if edge_mode { PllMode::EdgePFD } else { PllMode::AnalogLikePD };
         self.pll_oscillator.set_params(track, damp, mult, range, colored, mode);
@@ -383,15 +395,29 @@ impl Voice {
                 let ref_pulse = self.pll_reference_oscillator.next(self.pll_ref_pulse_width);
                 let ref_phase = self.pll_reference_oscillator.get_phase();
 
-                let pll_raw = self.pll_oscillator.next(ref_phase, ref_mod, ref_pulse);
+                let damp_left = (self.pll_damping - self.pll_damping_stereo_offset).clamp(0.001, 1.0);
+                let damp_right = (self.pll_damping + self.pll_damping_stereo_offset).clamp(0.001, 1.0);
+
+                let mode = if self.pll_mode_is_edge {
+                    super::oscillator::PllMode::EdgePFD
+                } else {
+                    super::oscillator::PllMode::AnalogLikePD
+                };
+
+                self.pll_oscillator.set_params(self.pll_track_speed, damp_left, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
+                let pll_raw_l = self.pll_oscillator.next(ref_phase, ref_mod, ref_pulse);
+
+                self.pll_oscillator.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
+                let pll_raw_r = self.pll_oscillator.next(ref_phase, ref_mod, ref_pulse);
+
                 let pll_dist_gain = 0.1 + self.pll_distortion_amount * 4.9;
-                let pll_out = f_distort(pll_dist_gain, self.pll_distortion_threshold, pll_raw);
+                let pll_out_l = f_distort(pll_dist_gain, self.pll_distortion_threshold, pll_raw_l);
+                let pll_out_r = f_distort(pll_dist_gain, self.pll_distortion_threshold, pll_raw_r);
 
-                // simple L/R variance using stereo_width
-                l += pll_out * self.pll_volume * volume_env * (1.0 - self.stereo_width * 0.2);
-                r += pll_out * self.pll_volume * volume_env * (1.0 + self.stereo_width * 0.2);
+                l += pll_out_l * self.pll_volume * volume_env;
+                r += pll_out_r * self.pll_volume * volume_env;
 
-                feedback = feedback * 0.9 + pll_raw * 0.1;
+                feedback = feedback * 0.9 + (pll_raw_l + pll_raw_r) * 0.05;
             }
 
             buf_l[i] = l;
