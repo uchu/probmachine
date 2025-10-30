@@ -279,6 +279,10 @@ impl Voice {
     }
 
     pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
+        if self.filter_mode != mode {
+            use nih_plug::nih_log;
+            nih_log!("Voice: Filter mode changed from {} to {}", self.filter_mode, mode);
+        }
         self.filter_cutoff = cutoff;
         self.filter_resonance = resonance;
         self.filter_envelope_amount = env_amount;

@@ -1,6 +1,7 @@
 use synfx_dsp::fh_va::{LadderFilter, FilterParams, LadderMode};
 use std::sync::Arc;
 use std::simd::f32x4;
+use nih_plug::nih_log;
 
 pub struct MoogFilter {
     filter: LadderFilter,
@@ -18,6 +19,7 @@ impl MoogFilter {
 
         let params_arc = Arc::new(params.clone());
         let mut filter = LadderFilter::new(params_arc);
+        filter.set_mix(LadderMode::LP24);
         filter.reset();
 
         Self {
@@ -37,7 +39,7 @@ impl MoogFilter {
         self.params.drive = drive;
 
         // Map mode integer to LadderMode enum
-        self.params.ladder_mode = match mode {
+        let new_mode = match mode {
             0 => LadderMode::LP6,
             1 => LadderMode::LP12,
             2 => LadderMode::LP18,
@@ -52,7 +54,14 @@ impl MoogFilter {
             _ => LadderMode::LP24,
         };
 
-        self.filter.params = Arc::new(self.params.clone());
+        if self.params.ladder_mode != new_mode {
+            nih_log!("Filter mode changed from {:?} to {:?}", self.params.ladder_mode, new_mode);
+            self.params.ladder_mode = new_mode;
+            self.filter.set_mix(new_mode);
+            self.filter.params = Arc::new(self.params.clone());
+        } else {
+            self.filter.params = Arc::new(self.params.clone());
+        }
 
         let input = f32x4::from_array(*buffer);
         let output = self.filter.tick_pivotal(input);

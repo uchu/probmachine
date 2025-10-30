@@ -85,6 +85,8 @@ impl SynthEngine {
     }
 
     pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
+        use nih_plug::nih_log;
+        nih_log!("Synth: set_filter_params mode={}", mode);
         self.voice.set_filter_params(cutoff, resonance, env_amount, drive, mode);
     }
 

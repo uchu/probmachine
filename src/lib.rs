@@ -194,12 +194,21 @@ impl Plugin for Device {
                 self.params.synth_distortion_threshold.modulated_plain_value(),
             );
 
+            let filter_mode = self.params.synth_filter_mode.value();
+            use nih_plug::nih_log;
+            static mut LAST_MODE: i32 = -1;
+            unsafe {
+                if LAST_MODE != filter_mode {
+                    nih_log!("Process: filter_mode param changed from {} to {}", LAST_MODE, filter_mode);
+                    LAST_MODE = filter_mode;
+                }
+            }
             synth.set_filter_params(
                 self.params.synth_filter_cutoff.modulated_plain_value(),
                 self.params.synth_filter_resonance.modulated_plain_value(),
                 self.params.synth_filter_env_amount.modulated_plain_value(),
                 self.params.synth_filter_drive.modulated_plain_value(),
-                self.params.synth_filter_mode.value(),
+                filter_mode,
             );
 
             synth.set_volume(self.params.synth_volume.modulated_plain_value());
