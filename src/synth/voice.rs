@@ -5,8 +5,10 @@ use super::envelope::Envelope;
 
 pub struct Voice {
     // ===== Oscillators =====
-    vps_oscillator: Oscillator,
-    polyblep_oscillator: PolyBlepWrapper,
+    vps_oscillator_left: Oscillator,
+    vps_oscillator_right: Oscillator,
+    polyblep_oscillator_left: PolyBlepWrapper,
+    polyblep_oscillator_right: PolyBlepWrapper,
     sub_oscillator_sine: PolyBlepWrapper,
     sub_oscillator_square: PolyBlepWrapper,
     pll_oscillator_left: PLLOscillator,
@@ -35,11 +37,13 @@ pub struct Voice {
     vps_d_param: f32,
     vps_v_param: f32,
     vps_volume: f32,
+    vps_stereo_v_offset: f32,
 
     // ===== PolyBLEP Pulse =====
     polyblep_volume: f32,
     polyblep_pulse_width: f32,
     polyblep_octave: i32,
+    polyblep_stereo_width: f32,
 
     // ===== Sub Oscillator =====
     sub_volume: f32,
@@ -105,8 +109,10 @@ impl Voice {
         let oversampled_rate = sample_rate * 4.0;
 
         Self {
-            vps_oscillator: Oscillator::new(oversampled_rate),
-            polyblep_oscillator: PolyBlepWrapper::new(oversampled_rate),
+            vps_oscillator_left: Oscillator::new(oversampled_rate),
+            vps_oscillator_right: Oscillator::new(oversampled_rate),
+            polyblep_oscillator_left: PolyBlepWrapper::new(oversampled_rate),
+            polyblep_oscillator_right: PolyBlepWrapper::new(oversampled_rate),
             sub_oscillator_sine: PolyBlepWrapper::new(sample_rate),
             sub_oscillator_square: PolyBlepWrapper::new(sample_rate),
             pll_oscillator_left: PLLOscillator::new(oversampled_rate),
@@ -130,10 +136,12 @@ impl Voice {
             vps_d_param: 0.5,
             vps_v_param: 0.5,
             vps_volume: 1.0,
+            vps_stereo_v_offset: 0.0,
 
             polyblep_volume: 0.0,
             polyblep_pulse_width: 0.5,
             polyblep_octave: 0,
+            polyblep_stereo_width: 0.0,
 
             sub_volume: 0.0,
             sub_octave: -1,
@@ -199,7 +207,12 @@ impl Voice {
     pub fn set_osc_params(&mut self, d: f32, v: f32) {
         self.vps_d_param = d;
         self.vps_v_param = v;
-        self.vps_oscillator.set_params(d, v);
+        self.vps_oscillator_left.set_params(d, v);
+        self.vps_oscillator_right.set_params(d, v);
+    }
+
+    pub fn set_vps_stereo_v_offset(&mut self, offset: f32) {
+        self.vps_stereo_v_offset = offset.clamp(0.0, 1.0);
     }
 
     pub fn set_osc_volume(&mut self, volume: f32) {
@@ -214,6 +227,10 @@ impl Voice {
         self.polyblep_volume = volume;
         self.polyblep_pulse_width = pulse_width;
         self.polyblep_octave = octave;
+    }
+
+    pub fn set_polyblep_stereo_width(&mut self, width: f32) {
+        self.polyblep_stereo_width = width.clamp(0.0, 1.0);
     }
 
     pub fn set_sub_params(&mut self, volume: f32, octave: i32, shape: f32) {
@@ -363,12 +380,16 @@ impl Voice {
             // VPS
             if self.vps_volume > 0.0 {
                 let base_freq = self.base_frequency * 2.0_f32.powi(self.vps_octave);
-                // stereo detune based on width
-                let detune = self.stereo_width * 0.002; // ~0.2%
-                self.vps_oscillator.set_frequency(base_freq * (1.0 - detune));
-                let raw_l = self.vps_oscillator.next(self.vps_d_param, self.vps_v_param);
-                self.vps_oscillator.set_frequency(base_freq * (1.0 + detune));
-                let raw_r = self.vps_oscillator.next(self.vps_d_param, self.vps_v_param);
+                let detune = self.stereo_width * 0.002;
+
+                let v_left = (self.vps_v_param - self.vps_stereo_v_offset).clamp(0.0, 1.0);
+                let v_right = (self.vps_v_param + self.vps_stereo_v_offset).clamp(0.0, 1.0);
+
+                self.vps_oscillator_left.set_frequency(base_freq * (1.0 - detune));
+                let raw_l = self.vps_oscillator_left.next(self.vps_d_param, v_left);
+
+                self.vps_oscillator_right.set_frequency(base_freq * (1.0 + detune));
+                let raw_r = self.vps_oscillator_right.next(self.vps_d_param, v_right);
 
                 let distortion_gain = 0.1 + self.distortion_amount * 4.9;
                 let left = f_distort(distortion_gain, self.distortion_threshold, raw_l);
@@ -381,11 +402,18 @@ impl Voice {
             // PolyBLEP
             if self.polyblep_volume > 0.0 {
                 let base_freq = self.base_frequency * 2.0_f32.powi(self.polyblep_octave);
-                let detune = self.stereo_width * 0.003;
-                self.polyblep_oscillator.set_frequency(base_freq * (1.0 - detune));
-                let raw_l = self.polyblep_oscillator.next(self.polyblep_pulse_width);
-                self.polyblep_oscillator.set_frequency(base_freq * (1.0 + detune));
-                let raw_r = self.polyblep_oscillator.next(self.polyblep_pulse_width);
+
+                let detune_amount = self.polyblep_stereo_width * 0.01;
+                let pw_offset = self.polyblep_stereo_width * 0.15;
+
+                let pw_left = (self.polyblep_pulse_width - pw_offset).clamp(0.01, 0.99);
+                let pw_right = (self.polyblep_pulse_width + pw_offset).clamp(0.01, 0.99);
+
+                self.polyblep_oscillator_left.set_frequency(base_freq * (1.0 - detune_amount));
+                let raw_l = self.polyblep_oscillator_left.next(pw_left);
+
+                self.polyblep_oscillator_right.set_frequency(base_freq * (1.0 + detune_amount));
+                let raw_r = self.polyblep_oscillator_right.next(pw_right);
 
                 l += raw_l * self.polyblep_volume * volume_env;
                 r += raw_r * self.polyblep_volume * volume_env;

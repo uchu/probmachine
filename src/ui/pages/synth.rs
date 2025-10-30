@@ -342,6 +342,18 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
+                                &params.synth_osc_stereo_v_offset,
+                                "StΔ",
+                                0.0,
+                                0.3,
+                                SliderScale::Linear,
+                                |v| format!("{:.3}", v),
+                                Some(Color32::from_rgb(80, 40, 80)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
                                 &params.synth_distortion_amount,
                                 "Amt",
                                 0.0,
@@ -408,6 +420,18 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
                                 Some(Color32::from_rgb(80, 80, 40)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_polyblep_stereo_width,
+                                "StΔ",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(80, 40, 80)),
                             );
                             render_vertical_slider(
                                 ui,

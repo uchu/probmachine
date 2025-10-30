@@ -347,6 +347,8 @@ pub struct DeviceParams {
     pub synth_osc_d: FloatParam,
     #[id = "synth_osc_v"]
     pub synth_osc_v: FloatParam,
+    #[id = "synth_osc_stereo_v_offset"]
+    pub synth_osc_stereo_v_offset: FloatParam,
     #[id = "synth_osc_volume"]
     pub synth_osc_volume: FloatParam,
     #[id = "synth_osc_octave"]
@@ -364,6 +366,8 @@ pub struct DeviceParams {
     pub synth_polyblep_pulse_width: FloatParam,
     #[id = "synth_polyblep_octave"]
     pub synth_polyblep_octave: IntParam,
+    #[id = "synth_polyblep_stereo_width"]
+    pub synth_polyblep_stereo_width: FloatParam,
 
     #[id = "synth_pll_track_speed"]
     pub synth_pll_track_speed: FloatParam,
@@ -1012,6 +1016,11 @@ impl Default for DeviceParams {
                 0.5,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_osc_stereo_v_offset: FloatParam::new(
+                "VPS Stereo V Δ".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_osc_volume: FloatParam::new(
                 "VPS Volume".to_string(),
                 1.0,
@@ -1053,6 +1062,11 @@ impl Default for DeviceParams {
                 0,
                 IntRange::Linear { min: -2, max: 2 }
             ),
+            synth_polyblep_stereo_width: FloatParam::new(
+                "PolyBlep Stereo Width".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_pll_track_speed: FloatParam::new(
                 "PLL Track Speed".to_string(),

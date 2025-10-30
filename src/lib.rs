@@ -136,6 +136,8 @@ impl Plugin for Device {
 
             synth.set_osc_octave(self.params.synth_osc_octave.value());
 
+            synth.set_vps_stereo_v_offset(self.params.synth_osc_stereo_v_offset.modulated_plain_value());
+
             synth.set_sub_params(
                 self.params.synth_sub_volume.modulated_plain_value(),
                 self.params.synth_sub_octave.value(),
@@ -147,6 +149,8 @@ impl Plugin for Device {
                 self.params.synth_polyblep_pulse_width.modulated_plain_value(),
                 self.params.synth_polyblep_octave.value(),
             );
+
+            synth.set_polyblep_stereo_width(self.params.synth_polyblep_stereo_width.modulated_plain_value());
 
             synth.set_pll_ref_params(
                 self.params.synth_pll_ref_octave.value(),

@@ -40,8 +40,16 @@ impl SynthEngine {
         self.voice.set_osc_octave(octave);
     }
 
+    pub fn set_vps_stereo_v_offset(&mut self, offset: f32) {
+        self.voice.set_vps_stereo_v_offset(offset);
+    }
+
     pub fn set_polyblep_params(&mut self, volume: f32, pulse_width: f32, octave: i32) {
         self.voice.set_polyblep_params(volume, pulse_width, octave);
+    }
+
+    pub fn set_polyblep_stereo_width(&mut self, width: f32) {
+        self.voice.set_polyblep_stereo_width(width);
     }
 
     pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f32, pulse_width: f32) {
