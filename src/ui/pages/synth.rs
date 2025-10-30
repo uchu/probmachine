@@ -459,6 +459,29 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                         |v| format!("{:.0}", v),
                         None,
                     );
+                    ui.add_space(3.0);
+                    render_vertical_slider(
+                        ui,
+                        params,
+                        setter,
+                        &params.synth_filter_drive,
+                        "Drv",
+                        1.0,
+                        15.849,
+                        SliderScale::Linear,
+                        |v| format!("{:.1}", v),
+                        None,
+                    );
+                    ui.add_space(3.0);
+                    render_int_vertical_slider(
+                        ui,
+                        params,
+                        setter,
+                        &params.synth_filter_mode,
+                        "Mod",
+                        &["LP6", "LP12", "LP18", "LP24", "HP6", "HP12", "HP18", "HP24", "BP12", "BP24", "N12"],
+                        None,
+                    );
                 });
             });
 

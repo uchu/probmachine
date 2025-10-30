@@ -72,8 +72,8 @@ impl SynthEngine {
         self.voice.set_distortion_params(amount, threshold);
     }
 
-    pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32) {
-        self.voice.set_filter_params(cutoff, resonance, env_amount);
+    pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
+        self.voice.set_filter_params(cutoff, resonance, env_amount, drive, mode);
     }
 
     pub fn set_volume(&mut self, volume: f32) {

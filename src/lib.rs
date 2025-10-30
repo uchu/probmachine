@@ -192,6 +192,8 @@ impl Plugin for Device {
                 self.params.synth_filter_cutoff.modulated_plain_value(),
                 self.params.synth_filter_resonance.modulated_plain_value(),
                 self.params.synth_filter_env_amount.modulated_plain_value(),
+                self.params.synth_filter_drive.modulated_plain_value(),
+                self.params.synth_filter_mode.value(),
             );
 
             synth.set_volume(self.params.synth_volume.modulated_plain_value());

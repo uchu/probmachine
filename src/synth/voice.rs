@@ -64,6 +64,8 @@ pub struct Voice {
     filter_cutoff: f32,
     filter_resonance: f32,
     filter_envelope_amount: f32,
+    filter_drive: f32,
+    filter_mode: i32,
 
     // ===== Volume Envelope Parameters =====
     vol_env_attack: f32,
@@ -152,6 +154,8 @@ impl Voice {
             filter_cutoff: 1000.0,
             filter_resonance: 0.0,
             filter_envelope_amount: 0.0,
+            filter_drive: 1.0,
+            filter_mode: 3,
 
             // Volume Envelope
             vol_env_attack: 1.0,
@@ -255,10 +259,12 @@ impl Voice {
 
     // ===== Filter Setters =====
 
-    pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32) {
+    pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
         self.filter_cutoff = cutoff;
         self.filter_resonance = resonance;
         self.filter_envelope_amount = env_amount;
+        self.filter_drive = drive;
+        self.filter_mode = mode;
     }
 
     // ===== Master Volume =====
@@ -404,7 +410,7 @@ impl Voice {
         }
 
         // Apply filter to oversampled buffer
-        self.filter.process_buffer(oversample_buffer, modulated_filter_cutoff, self.filter_resonance);
+        self.filter.process_buffer(oversample_buffer, modulated_filter_cutoff, self.filter_resonance, self.filter_drive, self.filter_mode);
 
         // Store feedback state for next block
         self.pll_feedback_state = feedback_state;

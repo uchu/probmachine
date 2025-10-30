@@ -407,6 +407,10 @@ pub struct DeviceParams {
     pub synth_filter_resonance: FloatParam,
     #[id = "synth_filter_env_amount"]
     pub synth_filter_env_amount: FloatParam,
+    #[id = "synth_filter_drive"]
+    pub synth_filter_drive: FloatParam,
+    #[id = "synth_filter_mode"]
+    pub synth_filter_mode: IntParam,
 
     #[id = "synth_volume"]
     pub synth_volume: FloatParam,
@@ -1148,6 +1152,16 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: -5000.0, max: 5000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filter_drive: FloatParam::new(
+                "Filter Drive".to_string(),
+                1.0,
+                FloatRange::Linear { min: 1.0, max: 15.849 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filter_mode: IntParam::new(
+                "Filter Mode".to_string(),
+                3,
+                IntRange::Linear { min: 0, max: 10 }
+            ),
 
             synth_volume: FloatParam::new(
                 "Volume".to_string(),

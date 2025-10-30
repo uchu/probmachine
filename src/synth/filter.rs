@@ -27,12 +27,31 @@ impl MoogFilter {
         }
     }
 
-    pub fn process_buffer(&mut self, buffer: &mut [f32; 4], cutoff: f32, resonance: f32) {
+    pub fn process_buffer(&mut self, buffer: &mut [f32; 4], cutoff: f32, resonance: f32, drive: f32, mode: i32) {
         let cutoff = cutoff.clamp(20.0, 20000.0);
         let resonance = resonance.clamp(0.0, 0.99);
+        let drive = drive.clamp(1.0, 15.849);
 
         self.params.set_frequency(cutoff);
         self.params.set_resonance(resonance);
+        self.params.drive = drive;
+
+        // Map mode integer to LadderMode enum
+        self.params.ladder_mode = match mode {
+            0 => LadderMode::LP6,
+            1 => LadderMode::LP12,
+            2 => LadderMode::LP18,
+            3 => LadderMode::LP24,
+            4 => LadderMode::HP6,
+            5 => LadderMode::HP12,
+            6 => LadderMode::HP18,
+            7 => LadderMode::HP24,
+            8 => LadderMode::BP12,
+            9 => LadderMode::BP24,
+            10 => LadderMode::N12,
+            _ => LadderMode::LP24,
+        };
+
         self.filter.params = Arc::new(self.params.clone());
 
         let input = f32x4::from_array(*buffer);
