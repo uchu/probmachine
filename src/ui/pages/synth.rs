@@ -386,6 +386,18 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 |v| format!("{:.2}", v),
                                 Some(Color32::from_rgb(40, 80, 40)),
                             );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_vps_dry_wet,
+                                "Rvb",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.0}%", v * 100.0),
+                                Some(Color32::from_rgb(100, 80, 140)),
+                            );
                         });
                     });
                 });
@@ -553,6 +565,106 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                     Some(Color32::from_rgb(50, 180, 80)),
                 );
             });
+
+            ui.add_space(8.0);
+
+            egui::Frame::default()
+                .fill(ui.visuals().extreme_bg_color)
+                .inner_margin(egui::Margin { left: 10, right: 10, top: 10, bottom: 10 })
+                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                .corner_radius(15.0)
+                .show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new("REVERB (VPS)").size(10.0).strong());
+                        ui.add_space(5.0);
+                        ui.horizontal(|ui| {
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_time_scale,
+                                "Size",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                                None,
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_decay,
+                                "Decay",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                                None,
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_diffusion,
+                                "Diff",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                                None,
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_pre_delay,
+                                "PreDly",
+                                0.0,
+                                500.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.0}ms", v),
+                                None,
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_mod_depth,
+                                "ModDep",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                                None,
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_hpf,
+                                "HPF",
+                                20.0,
+                                1000.0,
+                                SliderScale::Logarithmic,
+                                |v| format!("{:.0}Hz", v),
+                                None,
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_lpf,
+                                "LPF",
+                                1000.0,
+                                22000.0,
+                                SliderScale::Logarithmic,
+                                |v| format!("{:.0}Hz", v),
+                                None,
+                            );
+                        });
+                    });
+                });
         });
     });
 }

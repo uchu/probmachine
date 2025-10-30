@@ -195,14 +195,6 @@ impl Plugin for Device {
             );
 
             let filter_mode = self.params.synth_filter_mode.value();
-            use nih_plug::nih_log;
-            static mut LAST_MODE: i32 = -1;
-            unsafe {
-                if LAST_MODE != filter_mode {
-                    nih_log!("Process: filter_mode param changed from {} to {}", LAST_MODE, filter_mode);
-                    LAST_MODE = filter_mode;
-                }
-            }
             synth.set_filter_params(
                 self.params.synth_filter_cutoff.modulated_plain_value(),
                 self.params.synth_filter_resonance.modulated_plain_value(),
@@ -231,6 +223,24 @@ impl Plugin for Device {
                 self.params.synth_filt_sustain.modulated_plain_value(),
                 self.params.synth_filt_release.modulated_plain_value(),
                 self.params.synth_filt_release_shape.modulated_plain_value(),
+            );
+
+            synth.set_vps_dry_wet(self.params.synth_vps_dry_wet.modulated_plain_value());
+
+            synth.set_reverb_params(
+                self.params.synth_reverb_mix.modulated_plain_value(),
+                self.params.synth_reverb_pre_delay.modulated_plain_value(),
+                self.params.synth_reverb_time_scale.modulated_plain_value(),
+                self.params.synth_reverb_input_hpf.modulated_plain_value(),
+                self.params.synth_reverb_input_lpf.modulated_plain_value(),
+                self.params.synth_reverb_hpf.modulated_plain_value(),
+                self.params.synth_reverb_lpf.modulated_plain_value(),
+                self.params.synth_reverb_mod_speed.modulated_plain_value(),
+                self.params.synth_reverb_mod_depth.modulated_plain_value(),
+                self.params.synth_reverb_mod_shape.modulated_plain_value(),
+                self.params.synth_reverb_diffusion_mix.modulated_plain_value(),
+                self.params.synth_reverb_diffusion.modulated_plain_value(),
+                self.params.synth_reverb_decay.modulated_plain_value(),
             );
 
             let mut output_l = vec![0.0; buffer.samples()];

@@ -1,7 +1,6 @@
 use synfx_dsp::fh_va::{LadderFilter, FilterParams, LadderMode};
 use std::sync::Arc;
 use std::simd::f32x4;
-use nih_plug::nih_log;
 
 pub struct MoogFilter {
     filter: LadderFilter,
@@ -55,7 +54,6 @@ impl MoogFilter {
         };
 
         if self.params.ladder_mode != new_mode {
-            nih_log!("Filter mode changed from {:?} to {:?}", self.params.ladder_mode, new_mode);
             self.params.ladder_mode = new_mode;
             self.filter.set_mix(new_mode);
             self.filter.params = Arc::new(self.params.clone());

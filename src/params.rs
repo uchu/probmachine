@@ -451,6 +451,36 @@ pub struct DeviceParams {
     #[id = "synth_filt_release_shape"]
     pub synth_filt_release_shape: FloatParam,
 
+    #[id = "synth_vps_dry_wet"]
+    pub synth_vps_dry_wet: FloatParam,
+
+    #[id = "synth_reverb_mix"]
+    pub synth_reverb_mix: FloatParam,
+    #[id = "synth_reverb_pre_delay"]
+    pub synth_reverb_pre_delay: FloatParam,
+    #[id = "synth_reverb_time_scale"]
+    pub synth_reverb_time_scale: FloatParam,
+    #[id = "synth_reverb_input_hpf"]
+    pub synth_reverb_input_hpf: FloatParam,
+    #[id = "synth_reverb_input_lpf"]
+    pub synth_reverb_input_lpf: FloatParam,
+    #[id = "synth_reverb_hpf"]
+    pub synth_reverb_hpf: FloatParam,
+    #[id = "synth_reverb_lpf"]
+    pub synth_reverb_lpf: FloatParam,
+    #[id = "synth_reverb_mod_speed"]
+    pub synth_reverb_mod_speed: FloatParam,
+    #[id = "synth_reverb_mod_depth"]
+    pub synth_reverb_mod_depth: FloatParam,
+    #[id = "synth_reverb_mod_shape"]
+    pub synth_reverb_mod_shape: FloatParam,
+    #[id = "synth_reverb_diffusion_mix"]
+    pub synth_reverb_diffusion_mix: FloatParam,
+    #[id = "synth_reverb_diffusion"]
+    pub synth_reverb_diffusion: FloatParam,
+    #[id = "synth_reverb_decay"]
+    pub synth_reverb_decay: FloatParam,
+
     #[id = "note_length_percent"]
     pub note_length_percent: FloatParam,
 }
@@ -1259,6 +1289,78 @@ impl Default for DeviceParams {
             synth_filt_release_shape: FloatParam::new(
                 "Filt Release Shape".to_string(),
                 0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_vps_dry_wet: FloatParam::new(
+                "VPS Dry/Wet".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_reverb_mix: FloatParam::new(
+                "Reverb Mix".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_pre_delay: FloatParam::new(
+                "Reverb Pre-Delay".to_string(),
+                50.0,
+                FloatRange::Linear { min: 0.0, max: 500.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_time_scale: FloatParam::new(
+                "Reverb Size".to_string(),
+                0.85,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_input_hpf: FloatParam::new(
+                "Reverb Input HPF".to_string(),
+                20.0,
+                FloatRange::Skewed { min: 20.0, max: 22000.0, factor: 0.25 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_input_lpf: FloatParam::new(
+                "Reverb Input LPF".to_string(),
+                18000.0,
+                FloatRange::Skewed { min: 20.0, max: 22000.0, factor: 0.25 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_hpf: FloatParam::new(
+                "Reverb HPF".to_string(),
+                100.0,
+                FloatRange::Skewed { min: 20.0, max: 22000.0, factor: 0.25 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_lpf: FloatParam::new(
+                "Reverb LPF".to_string(),
+                14000.0,
+                FloatRange::Skewed { min: 20.0, max: 22000.0, factor: 0.25 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_mod_speed: FloatParam::new(
+                "Reverb Mod Speed".to_string(),
+                0.3,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_mod_depth: FloatParam::new(
+                "Reverb Mod Depth".to_string(),
+                0.4,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_mod_shape: FloatParam::new(
+                "Reverb Mod Shape".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_diffusion_mix: FloatParam::new(
+                "Reverb Diffusion Mix".to_string(),
+                0.85,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_diffusion: FloatParam::new(
+                "Reverb Diffusion".to_string(),
+                0.75,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_decay: FloatParam::new(
+                "Reverb Decay".to_string(),
+                0.8,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 

@@ -2,6 +2,7 @@ use synfx_dsp::{Oversampling, f_distort};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, PllMode};
 use super::filter::MoogFilter;
 use super::envelope::Envelope;
+use super::reverb::StereoReverb;
 
 pub struct Voice {
     // ===== Oscillators =====
@@ -97,6 +98,12 @@ pub struct Voice {
     filt_env_sustain: f32,
     filt_env_release: f32,
     filt_env_release_shape: f32,
+
+    // ===== Reverb =====
+    reverb: StereoReverb,
+
+    // ===== VPS Dry/Wet =====
+    vps_dry_wet: f32,
 }
 
 impl Voice {
@@ -188,6 +195,9 @@ impl Voice {
             filt_env_sustain: 1.0,
             filt_env_release: 5.0,
             filt_env_release_shape: 0.5,
+
+            reverb: StereoReverb::new(sample_rate),
+            vps_dry_wet: 0.0,
         }
     }
 
@@ -279,15 +289,48 @@ impl Voice {
     }
 
     pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
-        if self.filter_mode != mode {
-            use nih_plug::nih_log;
-            nih_log!("Voice: Filter mode changed from {} to {}", self.filter_mode, mode);
-        }
         self.filter_cutoff = cutoff;
         self.filter_resonance = resonance;
         self.filter_envelope_amount = env_amount;
         self.filter_drive = drive;
         self.filter_mode = mode;
+    }
+
+    pub fn set_vps_dry_wet(&mut self, dry_wet: f32) {
+        self.vps_dry_wet = dry_wet.clamp(0.0, 1.0);
+    }
+
+    pub fn set_reverb_params(
+        &mut self,
+        mix: f32,
+        pre_delay_ms: f32,
+        time_scale: f32,
+        input_hpf_hz: f32,
+        input_lpf_hz: f32,
+        reverb_hpf_hz: f32,
+        reverb_lpf_hz: f32,
+        mod_speed: f32,
+        mod_depth: f32,
+        mod_shape: f32,
+        input_diffusion_mix: f32,
+        diffusion: f32,
+        decay: f32,
+    ) {
+        self.reverb.set_params(
+            mix,
+            pre_delay_ms,
+            time_scale,
+            input_hpf_hz,
+            input_lpf_hz,
+            reverb_hpf_hz,
+            reverb_lpf_hz,
+            mod_speed,
+            mod_depth,
+            mod_shape,
+            input_diffusion_mix,
+            diffusion,
+            decay,
+        );
     }
 
     pub fn set_volume(&mut self, volume: f32) {
@@ -481,8 +524,23 @@ impl Voice {
 
         self.pll_feedback_state = feedback;
 
-        let out_l = self.oversampling_left.downsample();
-        let out_r = self.oversampling_right.downsample();
+        let vps_l = self.oversampling_left.downsample();
+        let vps_r = self.oversampling_right.downsample();
+
+        // Apply reverb to VPS only, with dry/wet mix
+        let vps_dry_l = vps_l * (1.0 - self.vps_dry_wet);
+        let vps_dry_r = vps_r * (1.0 - self.vps_dry_wet);
+
+        let (vps_wet_l, vps_wet_r) = if self.vps_dry_wet > 0.0 {
+            self.reverb.process(vps_l, vps_r)
+        } else {
+            (0.0, 0.0)
+        };
+        let vps_wet_l = vps_wet_l * self.vps_dry_wet;
+        let vps_wet_r = vps_wet_r * self.vps_dry_wet;
+
+        let vps_final_l = vps_dry_l + vps_wet_l;
+        let vps_final_r = vps_dry_r + vps_wet_r;
 
         // Sub oscillator (mono center)
         let sub = if self.sub_volume > 0.0 {
@@ -494,8 +552,8 @@ impl Voice {
             (s * (1.0 - self.sub_shape) + q * self.sub_shape) * self.sub_volume * volume_env
         } else { 0.0 };
 
-        let final_l = (out_l + sub) * self.master_volume;
-        let final_r = (out_r + sub) * self.master_volume;
+        let final_l = (vps_final_l + sub) * self.master_volume;
+        let final_r = (vps_final_r + sub) * self.master_volume;
 
         (final_l, final_r)
     }

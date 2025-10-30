@@ -1,6 +1,7 @@
 mod oscillator;
 mod filter;
 mod envelope;
+mod reverb;
 mod voice;
 
 pub use voice::Voice;
@@ -85,8 +86,6 @@ impl SynthEngine {
     }
 
     pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
-        use nih_plug::nih_log;
-        nih_log!("Synth: set_filter_params mode={}", mode);
         self.voice.set_filter_params(cutoff, resonance, env_amount, drive, mode);
     }
 
@@ -100,6 +99,43 @@ impl SynthEngine {
 
     pub fn set_filter_envelope(&mut self, attack: f32, attack_shape: f32, decay: f32, decay_shape: f32, sustain: f32, release: f32, release_shape: f32) {
         self.voice.set_filter_envelope(attack, attack_shape, decay, decay_shape, sustain, release, release_shape);
+    }
+
+    pub fn set_vps_dry_wet(&mut self, dry_wet: f32) {
+        self.voice.set_vps_dry_wet(dry_wet);
+    }
+
+    pub fn set_reverb_params(
+        &mut self,
+        mix: f32,
+        pre_delay_ms: f32,
+        time_scale: f32,
+        input_hpf_hz: f32,
+        input_lpf_hz: f32,
+        reverb_hpf_hz: f32,
+        reverb_lpf_hz: f32,
+        mod_speed: f32,
+        mod_depth: f32,
+        mod_shape: f32,
+        input_diffusion_mix: f32,
+        diffusion: f32,
+        decay: f32,
+    ) {
+        self.voice.set_reverb_params(
+            mix,
+            pre_delay_ms,
+            time_scale,
+            input_hpf_hz,
+            input_lpf_hz,
+            reverb_hpf_hz,
+            reverb_lpf_hz,
+            mod_speed,
+            mod_depth,
+            mod_shape,
+            input_diffusion_mix,
+            diffusion,
+            decay,
+        );
     }
 
     pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams, feedback_amount: f32, base_freq: f32) {
