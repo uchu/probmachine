@@ -420,18 +420,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 |v| format!("{:.2}", v),
                                 Some(Color32::from_rgb(40, 80, 40)),
                             );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_vps_dry_wet,
-                                "Rvb",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.0}%", v * 100.0),
-                                Some(Color32::from_rgb(100, 80, 140)),
-                            );
                         });
                     });
                 });
@@ -500,7 +488,14 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
             ui.add_space(8.0);
 
             ui.vertical(|ui| {
-                ui.label(egui::RichText::new("FILT").size(10.0).strong());
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("FILT").size(10.0).strong());
+                    ui.add_space(10.0);
+                    let mut enabled = params.synth_filter_enable.value();
+                    if ui.checkbox(&mut enabled, "Enable").changed() {
+                        setter.set_parameter(&params.synth_filter_enable, enabled);
+                    }
+                });
                 ui.add_space(2.0);
                 ui.horizontal(|ui| {
                     render_vertical_slider(
@@ -614,9 +609,21 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                 .corner_radius(15.0)
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
-                        ui.label(egui::RichText::new("REVERB (VPS)").size(10.0).strong());
+                        ui.label(egui::RichText::new("REVERB").size(10.0).strong());
                         ui.add_space(5.0);
                         ui.horizontal(|ui| {
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_reverb_mix,
+                                "Dry/Wet",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.0}%", v * 100.0),
+                                Some(Color32::from_rgb(100, 80, 140)),
+                            );
                             render_vertical_slider(
                                 ui,
                                 params,

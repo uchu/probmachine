@@ -407,6 +407,8 @@ pub struct DeviceParams {
     #[id = "synth_distortion_threshold"]
     pub synth_distortion_threshold: FloatParam,
 
+    #[id = "synth_filter_enable"]
+    pub synth_filter_enable: BoolParam,
     #[id = "synth_filter_cutoff"]
     pub synth_filter_cutoff: FloatParam,
     #[id = "synth_filter_resonance"]
@@ -450,9 +452,6 @@ pub struct DeviceParams {
     pub synth_filt_release: FloatParam,
     #[id = "synth_filt_release_shape"]
     pub synth_filt_release_shape: FloatParam,
-
-    #[id = "synth_vps_dry_wet"]
-    pub synth_vps_dry_wet: FloatParam,
 
     #[id = "synth_reverb_mix"]
     pub synth_reverb_mix: FloatParam,
@@ -1188,6 +1187,10 @@ impl Default for DeviceParams {
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
+            synth_filter_enable: BoolParam::new(
+                "Filter Enable".to_string(),
+                true
+            ),
             synth_filter_cutoff: FloatParam::new(
                 "Filter Cutoff".to_string(),
                 1000.0,
@@ -1292,14 +1295,8 @@ impl Default for DeviceParams {
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
-            synth_vps_dry_wet: FloatParam::new(
-                "VPS Dry/Wet".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-
             synth_reverb_mix: FloatParam::new(
-                "Reverb Mix".to_string(),
+                "Reverb Dry/Wet".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),

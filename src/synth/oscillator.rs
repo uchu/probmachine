@@ -49,10 +49,6 @@ impl Oscillator {
 
         self.osc.next(self.freq as f32, israte as f32, d_f32, v_limited) as f64
     }
-
-    pub fn get_phase(&self) -> f64 {
-        self.phase
-    }
 }
 
 pub struct PolyBlepWrapper {
@@ -164,10 +160,6 @@ impl PLLOscillator {
         };
         pll.prepare_block();
         pll
-    }
-
-    pub fn set_frequency(&mut self, freq: f64) {
-        self.base_freq = freq;
     }
 
     pub fn set_params(&mut self, track: f64, damp: f64, mult: f64, range: f64, colored: bool, mode: PllMode) {

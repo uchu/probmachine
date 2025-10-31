@@ -97,10 +97,6 @@ impl StereoReverb {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.reverb.reset();
-    }
-
     pub fn set_params(
         &mut self,
         mix: f64,

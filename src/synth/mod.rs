@@ -10,8 +10,6 @@ use crate::params::DeviceParams;
 
 pub struct SynthEngine {
     voice: Voice,
-    #[allow(dead_code)]
-    sample_rate: f64,
     sequencer: Sequencer,
     pll_feedback: f64,
 }
@@ -24,7 +22,6 @@ impl SynthEngine {
 
         Self {
             voice,
-            sample_rate: sample_rate_f64,
             sequencer: Sequencer::new(sample_rate_f64, 120.0),
             pll_feedback: 0.0,
         }
@@ -86,8 +83,8 @@ impl SynthEngine {
         self.voice.set_distortion_params(amount as f64, threshold as f64);
     }
 
-    pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
-        self.voice.set_filter_params(cutoff as f64, resonance as f64, env_amount as f64, drive as f64, mode);
+    pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
+        self.voice.set_filter_params(enabled, cutoff as f64, resonance as f64, env_amount as f64, drive as f64, mode);
     }
 
     pub fn set_volume(&mut self, volume: f32) {
@@ -100,10 +97,6 @@ impl SynthEngine {
 
     pub fn set_filter_envelope(&mut self, attack: f32, attack_shape: f32, decay: f32, decay_shape: f32, sustain: f32, release: f32, release_shape: f32) {
         self.voice.set_filter_envelope(attack as f64, attack_shape as f64, decay as f64, decay_shape as f64, sustain as f64, release as f64, release_shape as f64);
-    }
-
-    pub fn set_vps_dry_wet(&mut self, dry_wet: f32) {
-        self.voice.set_vps_dry_wet(dry_wet as f64);
     }
 
     pub fn set_reverb_params(

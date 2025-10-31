@@ -75,6 +75,7 @@ pub struct Voice {
     distortion_threshold: f64,
 
     // ===== Filter =====
+    filter_enabled: bool,
     filter_cutoff: f64,
     filter_resonance: f64,
     filter_envelope_amount: f64,
@@ -101,9 +102,6 @@ pub struct Voice {
 
     // ===== Reverb =====
     reverb: StereoReverb,
-
-    // ===== VPS Dry/Wet =====
-    vps_dry_wet: f64,
 }
 
 impl Voice {
@@ -121,8 +119,8 @@ impl Voice {
             vps_oscillator_right: Oscillator::new(oversampled_rate),
             polyblep_oscillator_left: PolyBlepWrapper::new(oversampled_rate),
             polyblep_oscillator_right: PolyBlepWrapper::new(oversampled_rate),
-            sub_oscillator_sine: PolyBlepWrapper::new(sample_rate_f64),
-            sub_oscillator_square: PolyBlepWrapper::new(sample_rate_f64),
+            sub_oscillator_sine: PolyBlepWrapper::new(oversampled_rate),
+            sub_oscillator_square: PolyBlepWrapper::new(oversampled_rate),
             pll_oscillator_left: PLLOscillator::new(oversampled_rate),
             pll_oscillator_right: PLLOscillator::new(oversampled_rate),
             pll_reference_oscillator: PolyBlepWrapper::new(oversampled_rate),
@@ -175,6 +173,7 @@ impl Voice {
             distortion_amount: 0.0,
             distortion_threshold: 0.9,
 
+            filter_enabled: true,
             filter_cutoff: 1000.0,
             filter_resonance: 0.0,
             filter_envelope_amount: 0.0,
@@ -197,13 +196,8 @@ impl Voice {
             filt_env_release: 5.0,
             filt_env_release_shape: 0.5,
 
-            reverb: StereoReverb::new(sample_rate),
-            vps_dry_wet: 0.0,
+            reverb: StereoReverb::new(oversampled_rate as f32),
         }
-    }
-
-    pub fn set_stereo_width(&mut self, width: f64) {
-        self.stereo_width = width.clamp(0.0, 1.0);
     }
 
     pub fn set_pll_stereo_damp_offset(&mut self, offset: f64) {
@@ -289,16 +283,13 @@ impl Voice {
         self.distortion_threshold = threshold;
     }
 
-    pub fn set_filter_params(&mut self, cutoff: f64, resonance: f64, env_amount: f64, drive: f64, mode: i32) {
+    pub fn set_filter_params(&mut self, enabled: bool, cutoff: f64, resonance: f64, env_amount: f64, drive: f64, mode: i32) {
+        self.filter_enabled = enabled;
         self.filter_cutoff = cutoff;
         self.filter_resonance = resonance;
         self.filter_envelope_amount = env_amount;
         self.filter_drive = drive;
         self.filter_mode = mode;
-    }
-
-    pub fn set_vps_dry_wet(&mut self, dry_wet: f64) {
-        self.vps_dry_wet = dry_wet.clamp(0.0, 1.0);
     }
 
     pub fn set_reverb_params(
@@ -422,10 +413,10 @@ impl Voice {
         let mut feedback = self.pll_feedback_state;
 
         for i in 0..4 {
-            let mut l = 0.0_f64;
-            let mut r = 0.0_f64;
+            let mut mixed_oscillators_l = 0.0_f64;
+            let mut mixed_oscillators_r = 0.0_f64;
 
-            // VPS
+            // VPS Oscillators
             if self.vps_volume > 0.0 {
                 let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave);
                 let detune = self.stereo_width * 0.002;
@@ -443,11 +434,11 @@ impl Voice {
                 let left = f_distort(distortion_gain as f32, self.distortion_threshold as f32, raw_l as f32) as f64;
                 let right = f_distort(distortion_gain as f32, self.distortion_threshold as f32, raw_r as f32) as f64;
 
-                l += left * self.vps_volume * volume_env;
-                r += right * self.vps_volume * volume_env;
+                mixed_oscillators_l += left * self.vps_volume * volume_env;
+                mixed_oscillators_r += right * self.vps_volume * volume_env;
             }
 
-            // PolyBLEP
+            // PolyBLEP Oscillators
             if self.polyblep_volume > 0.0 {
                 let base_freq = self.base_frequency * 2.0_f64.powi(self.polyblep_octave);
 
@@ -463,11 +454,11 @@ impl Voice {
                 self.polyblep_oscillator_right.set_frequency(base_freq * (1.0 + detune_amount));
                 let raw_r = self.polyblep_oscillator_right.next(pw_right);
 
-                l += raw_l * self.polyblep_volume * volume_env;
-                r += raw_r * self.polyblep_volume * volume_env;
+                mixed_oscillators_l += raw_l * self.polyblep_volume * volume_env;
+                mixed_oscillators_r += raw_r * self.polyblep_volume * volume_env;
             }
 
-            // PLL
+            // PLL Oscillators
             if self.pll_volume > 0.0 {
                 let tune_oct = (self.pll_ref_tune_semitones as f64 + self.pll_ref_fine_tune_cents) / 12.0;
                 let ref_freq = self.base_frequency * 2.0_f64.powi(self.pll_ref_octave) * 2.0_f64.powf(tune_oct);
@@ -498,63 +489,72 @@ impl Voice {
                 let pll_out_l = f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_l as f32) as f64;
                 let pll_out_r = f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_r as f32) as f64;
 
-                l += pll_out_l * self.pll_volume * volume_env;
-                r += pll_out_r * self.pll_volume * volume_env;
+                mixed_oscillators_l += pll_out_l * self.pll_volume * volume_env;
+                mixed_oscillators_r += pll_out_r * self.pll_volume * volume_env;
 
                 feedback = feedback * 0.9 + (pll_raw_l + pll_raw_r) * 0.05;
             }
 
-            buf_l[i] = l as f32;
-            buf_r[i] = r as f32;
+            buf_l[i] = mixed_oscillators_l as f32;
+            buf_r[i] = mixed_oscillators_r as f32;
         }
 
-        self.filter_left.process_buffer(
-            unsafe { &mut *(buf_l.as_mut_ptr() as *mut [f32; 4]) },
-            cutoff as f32,
-            self.filter_resonance as f32,
-            self.filter_drive as f32,
-            self.filter_mode,
-        );
-        self.filter_right.process_buffer(
-            unsafe { &mut *(buf_r.as_mut_ptr() as *mut [f32; 4]) },
-            cutoff as f32,
-            self.filter_resonance as f32,
-            self.filter_drive as f32,
-            self.filter_mode,
-        );
+        // Apply filter at oversampled rate (only if enabled)
+        if self.filter_enabled {
+            self.filter_left.process_buffer(
+                unsafe { &mut *(buf_l.as_mut_ptr() as *mut [f32; 4]) },
+                cutoff as f32,
+                self.filter_resonance as f32,
+                self.filter_drive as f32,
+                self.filter_mode,
+            );
+            self.filter_right.process_buffer(
+                unsafe { &mut *(buf_r.as_mut_ptr() as *mut [f32; 4]) },
+                cutoff as f32,
+                self.filter_resonance as f32,
+                self.filter_drive as f32,
+                self.filter_mode,
+            );
+        }
+
+        // Apply reverb at oversampled rate (processes the buffer in-place with dry/wet mix)
+        if self.reverb.mix > 0.0 {
+            for i in 0..4 {
+                let dry_l = buf_l[i] as f64;
+                let dry_r = buf_r[i] as f64;
+
+                let (wet_l, wet_r) = self.reverb.process(dry_l, dry_r);
+
+                buf_l[i] = (dry_l * (1.0 - self.reverb.mix) + wet_l * self.reverb.mix) as f32;
+                buf_r[i] = (dry_r * (1.0 - self.reverb.mix) + wet_r * self.reverb.mix) as f32;
+            }
+        }
+
+        // Add sub oscillator at oversampled rate (after reverb, so it's never processed through reverb)
+        if self.sub_volume > 0.0 {
+            let sub_freq = self.base_frequency * 2.0_f64.powi(self.sub_octave);
+            for i in 0..4 {
+                self.sub_oscillator_sine.set_frequency(sub_freq);
+                self.sub_oscillator_square.set_frequency(sub_freq);
+                let sine_sample = self.sub_oscillator_sine.next_sin();
+                let square_sample = self.sub_oscillator_square.next(0.5);
+                let sub_sample = (sine_sample * (1.0 - self.sub_shape) + square_sample * self.sub_shape)
+                    * self.sub_volume * volume_env;
+
+                buf_l[i] += sub_sample as f32;
+                buf_r[i] += sub_sample as f32;
+            }
+        }
 
         self.pll_feedback_state = feedback;
 
-        let vps_l = self.oversampling_left.downsample() as f64;
-        let vps_r = self.oversampling_right.downsample() as f64;
+        // Downsample the complete signal
+        let downsampled_l = self.oversampling_left.downsample() as f64;
+        let downsampled_r = self.oversampling_right.downsample() as f64;
 
-        // Apply reverb to VPS only, with dry/wet mix
-        let vps_dry_l = vps_l * (1.0 - self.vps_dry_wet);
-        let vps_dry_r = vps_r * (1.0 - self.vps_dry_wet);
-
-        let (vps_wet_l, vps_wet_r) = if self.vps_dry_wet > 0.0 {
-            self.reverb.process(vps_l, vps_r)
-        } else {
-            (0.0, 0.0)
-        };
-        let vps_wet_l = vps_wet_l * self.vps_dry_wet;
-        let vps_wet_r = vps_wet_r * self.vps_dry_wet;
-
-        let vps_final_l = vps_dry_l + vps_wet_l;
-        let vps_final_r = vps_dry_r + vps_wet_r;
-
-        // Sub oscillator (mono center)
-        let sub = if self.sub_volume > 0.0 {
-            let f = self.base_frequency * 2.0_f64.powi(self.sub_octave);
-            self.sub_oscillator_sine.set_frequency(f);
-            self.sub_oscillator_square.set_frequency(f);
-            let s = self.sub_oscillator_sine.next_sin();
-            let q = self.sub_oscillator_square.next(0.5);
-            (s * (1.0 - self.sub_shape) + q * self.sub_shape) * self.sub_volume * volume_env
-        } else { 0.0 };
-
-        let final_l = (vps_final_l + sub) * self.master_volume;
-        let final_r = (vps_final_r + sub) * self.master_volume;
+        // Apply master volume
+        let final_l = downsampled_l * self.master_volume;
+        let final_r = downsampled_r * self.master_volume;
 
         (final_l, final_r)
     }
