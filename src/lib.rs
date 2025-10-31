@@ -14,12 +14,13 @@ use nih_plug::prelude::*;
 use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
-use ui::Page;
+use ui::{Page, SharedUiState};
 use synth::SynthEngine;
 
 pub struct Device {
     params: Arc<DeviceParams>,
     synth_engine: Option<SynthEngine>,
+    ui_state: Arc<SharedUiState>,
 }
 
 impl Default for Device {
@@ -27,6 +28,7 @@ impl Default for Device {
         Self {
             params: Arc::new(DeviceParams::default()),
             synth_engine: None,
+            ui_state: Arc::new(SharedUiState::new()),
         }
     }
 }
@@ -59,6 +61,7 @@ impl Plugin for Device {
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
+        let ui_state = self.ui_state.clone();
         create_egui_editor(
             self.params.editor_state.clone(),
             (),
@@ -101,7 +104,7 @@ impl Plugin for Device {
                                 });
                             });
 
-                            current_page.render(tui, &params, setter);
+                            current_page.render(tui, &params, setter, &ui_state);
                         });
                 });
             },
@@ -127,6 +130,14 @@ impl Plugin for Device {
         _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         if let Some(synth) = &mut self.synth_engine {
+            // Update note pool and strength values from UI
+            if let Ok(note_pool) = self.ui_state.note_pool.lock() {
+                synth.update_note_pool(note_pool.clone());
+            }
+            if let Ok(strength_values) = self.ui_state.strength_values.lock() {
+                synth.update_strength_values(strength_values.clone());
+            }
+
             synth.set_osc_params(
                 self.params.synth_osc_d.modulated_plain_value(),
                 self.params.synth_osc_v.modulated_plain_value(),

@@ -4,6 +4,7 @@ use nih_plug_egui::egui::style::HandleShape;
 use egui_taffy::TuiBuilderLogic;
 use egui_taffy::taffy::{prelude::*, style::AlignItems};
 use crate::params::DeviceParams;
+use crate::ui::SharedUiState;
 
 #[derive(Clone, Copy, PartialEq)]
 enum BeatStrengthMode {
@@ -53,6 +54,7 @@ pub fn render(
     tui: &mut egui_taffy::Tui,
     _params: &Arc<DeviceParams>,
     _setter: &nih_plug::prelude::ParamSetter,
+    ui_state: &Arc<SharedUiState>,
 ) {
     let state_id = egui::Id::new("strength_state");
 
@@ -74,6 +76,12 @@ pub fn render(
         render_beat_strength(ui, &mut state);
 
         if state != state_before {
+            // Update shared state with normalized strength values (0.0 to 1.0)
+            if let Ok(mut strength_values) = ui_state.strength_values.lock() {
+                for i in 0..96 {
+                    strength_values[i] = state.beat_strength_values[i] as f32 / 127.0;
+                }
+            }
             ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
         }

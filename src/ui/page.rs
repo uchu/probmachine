@@ -2,6 +2,7 @@ use std::sync::Arc;
 use nih_plug_egui::egui;
 use egui_taffy::{Tui, TuiBuilderLogic};
 use crate::params::DeviceParams;
+use super::SharedUiState;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Page {
@@ -44,6 +45,7 @@ impl Page {
         tui: &mut Tui,
         params: &Arc<DeviceParams>,
         setter: &nih_plug::prelude::ParamSetter,
+        ui_state: &Arc<SharedUiState>,
     ) {
         match self {
             Page::BeatProbability => {
@@ -53,10 +55,10 @@ impl Page {
                 super::pages::length::render(tui, params, setter)
             },
             Page::Notes => {
-                super::pages::notes::render(tui, params, setter)
+                super::pages::notes::render(tui, params, setter, ui_state)
             },
             Page::Strength => {
-                super::pages::strength::render(tui, params, setter)
+                super::pages::strength::render(tui, params, setter, ui_state)
             }
             Page::Synth => {
                 super::pages::synth::render(tui, params, setter)

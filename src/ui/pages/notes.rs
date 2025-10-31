@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use egui_taffy::TuiBuilderLogic;
 use nih_plug_egui::egui::{self, Color32};
 use crate::params::DeviceParams;
+use crate::ui::SharedUiState;
+use crate::sequencer::NotePool;
 use nih_plug::prelude::*;
 
 #[derive(Clone, PartialEq)]
@@ -18,12 +20,12 @@ struct NoteState {
 impl Default for NoteState {
     fn default() -> Self {
         Self {
-            selected_note: Some(24),
-            root_note: 24,
+            selected_note: Some(48), // C3
+            root_note: 48,           // C3 (default root note)
             note_chances: HashMap::new(),
             note_beats: HashMap::new(),
             note_beat_lengths: HashMap::new(),
-            scroll_offset: 14.0,
+            scroll_offset: 18.0, // Position to show C3 area
         }
     }
 }
@@ -32,6 +34,7 @@ pub fn render(
     tui: &mut egui_taffy::Tui,
     _params: &Arc<DeviceParams>,
     _setter: &nih_plug::prelude::ParamSetter,
+    ui_state: &Arc<SharedUiState>,
 ) {
     let state_id = egui::Id::new("note_state");
 
@@ -69,6 +72,7 @@ pub fn render(
 
             if chances_changed || beats_changed || beat_lengths_changed || root_changed {
                 log_note_values(&state);
+                update_shared_state(&state, ui_state);
             }
 
             ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
@@ -198,7 +202,9 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
             let midi_note = (octave * 12) as u8 + note_offset;
 
             let label = if note_in_octave == 0 {
-                Some(format!("C{}", octave))
+                // Use proper MIDI octave numbering (MIDI note 12 = C0, 24 = C1, etc.)
+                let midi_octave = (midi_note / 12) as i32 - 1;
+                Some(format!("C{}", midi_octave))
             } else {
                 None
             };
@@ -397,7 +403,7 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
 
 fn midi_note_to_name(midi_note: u8) -> String {
     let note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-    let octave = (midi_note / 12) as i32;
+    let octave = (midi_note / 12) as i32 - 1; // Fixed: Proper MIDI octave calculation
     let note_index = (midi_note % 12) as usize;
     format!("{}{}", note_names[note_index], octave)
 }
@@ -439,6 +445,39 @@ fn log_note_values(state: &NoteState) {
 
     if !values.is_empty() {
         nih_log!("Notes: {}", values.join(", "));
+    }
+}
+
+fn update_shared_state(state: &NoteState, ui_state: &Arc<SharedUiState>) {
+    if let Ok(mut note_pool) = ui_state.note_pool.lock() {
+        // Clear existing pool
+        note_pool.notes.clear();
+
+        // Set root note
+        note_pool.set_root_note(state.root_note);
+
+        // Add all notes with their parameters
+        for midi_note in 0..=127 {
+            let chance = state.note_chances.get(&midi_note).copied().unwrap_or(0);
+            let beat = state.note_beats.get(&midi_note).copied().unwrap_or(64);
+
+            // Skip notes with 0 chance (except root note which is already handled)
+            if midi_note != state.root_note && chance == 0 {
+                continue;
+            }
+
+            // Convert chance from 0-127 to 0.0-1.0
+            let chance_normalized = chance as f32 / 127.0;
+
+            // Convert beat from 0-127 to -1.0 to 1.0 (strength bias)
+            // 0 = fully weak (-1.0), 64 = neutral (0.0), 127 = fully strong (1.0)
+            let strength_bias = (beat as f32 - 64.0) / 63.0;
+
+            // Update the note in the pool
+            if midi_note != state.root_note {
+                note_pool.set_note(midi_note, chance_normalized, strength_bias);
+            }
+        }
     }
 }
 

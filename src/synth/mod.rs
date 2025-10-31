@@ -99,6 +99,16 @@ impl SynthEngine {
         self.voice.set_filter_envelope(attack as f64, attack_shape as f64, decay as f64, decay_shape as f64, sustain as f64, release as f64, release_shape as f64);
     }
 
+    pub fn update_note_pool(&mut self, note_pool: crate::sequencer::NotePool) {
+        self.sequencer.note_pool = note_pool;
+    }
+
+    pub fn update_strength_values(&mut self, strength_values: Vec<f32>) {
+        if strength_values.len() == 96 {
+            self.sequencer.strength_values = strength_values;
+        }
+    }
+
     pub fn set_reverb_params(
         &mut self,
         mix: f32,
@@ -132,12 +142,12 @@ impl SynthEngine {
         );
     }
 
-    pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams, feedback_amount: f32, base_freq: f32) {
+    pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams, feedback_amount: f32, _base_freq: f32) {
         for (l, r) in output_l.iter_mut().zip(output_r.iter_mut()) {
-            let (should_trigger, should_release) = self.sequencer.update(params);
+            let (should_trigger, should_release, frequency) = self.sequencer.update(params);
 
             if should_trigger {
-                self.voice.set_frequency(base_freq as f64, self.pll_feedback, feedback_amount as f64);
+                self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
                 self.voice.trigger();
             }
 
