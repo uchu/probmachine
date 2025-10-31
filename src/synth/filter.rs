@@ -5,13 +5,13 @@ use std::simd::f32x4;
 pub struct MoogFilter {
     filter: LadderFilter,
     params: FilterParams,
-    sample_rate: f32,
+    sample_rate: f64,
 }
 
 impl MoogFilter {
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new(sample_rate: f64) -> Self {
         let mut params = FilterParams::new();
-        params.set_sample_rate(sample_rate);
+        params.set_sample_rate(sample_rate as f32);
         params.set_frequency(1000.0);
         params.set_resonance(0.0);
         params.ladder_mode = LadderMode::LP24;

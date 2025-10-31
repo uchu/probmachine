@@ -6,13 +6,13 @@ use nih_plug::prelude::Param;
 struct NoteEvent {
     sample_position: usize,
     #[allow(dead_code)]
-    frequency: f32,
+    frequency: f64,
     duration_samples: usize,
 }
 
 pub struct Sequencer {
     #[allow(dead_code)]
-    sample_rate: f32,
+    sample_rate: f64,
     current_bar: Vec<NoteEvent>,
     next_bar: Vec<NoteEvent>,
     bar_position_samples: usize,
@@ -20,11 +20,11 @@ pub struct Sequencer {
     current_note: Option<(usize, usize)>,
     params_hash: u64,
     #[allow(dead_code)]
-    tempo_bpm: f32,
+    tempo_bpm: f64,
 }
 
 impl Sequencer {
-    pub fn new(sample_rate: f32, tempo_bpm: f32) -> Self {
+    pub fn new(sample_rate: f64, tempo_bpm: f64) -> Self {
         let bar_length_samples = Self::calculate_bar_length_samples(sample_rate, tempo_bpm);
 
         Self {
@@ -39,7 +39,7 @@ impl Sequencer {
         }
     }
 
-    fn calculate_bar_length_samples(sample_rate: f32, tempo_bpm: f32) -> usize {
+    fn calculate_bar_length_samples(sample_rate: f64, tempo_bpm: f64) -> usize {
         let seconds_per_beat = 60.0 / tempo_bpm;
         let seconds_per_bar = seconds_per_beat * 4.0;
         (seconds_per_bar * sample_rate) as usize

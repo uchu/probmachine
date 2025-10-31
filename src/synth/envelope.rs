@@ -8,9 +8,9 @@ pub struct Envelope {
 }
 
 impl Envelope {
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new(sample_rate: f64) -> Self {
         let mut adsr = EnvRetrigADSR::new();
-        adsr.set_sample_rate(sample_rate);
+        adsr.set_sample_rate(sample_rate as f32);
 
         Self {
             adsr,
@@ -20,15 +20,15 @@ impl Envelope {
         }
     }
 
-    pub fn trigger(&mut self, attack_ms: f32, attack_shape: f32, decay_ms: f32, decay_shape: f32, sustain: f32, release_ms: f32, release_shape: f32) {
+    pub fn trigger(&mut self, attack_ms: f64, attack_shape: f64, decay_ms: f64, decay_shape: f64, sustain: f64, release_ms: f64, release_shape: f64) {
         self.params = EnvADSRParams {
-            attack_ms,
-            attack_shape,
-            decay_ms,
-            decay_shape,
-            sustain,
-            release_ms,
-            release_shape,
+            attack_ms: attack_ms as f32,
+            attack_shape: attack_shape as f32,
+            decay_ms: decay_ms as f32,
+            decay_shape: decay_shape as f32,
+            sustain: sustain as f32,
+            release_ms: release_ms as f32,
+            release_shape: release_shape as f32,
         };
 
         if self.gate > 0.0 {
@@ -43,7 +43,7 @@ impl Envelope {
         self.retrigger_countdown = 0;
     }
 
-    pub fn next(&mut self) -> f32 {
+    pub fn next(&mut self) -> f64 {
         if self.retrigger_countdown > 0 {
             if self.retrigger_countdown == 2 {
                 self.gate = 0.0;
@@ -54,6 +54,6 @@ impl Envelope {
         }
 
         let (env, _) = self.adsr.tick(self.gate, &mut self.params);
-        env
+        env as f64
     }
 }

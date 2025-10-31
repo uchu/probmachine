@@ -8,15 +8,15 @@ pub enum PllMode {
 
 pub struct Oscillator {
     osc: VPSOscillator,
-    sample_rate: f32,
-    freq: f32,
-    d: f32,
-    v: f32,
-    phase: f32,
+    sample_rate: f64,
+    freq: f64,
+    d: f64,
+    v: f64,
+    phase: f64,
 }
 
 impl Oscillator {
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new(sample_rate: f64) -> Self {
         Self {
             osc: VPSOscillator::new(rand_01() * 0.25),
             sample_rate,
@@ -27,109 +27,111 @@ impl Oscillator {
         }
     }
 
-    pub fn set_frequency(&mut self, freq: f32) {
+    pub fn set_frequency(&mut self, freq: f64) {
         self.freq = freq;
     }
 
-    pub fn set_params(&mut self, d: f32, v: f32) {
+    pub fn set_params(&mut self, d: f64, v: f64) {
         self.d = d;
         self.v = v;
     }
 
-    pub fn next(&mut self, d: f32, v: f32) -> f32 {
+    pub fn next(&mut self, d: f64, v: f64) -> f64 {
         let israte = 1.0 / self.sample_rate;
-        let v_limited = VPSOscillator::limit_v(d, v);
+        let d_f32 = d as f32;
+        let v_f32 = v as f32;
+        let v_limited = VPSOscillator::limit_v(d_f32, v_f32);
 
         self.phase += self.freq * israte;
         if self.phase >= 1.0 {
             self.phase -= 1.0;
         }
 
-        self.osc.next(self.freq, israte, d, v_limited)
+        self.osc.next(self.freq as f32, israte as f32, d_f32, v_limited) as f64
     }
 
-    pub fn get_phase(&self) -> f32 {
+    pub fn get_phase(&self) -> f64 {
         self.phase
     }
 }
 
 pub struct PolyBlepWrapper {
     osc: PolyBlepOscillator,
-    sample_rate: f32,
-    freq: f32,
-    phase: f32,
+    sample_rate: f64,
+    freq: f64,
+    phase: f64,
 }
 
 impl PolyBlepWrapper {
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new(sample_rate: f64) -> Self {
         Self {
             osc: PolyBlepOscillator::new(rand_01() * 0.25),
             sample_rate,
             freq: 220.0,
-            phase: rand_01() * 0.25,
+            phase: rand_01() as f64 * 0.25,
         }
     }
 
-    pub fn set_frequency(&mut self, freq: f32) {
+    pub fn set_frequency(&mut self, freq: f64) {
         self.freq = freq;
     }
 
-    pub fn next(&mut self, pulse_width: f32) -> f32 {
+    pub fn next(&mut self, pulse_width: f64) -> f64 {
         let israte = 1.0 / self.sample_rate;
         self.phase += self.freq * israte;
         if self.phase >= 1.0 {
             self.phase -= 1.0;
         }
-        self.osc.next_pulse(self.freq, israte, pulse_width)
+        self.osc.next_pulse(self.freq as f32, israte as f32, pulse_width as f32) as f64
     }
 
-    pub fn next_sin(&mut self) -> f32 {
+    pub fn next_sin(&mut self) -> f64 {
         let israte = 1.0 / self.sample_rate;
         self.phase += self.freq * israte;
         if self.phase >= 1.0 {
             self.phase -= 1.0;
         }
-        self.osc.next_sin(self.freq, israte)
+        self.osc.next_sin(self.freq as f32, israte as f32) as f64
     }
 
-    pub fn get_phase(&self) -> f32 {
+    pub fn get_phase(&self) -> f64 {
         self.phase
     }
 }
 
 pub struct PLLOscillator {
-    phase: f32,
-    integrator: f32,
-    filtered_error: f32,
-    jitter_state: f32,
-    base_freq: f32,
-    track_gain: f32,
-    damping: f32,
-    mult: f32,
-    desired_mult: f32,
-    range_coeff: f32,
-    ki_multiplier: f32,
+    phase: f64,
+    integrator: f64,
+    filtered_error: f64,
+    jitter_state: f64,
+    base_freq: f64,
+    track_gain: f64,
+    damping: f64,
+    mult: f64,
+    desired_mult: f64,
+    range_coeff: f64,
+    ki_multiplier: f64,
     colored: bool,
-    color_x: f32,
-    sample_rate: f32,
+    color_x: f64,
+    sample_rate: f64,
 
     mode: PllMode,
-    last_ref_phase: f32,
-    last_pll_phase: f32,
+    last_ref_phase: f64,
+    last_pll_phase: f64,
     last_ref_rising_smpl: i64,
     last_pll_rising_smpl: i64,
     last_ref_falling_smpl: i64,
     last_pll_falling_smpl: i64,
     sample_counter: i64,
-    pfd_state: f32,
+    pfd_state: f64,
 
-    cached_alpha: f32,
-    cached_kp: f32,
-    cached_ki: f32,
+    cached_alpha: f64,
+    cached_kp: f64,
+    cached_ki: f64,
 }
 
 impl PLLOscillator {
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new(sample_rate: f64) -> Self {
         let mut pll = Self {
             phase: 0.0,
             integrator: 0.0,
@@ -164,11 +166,11 @@ impl PLLOscillator {
         pll
     }
 
-    pub fn set_frequency(&mut self, freq: f32) {
+    pub fn set_frequency(&mut self, freq: f64) {
         self.base_freq = freq;
     }
 
-    pub fn set_params(&mut self, track: f32, damp: f32, mult: f32, range: f32, colored: bool, mode: PllMode) {
+    pub fn set_params(&mut self, track: f64, damp: f64, mult: f64, range: f64, colored: bool, mode: PllMode) {
         self.track_gain = track;
         self.damping = damp;
         self.desired_mult = mult;
@@ -177,7 +179,7 @@ impl PLLOscillator {
         self.mode = mode;
     }
 
-    pub fn set_ki_multiplier(&mut self, ki_mult: f32) {
+    pub fn set_ki_multiplier(&mut self, ki_mult: f64) {
         self.ki_multiplier = ki_mult;
     }
 
@@ -201,20 +203,20 @@ impl PLLOscillator {
 
     pub fn trigger(&mut self) {
         use synfx_dsp::rand_01;
-        self.phase = rand_01() * 0.2;
+        self.phase = rand_01() as f64 * 0.2;
         self.integrator = 0.0;
         self.filtered_error = 0.0;
         self.jitter_state = 0.0;
     }
 
-    fn wrap_pi(x: f32) -> f32 {
-        use std::f32::consts::PI;
+    fn wrap_pi(x: f64) -> f64 {
+        use std::f64::consts::PI;
         let two_pi = PI * 2.0;
         let y = x - two_pi * (x / two_pi).floor();
         if y > PI { y - two_pi } else { y }
     }
 
-    fn detect_edges(_prev: f32, cur: f32, up_th: f32, dn_th: f32, was_high: bool)
+    fn detect_edges(_prev: f64, cur: f64, up_th: f64, dn_th: f64, was_high: bool)
         -> (bool /*rising*/, bool /*falling*/, bool /*is_high now*/) {
         if !was_high && cur >= up_th {
             (true, false, true)
@@ -225,9 +227,9 @@ impl PLLOscillator {
         }
     }
 
-    fn next_pfd(&mut self, ref_sig: f32) -> f32 {
+    fn next_pfd(&mut self, ref_sig: f64) -> f64 {
         self.sample_counter += 1;
-        let pll_sig = ((self.phase * 2.0 * std::f32::consts::PI).sin()).signum();
+        let pll_sig = ((self.phase * 2.0 * std::f64::consts::PI).sin()).signum();
 
         let rising_threshold = 0.02;
         let falling_threshold = -0.02;
@@ -247,8 +249,8 @@ impl PLLOscillator {
         self.last_ref_phase = if ref_high { 1.0 } else { -1.0 };
         self.last_pll_phase = if pll_high { 1.0 } else { -1.0 };
 
-        let dt_rising = (self.last_ref_rising_smpl - self.last_pll_rising_smpl) as f32;
-        let dt_falling = (self.last_ref_falling_smpl - self.last_pll_falling_smpl) as f32;
+        let dt_rising = (self.last_ref_rising_smpl - self.last_pll_rising_smpl) as f64;
+        let dt_falling = (self.last_ref_falling_smpl - self.last_pll_falling_smpl) as f64;
         let dt = (dt_rising + dt_falling) * 0.5;
 
         let effective_freq = (self.base_freq * self.mult).max(1.0);
@@ -258,13 +260,13 @@ impl PLLOscillator {
         self.pfd_state
     }
 
-    pub fn next(&mut self, input_phase: f32, input_freq: f32, ref_pulse: f32) -> f32 {
-        use std::f32::consts::PI;
+    pub fn next(&mut self, input_phase: f64, input_freq: f64, ref_pulse: f64) -> f64 {
+        use std::f64::consts::PI;
         use synfx_dsp::rand_01;
 
         self.base_freq = input_freq;
 
-        let raw_noise = (rand_01() - 0.5) * 2.0;
+        let raw_noise = (rand_01() as f64 - 0.5) * 2.0;
         let j_alpha = 0.005;
         self.jitter_state = self.jitter_state * (1.0 - j_alpha) + raw_noise * j_alpha;
         let jitter = self.jitter_state * 0.01;
@@ -288,7 +290,7 @@ impl PLLOscillator {
 
         let target_freq = self.base_freq * self.mult + correction;
 
-        let freq_jitter = (rand_01() - 0.5) * 0.002 * self.base_freq;
+        let freq_jitter = (rand_01() as f64 - 0.5) * 0.002 * self.base_freq;
         let nyquist = 0.48 * self.sample_rate;
         let freq_control = (target_freq + freq_jitter).clamp(20.0, nyquist);
 

@@ -25,85 +25,85 @@ pub struct Voice {
     oversampling_right: Oversampling<4>,
 
     // ===== Global Parameters =====
-    base_frequency: f32,
-    master_volume: f32,
-    sample_rate: f32,
+    base_frequency: f64,
+    master_volume: f64,
+    sample_rate: f64,
 
     // ===== Stereo =====
-    stereo_width: f32,
-    pll_damping_stereo_offset: f32,
+    stereo_width: f64,
+    pll_damping_stereo_offset: f64,
 
     // ===== VPS Oscillator =====
     vps_octave: i32,
-    vps_d_param: f32,
-    vps_v_param: f32,
-    vps_volume: f32,
-    vps_stereo_v_offset: f32,
+    vps_d_param: f64,
+    vps_v_param: f64,
+    vps_volume: f64,
+    vps_stereo_v_offset: f64,
 
     // ===== PolyBLEP Pulse =====
-    polyblep_volume: f32,
-    polyblep_pulse_width: f32,
+    polyblep_volume: f64,
+    polyblep_pulse_width: f64,
     polyblep_octave: i32,
-    polyblep_stereo_width: f32,
+    polyblep_stereo_width: f64,
 
     // ===== Sub Oscillator =====
-    sub_volume: f32,
+    sub_volume: f64,
     sub_octave: i32,
-    sub_shape: f32,
+    sub_shape: f64,
 
     // ===== PLL =====
-    pll_volume: f32,
-    pll_track_speed: f32,
-    pll_damping: f32,
-    pll_range: f32,
-    pll_multiplier: f32,
-    pll_feedback_amount: f32,
-    pll_feedback_state: f32,
-    pll_distortion_amount: f32,
-    pll_distortion_threshold: f32,
+    pll_volume: f64,
+    pll_track_speed: f64,
+    pll_damping: f64,
+    pll_range: f64,
+    pll_multiplier: f64,
+    pll_feedback_amount: f64,
+    pll_feedback_state: f64,
+    pll_distortion_amount: f64,
+    pll_distortion_threshold: f64,
     pll_mode_is_edge: bool,
     pll_colored: bool,
 
     // ===== PLL Reference =====
     pll_ref_octave: i32,
     pll_ref_tune_semitones: i32,
-    pll_ref_fine_tune_cents: f32,
-    pll_ref_pulse_width: f32,
+    pll_ref_fine_tune_cents: f64,
+    pll_ref_pulse_width: f64,
 
     // ===== Distortion =====
-    distortion_amount: f32,
-    distortion_threshold: f32,
+    distortion_amount: f64,
+    distortion_threshold: f64,
 
     // ===== Filter =====
-    filter_cutoff: f32,
-    filter_resonance: f32,
-    filter_envelope_amount: f32,
-    filter_drive: f32,
+    filter_cutoff: f64,
+    filter_resonance: f64,
+    filter_envelope_amount: f64,
+    filter_drive: f64,
     filter_mode: i32,
 
     // ===== Volume Envelope =====
-    vol_env_attack: f32,
-    vol_env_attack_shape: f32,
-    vol_env_decay: f32,
-    vol_env_decay_shape: f32,
-    vol_env_sustain: f32,
-    vol_env_release: f32,
-    vol_env_release_shape: f32,
+    vol_env_attack: f64,
+    vol_env_attack_shape: f64,
+    vol_env_decay: f64,
+    vol_env_decay_shape: f64,
+    vol_env_sustain: f64,
+    vol_env_release: f64,
+    vol_env_release_shape: f64,
 
     // ===== Filter Envelope =====
-    filt_env_attack: f32,
-    filt_env_attack_shape: f32,
-    filt_env_decay: f32,
-    filt_env_decay_shape: f32,
-    filt_env_sustain: f32,
-    filt_env_release: f32,
-    filt_env_release_shape: f32,
+    filt_env_attack: f64,
+    filt_env_attack_shape: f64,
+    filt_env_decay: f64,
+    filt_env_decay_shape: f64,
+    filt_env_sustain: f64,
+    filt_env_release: f64,
+    filt_env_release_shape: f64,
 
     // ===== Reverb =====
     reverb: StereoReverb,
 
     // ===== VPS Dry/Wet =====
-    vps_dry_wet: f32,
+    vps_dry_wet: f64,
 }
 
 impl Voice {
@@ -113,29 +113,30 @@ impl Voice {
         oversampling_left.set_sample_rate(sample_rate);
         oversampling_right.set_sample_rate(sample_rate);
 
-        let oversampled_rate = sample_rate * 4.0;
+        let sample_rate_f64 = sample_rate as f64;
+        let oversampled_rate = sample_rate_f64 * 4.0;
 
         Self {
             vps_oscillator_left: Oscillator::new(oversampled_rate),
             vps_oscillator_right: Oscillator::new(oversampled_rate),
             polyblep_oscillator_left: PolyBlepWrapper::new(oversampled_rate),
             polyblep_oscillator_right: PolyBlepWrapper::new(oversampled_rate),
-            sub_oscillator_sine: PolyBlepWrapper::new(sample_rate),
-            sub_oscillator_square: PolyBlepWrapper::new(sample_rate),
+            sub_oscillator_sine: PolyBlepWrapper::new(sample_rate_f64),
+            sub_oscillator_square: PolyBlepWrapper::new(sample_rate_f64),
             pll_oscillator_left: PLLOscillator::new(oversampled_rate),
             pll_oscillator_right: PLLOscillator::new(oversampled_rate),
             pll_reference_oscillator: PolyBlepWrapper::new(oversampled_rate),
 
             filter_left: MoogFilter::new(oversampled_rate),
             filter_right: MoogFilter::new(oversampled_rate),
-            volume_envelope: Envelope::new(sample_rate),
-            filter_envelope: Envelope::new(sample_rate),
+            volume_envelope: Envelope::new(sample_rate_f64),
+            filter_envelope: Envelope::new(sample_rate_f64),
             oversampling_left,
             oversampling_right,
 
             base_frequency: 220.0,
             master_volume: 0.8,
-            sample_rate,
+            sample_rate: sample_rate_f64,
             stereo_width: 0.0,
             pll_damping_stereo_offset: 0.0,
 
@@ -201,31 +202,31 @@ impl Voice {
         }
     }
 
-    pub fn set_stereo_width(&mut self, width: f32) {
+    pub fn set_stereo_width(&mut self, width: f64) {
         self.stereo_width = width.clamp(0.0, 1.0);
     }
 
-    pub fn set_pll_stereo_damp_offset(&mut self, offset: f32) {
+    pub fn set_pll_stereo_damp_offset(&mut self, offset: f64) {
         self.pll_damping_stereo_offset = offset.clamp(0.0, 1.0);
     }
 
-    pub fn set_frequency(&mut self, freq: f32, _pll_feedback: f32, feedback_amount: f32) {
+    pub fn set_frequency(&mut self, freq: f64, _pll_feedback: f64, feedback_amount: f64) {
         self.base_frequency = freq;
         self.pll_feedback_amount = feedback_amount;
     }
 
-    pub fn set_osc_params(&mut self, d: f32, v: f32) {
+    pub fn set_osc_params(&mut self, d: f64, v: f64) {
         self.vps_d_param = d;
         self.vps_v_param = v;
         self.vps_oscillator_left.set_params(d, v);
         self.vps_oscillator_right.set_params(d, v);
     }
 
-    pub fn set_vps_stereo_v_offset(&mut self, offset: f32) {
+    pub fn set_vps_stereo_v_offset(&mut self, offset: f64) {
         self.vps_stereo_v_offset = offset.clamp(0.0, 1.0);
     }
 
-    pub fn set_osc_volume(&mut self, volume: f32) {
+    pub fn set_osc_volume(&mut self, volume: f64) {
         self.vps_volume = volume;
     }
 
@@ -233,30 +234,30 @@ impl Voice {
         self.vps_octave = octave;
     }
 
-    pub fn set_polyblep_params(&mut self, volume: f32, pulse_width: f32, octave: i32) {
+    pub fn set_polyblep_params(&mut self, volume: f64, pulse_width: f64, octave: i32) {
         self.polyblep_volume = volume;
         self.polyblep_pulse_width = pulse_width;
         self.polyblep_octave = octave;
     }
 
-    pub fn set_polyblep_stereo_width(&mut self, width: f32) {
+    pub fn set_polyblep_stereo_width(&mut self, width: f64) {
         self.polyblep_stereo_width = width.clamp(0.0, 1.0);
     }
 
-    pub fn set_sub_params(&mut self, volume: f32, octave: i32, shape: f32) {
+    pub fn set_sub_params(&mut self, volume: f64, octave: i32, shape: f64) {
         self.sub_volume = volume;
         self.sub_octave = octave;
         self.sub_shape = shape;
     }
 
-    pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f32, pulse_width: f32) {
+    pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f64, pulse_width: f64) {
         self.pll_ref_octave = octave;
         self.pll_ref_tune_semitones = tune;
         self.pll_ref_fine_tune_cents = fine_tune;
         self.pll_ref_pulse_width = pulse_width;
     }
 
-    pub fn set_pll_params(&mut self, track: f32, damp: f32, mult: f32, range: f32, colored: bool, edge_mode: bool) {
+    pub fn set_pll_params(&mut self, track: f64, damp: f64, mult: f64, range: f64, colored: bool, edge_mode: bool) {
         self.pll_track_speed = track;
         self.pll_damping = damp;
         self.pll_multiplier = mult;
@@ -269,26 +270,26 @@ impl Voice {
         self.pll_oscillator_right.set_params(track, damp, mult, range, colored, mode);
     }
 
-    pub fn set_pll_volume(&mut self, volume: f32) {
+    pub fn set_pll_volume(&mut self, volume: f64) {
         self.pll_volume = volume;
     }
 
-    pub fn set_pll_ki_multiplier(&mut self, ki_mult: f32) {
+    pub fn set_pll_ki_multiplier(&mut self, ki_mult: f64) {
         self.pll_oscillator_left.set_ki_multiplier(ki_mult);
         self.pll_oscillator_right.set_ki_multiplier(ki_mult);
     }
 
-    pub fn set_pll_distortion_params(&mut self, amount: f32, threshold: f32) {
+    pub fn set_pll_distortion_params(&mut self, amount: f64, threshold: f64) {
         self.pll_distortion_amount = amount;
         self.pll_distortion_threshold = threshold;
     }
 
-    pub fn set_distortion_params(&mut self, amount: f32, threshold: f32) {
+    pub fn set_distortion_params(&mut self, amount: f64, threshold: f64) {
         self.distortion_amount = amount;
         self.distortion_threshold = threshold;
     }
 
-    pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
+    pub fn set_filter_params(&mut self, cutoff: f64, resonance: f64, env_amount: f64, drive: f64, mode: i32) {
         self.filter_cutoff = cutoff;
         self.filter_resonance = resonance;
         self.filter_envelope_amount = env_amount;
@@ -296,25 +297,25 @@ impl Voice {
         self.filter_mode = mode;
     }
 
-    pub fn set_vps_dry_wet(&mut self, dry_wet: f32) {
+    pub fn set_vps_dry_wet(&mut self, dry_wet: f64) {
         self.vps_dry_wet = dry_wet.clamp(0.0, 1.0);
     }
 
     pub fn set_reverb_params(
         &mut self,
-        mix: f32,
-        pre_delay_ms: f32,
-        time_scale: f32,
-        input_hpf_hz: f32,
-        input_lpf_hz: f32,
-        reverb_hpf_hz: f32,
-        reverb_lpf_hz: f32,
-        mod_speed: f32,
-        mod_depth: f32,
-        mod_shape: f32,
-        input_diffusion_mix: f32,
-        diffusion: f32,
-        decay: f32,
+        mix: f64,
+        pre_delay_ms: f64,
+        time_scale: f64,
+        input_hpf_hz: f64,
+        input_lpf_hz: f64,
+        reverb_hpf_hz: f64,
+        reverb_lpf_hz: f64,
+        mod_speed: f64,
+        mod_depth: f64,
+        mod_shape: f64,
+        input_diffusion_mix: f64,
+        diffusion: f64,
+        decay: f64,
     ) {
         self.reverb.set_params(
             mix,
@@ -333,19 +334,19 @@ impl Voice {
         );
     }
 
-    pub fn set_volume(&mut self, volume: f32) {
+    pub fn set_volume(&mut self, volume: f64) {
         self.master_volume = volume;
     }
 
     pub fn set_volume_envelope(
         &mut self,
-        attack: f32,
-        attack_shape: f32,
-        decay: f32,
-        decay_shape: f32,
-        sustain: f32,
-        release: f32,
-        release_shape: f32,
+        attack: f64,
+        attack_shape: f64,
+        decay: f64,
+        decay_shape: f64,
+        sustain: f64,
+        release: f64,
+        release_shape: f64,
     ) {
         self.vol_env_attack = attack;
         self.vol_env_attack_shape = attack_shape;
@@ -358,13 +359,13 @@ impl Voice {
 
     pub fn set_filter_envelope(
         &mut self,
-        attack: f32,
-        attack_shape: f32,
-        decay: f32,
-        decay_shape: f32,
-        sustain: f32,
-        release: f32,
-        release_shape: f32,
+        attack: f64,
+        attack_shape: f64,
+        decay: f64,
+        decay_shape: f64,
+        sustain: f64,
+        release: f64,
+        release_shape: f64,
     ) {
         self.filt_env_attack = attack;
         self.filt_env_attack_shape = attack_shape;
@@ -406,7 +407,7 @@ impl Voice {
     }
 
 
-    pub fn process(&mut self, _pll_feedback: f32) -> (f32, f32) {
+    pub fn process(&mut self, _pll_feedback: f64) -> (f64, f64) {
         let volume_env = self.volume_envelope.next();
         let filter_env = self.filter_envelope.next();
 
@@ -421,12 +422,12 @@ impl Voice {
         let mut feedback = self.pll_feedback_state;
 
         for i in 0..4 {
-            let mut l = 0.0;
-            let mut r = 0.0;
+            let mut l = 0.0_f64;
+            let mut r = 0.0_f64;
 
             // VPS
             if self.vps_volume > 0.0 {
-                let base_freq = self.base_frequency * 2.0_f32.powi(self.vps_octave);
+                let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave);
                 let detune = self.stereo_width * 0.002;
 
                 let v_left = (self.vps_v_param - self.vps_stereo_v_offset).clamp(0.0, 1.0);
@@ -439,8 +440,8 @@ impl Voice {
                 let raw_r = self.vps_oscillator_right.next(self.vps_d_param, v_right);
 
                 let distortion_gain = 0.1 + self.distortion_amount * 4.9;
-                let left = f_distort(distortion_gain, self.distortion_threshold, raw_l);
-                let right = f_distort(distortion_gain, self.distortion_threshold, raw_r);
+                let left = f_distort(distortion_gain as f32, self.distortion_threshold as f32, raw_l as f32) as f64;
+                let right = f_distort(distortion_gain as f32, self.distortion_threshold as f32, raw_r as f32) as f64;
 
                 l += left * self.vps_volume * volume_env;
                 r += right * self.vps_volume * volume_env;
@@ -448,7 +449,7 @@ impl Voice {
 
             // PolyBLEP
             if self.polyblep_volume > 0.0 {
-                let base_freq = self.base_frequency * 2.0_f32.powi(self.polyblep_octave);
+                let base_freq = self.base_frequency * 2.0_f64.powi(self.polyblep_octave);
 
                 let detune_amount = self.polyblep_stereo_width * 0.01;
                 let pw_offset = self.polyblep_stereo_width * 0.15;
@@ -468,8 +469,8 @@ impl Voice {
 
             // PLL
             if self.pll_volume > 0.0 {
-                let tune_oct = (self.pll_ref_tune_semitones as f32 + self.pll_ref_fine_tune_cents) / 12.0;
-                let ref_freq = self.base_frequency * 2.0_f32.powi(self.pll_ref_octave) * 2.0_f32.powf(tune_oct);
+                let tune_oct = (self.pll_ref_tune_semitones as f64 + self.pll_ref_fine_tune_cents) / 12.0;
+                let ref_freq = self.base_frequency * 2.0_f64.powi(self.pll_ref_octave) * 2.0_f64.powf(tune_oct);
 
                 let fb_mod = feedback * self.pll_feedback_amount * 5.0;
                 let ref_mod = (ref_freq * (1.0 + fb_mod)).clamp(20.0, self.sample_rate * 2.0);
@@ -494,8 +495,8 @@ impl Voice {
                 let pll_raw_r = self.pll_oscillator_right.next(ref_phase, ref_mod, ref_pulse);
 
                 let pll_dist_gain = 0.1 + self.pll_distortion_amount * 4.9;
-                let pll_out_l = f_distort(pll_dist_gain, self.pll_distortion_threshold, pll_raw_l);
-                let pll_out_r = f_distort(pll_dist_gain, self.pll_distortion_threshold, pll_raw_r);
+                let pll_out_l = f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_l as f32) as f64;
+                let pll_out_r = f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_r as f32) as f64;
 
                 l += pll_out_l * self.pll_volume * volume_env;
                 r += pll_out_r * self.pll_volume * volume_env;
@@ -503,29 +504,29 @@ impl Voice {
                 feedback = feedback * 0.9 + (pll_raw_l + pll_raw_r) * 0.05;
             }
 
-            buf_l[i] = l;
-            buf_r[i] = r;
+            buf_l[i] = l as f32;
+            buf_r[i] = r as f32;
         }
 
         self.filter_left.process_buffer(
             unsafe { &mut *(buf_l.as_mut_ptr() as *mut [f32; 4]) },
-            cutoff,
-            self.filter_resonance,
-            self.filter_drive,
+            cutoff as f32,
+            self.filter_resonance as f32,
+            self.filter_drive as f32,
             self.filter_mode,
         );
         self.filter_right.process_buffer(
             unsafe { &mut *(buf_r.as_mut_ptr() as *mut [f32; 4]) },
-            cutoff,
-            self.filter_resonance,
-            self.filter_drive,
+            cutoff as f32,
+            self.filter_resonance as f32,
+            self.filter_drive as f32,
             self.filter_mode,
         );
 
         self.pll_feedback_state = feedback;
 
-        let vps_l = self.oversampling_left.downsample();
-        let vps_r = self.oversampling_right.downsample();
+        let vps_l = self.oversampling_left.downsample() as f64;
+        let vps_r = self.oversampling_right.downsample() as f64;
 
         // Apply reverb to VPS only, with dry/wet mix
         let vps_dry_l = vps_l * (1.0 - self.vps_dry_wet);
@@ -544,7 +545,7 @@ impl Voice {
 
         // Sub oscillator (mono center)
         let sub = if self.sub_volume > 0.0 {
-            let f = self.base_frequency * 2.0_f32.powi(self.sub_octave);
+            let f = self.base_frequency * 2.0_f64.powi(self.sub_octave);
             self.sub_oscillator_sine.set_frequency(f);
             self.sub_oscillator_square.set_frequency(f);
             let s = self.sub_oscillator_sine.next_sin();
