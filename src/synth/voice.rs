@@ -30,7 +30,6 @@ pub struct Voice {
     sample_rate: f64,
 
     // ===== Stereo =====
-    stereo_width: f64,
     pll_damping_stereo_offset: f64,
 
     // ===== VPS Oscillator =====
@@ -135,7 +134,6 @@ impl Voice {
             base_frequency: 220.0,
             master_volume: 0.8,
             sample_rate: sample_rate_f64,
-            stereo_width: 0.0,
             pll_damping_stereo_offset: 0.0,
 
             vps_octave: 0,
@@ -419,16 +417,30 @@ impl Voice {
             // VPS Oscillators
             if self.vps_volume > 0.0 {
                 let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave);
-                let detune = self.stereo_width * 0.002;
 
-                let v_left = (self.vps_v_param - self.vps_stereo_v_offset).clamp(0.0, 1.0);
-                let v_right = (self.vps_v_param + self.vps_stereo_v_offset).clamp(0.0, 1.0);
+                // When stereo offset is 0, use identical parameters for both channels
+                let use_stereo = self.vps_stereo_v_offset > 0.0001;
 
-                self.vps_oscillator_left.set_frequency(base_freq * (1.0 - detune));
+                let v_left = if use_stereo {
+                    (self.vps_v_param - self.vps_stereo_v_offset).clamp(0.0, 1.0)
+                } else {
+                    self.vps_v_param
+                };
+                let v_right = if use_stereo {
+                    (self.vps_v_param + self.vps_stereo_v_offset).clamp(0.0, 1.0)
+                } else {
+                    self.vps_v_param
+                };
+
+                self.vps_oscillator_left.set_frequency(base_freq);
                 let raw_l = self.vps_oscillator_left.next(self.vps_d_param, v_left);
 
-                self.vps_oscillator_right.set_frequency(base_freq * (1.0 + detune));
-                let raw_r = self.vps_oscillator_right.next(self.vps_d_param, v_right);
+                self.vps_oscillator_right.set_frequency(base_freq);
+                let raw_r = if use_stereo {
+                    self.vps_oscillator_right.next(self.vps_d_param, v_right)
+                } else {
+                    raw_l // Use same output when no stereo
+                };
 
                 let distortion_gain = 0.1 + self.distortion_amount * 4.9;
                 let left = f_distort(distortion_gain as f32, self.distortion_threshold as f32, raw_l as f32) as f64;
@@ -442,8 +454,11 @@ impl Voice {
             if self.polyblep_volume > 0.0 {
                 let base_freq = self.base_frequency * 2.0_f64.powi(self.polyblep_octave);
 
-                let detune_amount = self.polyblep_stereo_width * 0.01;
-                let pw_offset = self.polyblep_stereo_width * 0.15;
+                // When stereo width is 0, use identical parameters for both channels
+                let use_stereo = self.polyblep_stereo_width > 0.0001;
+
+                let detune_amount = if use_stereo { self.polyblep_stereo_width * 0.01 } else { 0.0 };
+                let pw_offset = if use_stereo { self.polyblep_stereo_width * 0.15 } else { 0.0 };
 
                 let pw_left = (self.polyblep_pulse_width - pw_offset).clamp(0.01, 0.99);
                 let pw_right = (self.polyblep_pulse_width + pw_offset).clamp(0.01, 0.99);
@@ -451,11 +466,17 @@ impl Voice {
                 self.polyblep_oscillator_left.set_frequency(base_freq * (1.0 - detune_amount));
                 let raw_l = self.polyblep_oscillator_left.next(pw_left);
 
-                self.polyblep_oscillator_right.set_frequency(base_freq * (1.0 + detune_amount));
-                let raw_r = self.polyblep_oscillator_right.next(pw_right);
-
-                mixed_oscillators_l += raw_l * self.polyblep_volume * volume_env;
-                mixed_oscillators_r += raw_r * self.polyblep_volume * volume_env;
+                if use_stereo {
+                    self.polyblep_oscillator_right.set_frequency(base_freq * (1.0 + detune_amount));
+                    let raw_r = self.polyblep_oscillator_right.next(pw_right);
+                    mixed_oscillators_l += raw_l * self.polyblep_volume * volume_env;
+                    mixed_oscillators_r += raw_r * self.polyblep_volume * volume_env;
+                } else {
+                    // Use same output for both channels when no stereo
+                    let mono_out = raw_l * self.polyblep_volume * volume_env;
+                    mixed_oscillators_l += mono_out;
+                    mixed_oscillators_r += mono_out;
+                }
             }
 
             // PLL Oscillators
@@ -470,8 +491,15 @@ impl Voice {
                 let ref_pulse = self.pll_reference_oscillator.next(self.pll_ref_pulse_width);
                 let ref_phase = self.pll_reference_oscillator.get_phase();
 
+                // When stereo offset is 0, use identical parameters for both channels
+                let use_stereo = self.pll_damping_stereo_offset > 0.0001;
+
                 let damp_left = (self.pll_damping - self.pll_damping_stereo_offset).clamp(0.001, 1.0);
-                let damp_right = (self.pll_damping + self.pll_damping_stereo_offset).clamp(0.001, 1.0);
+                let damp_right = if use_stereo {
+                    (self.pll_damping + self.pll_damping_stereo_offset).clamp(0.001, 1.0)
+                } else {
+                    damp_left // Use same damping for both when no stereo
+                };
 
                 let mode = if self.pll_mode_is_edge {
                     super::oscillator::PllMode::EdgePFD
@@ -482,12 +510,20 @@ impl Voice {
                 self.pll_oscillator_left.set_params(self.pll_track_speed, damp_left, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
                 let pll_raw_l = self.pll_oscillator_left.next(ref_phase, ref_mod, ref_pulse);
 
-                self.pll_oscillator_right.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
-                let pll_raw_r = self.pll_oscillator_right.next(ref_phase, ref_mod, ref_pulse);
+                let pll_raw_r = if use_stereo {
+                    self.pll_oscillator_right.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
+                    self.pll_oscillator_right.next(ref_phase, ref_mod, ref_pulse)
+                } else {
+                    pll_raw_l // Use same output when no stereo
+                };
 
                 let pll_dist_gain = 0.1 + self.pll_distortion_amount * 4.9;
                 let pll_out_l = f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_l as f32) as f64;
-                let pll_out_r = f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_r as f32) as f64;
+                let pll_out_r = if use_stereo {
+                    f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_r as f32) as f64
+                } else {
+                    pll_out_l // Use same distorted output when no stereo
+                };
 
                 mixed_oscillators_l += pll_out_l * self.pll_volume * volume_env;
                 mixed_oscillators_r += pll_out_r * self.pll_volume * volume_env;
