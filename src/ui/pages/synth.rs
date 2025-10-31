@@ -7,10 +7,42 @@ use nih_plug_egui::egui::Color32;
 use std::sync::Arc;
 
 pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &ParamSetter) {
+    // Get the current tab state from memory (A or B)
+    let mut current_tab = tui.ui(|ui| {
+        ui.memory_mut(|mem| {
+            *mem.data.get_temp_mut_or(egui::Id::new("synth_tab"), 'A')
+        })
+    });
+
     tui.ui(|ui| {
         ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Synth").size(14.0));
+        ui.horizontal(|ui| {
+            ui.heading(egui::RichText::new("    Synth").size(14.0));
+            ui.add_space(20.0);
+
+            // Tab buttons
+            let button_a = egui::Button::new(egui::RichText::new("A").size(12.0))
+                .min_size(egui::vec2(30.0, 22.0))
+                .selected(current_tab == 'A');
+            if ui.add(button_a).clicked() {
+                current_tab = 'A';
+            }
+
+            ui.add_space(4.0);
+
+            let button_b = egui::Button::new(egui::RichText::new("B").size(12.0))
+                .min_size(egui::vec2(30.0, 22.0))
+                .selected(current_tab == 'B');
+            if ui.add(button_b).clicked() {
+                current_tab = 'B';
+            }
+        });
         ui.add_space(8.0);
+
+        // Store the updated tab state
+        ui.memory_mut(|mem| {
+            mem.data.insert_temp(egui::Id::new("synth_tab"), current_tab);
+        });
     });
 
     tui.style(Style {
@@ -19,13 +51,15 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
         ..Default::default()
     })
     .ui(|ui| {
-        ui.horizontal(|ui| {
-            egui::Frame::default()
-                .fill(ui.visuals().extreme_bg_color)
-                .inner_margin(10.0)
-                .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-                .corner_radius(15.0)
-                .show(ui, |ui| {
+        // Tab A: PLL, Sub, VPS, Saw/Pulse, and Filter
+        if current_tab == 'A' {
+            ui.horizontal(|ui| {
+                egui::Frame::default()
+                    .fill(ui.visuals().extreme_bg_color)
+                    .inner_margin(10.0)
+                    .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                    .corner_radius(15.0)
+                    .show(ui, |ui| {
                     ui.vertical(|ui| {
                         ui.label(
                             egui::RichText::new("   Phase Locked Loop OSC")
@@ -532,41 +566,46 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                     );
                 });
             });
+        });
+        }
+        // Tab B: Envelopes, Volume, and Reverb
+        else {
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("VOL ENV").size(10.0).strong());
+                    ui.add_space(2.0);
+                    render_envelope_controls_compact(ui, params, setter, "vol");
+                });
 
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new("VOL ENV").size(10.0).strong());
-                ui.add_space(2.0);
-                render_envelope_controls_compact(ui, params, setter, "vol");
+                ui.add_space(20.0);
+
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("FILT ENV").size(10.0).strong());
+                    ui.add_space(2.0);
+                    render_envelope_controls_compact(ui, params, setter, "filt");
+                });
+
+                ui.add_space(20.0);
+
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("VOL").size(10.0).strong());
+                    ui.add_space(2.0);
+                    render_vertical_slider(
+                        ui,
+                        params,
+                        setter,
+                        &params.synth_volume,
+                        "Lvl",
+                        0.0,
+                        1.0,
+                        SliderScale::Linear,
+                        |v| format!("{:.0}%", v * 100.0),
+                        Some(Color32::from_rgb(50, 180, 80)),
+                    );
+                });
             });
 
-            ui.add_space(8.0);
-
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new("FILT ENV").size(10.0).strong());
-                ui.add_space(2.0);
-                render_envelope_controls_compact(ui, params, setter, "filt");
-            });
-
-            ui.add_space(8.0);
-
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new("VOL").size(10.0).strong());
-                ui.add_space(2.0);
-                render_vertical_slider(
-                    ui,
-                    params,
-                    setter,
-                    &params.synth_volume,
-                    "Lvl",
-                    0.0,
-                    1.0,
-                    SliderScale::Linear,
-                    |v| format!("{:.0}%", v * 100.0),
-                    Some(Color32::from_rgb(50, 180, 80)),
-                );
-            });
-
-            ui.add_space(8.0);
+            ui.add_space(20.0);
 
             egui::Frame::default()
                 .fill(ui.visuals().extreme_bg_color)
@@ -665,7 +704,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                         });
                     });
                 });
-        });
+        }
     });
 }
 
