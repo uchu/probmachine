@@ -1,6 +1,5 @@
 use std::sync::Arc;
-use nih_plug_egui::egui;
-use egui_taffy::{Tui, TuiBuilderLogic};
+use egui_taffy::Tui;
 use crate::params::DeviceParams;
 use super::SharedUiState;
 
@@ -11,20 +10,18 @@ pub enum Page {
     Notes,
     Strength,
     Synth,
-    Page5,
-    Page6,
+    Presets,
 }
 
 impl Page {
-    pub fn all() -> [Page; 7] {
+    pub fn all() -> [Page; 6] {
         [
             Page::BeatProbability,
             Page::Length,
             Page::Notes,
             Page::Strength,
             Page::Synth,
-            Page::Page5,
-            Page::Page6,
+            Page::Presets,
         ]
     }
 
@@ -35,8 +32,7 @@ impl Page {
             Page::Notes => "Notes",
             Page::Strength => "Strength",
             Page::Synth => "Synth",
-            Page::Page5 => "Page 5",
-            Page::Page6 => "Page 6",
+            Page::Presets => "Presets",
         }
     }
 
@@ -63,12 +59,8 @@ impl Page {
             Page::Synth => {
                 super::pages::synth::render(tui, params, setter)
             }
-            _ => {
-                tui.ui(|ui| {
-                    ui.centered_and_justified(|ui| {
-                        ui.label(egui::RichText::new("Coming soon...").size(24.0));
-                    });
-                });
+            Page::Presets => {
+                super::pages::presets::render(tui, params, setter, ui_state)
             }
         }
     }

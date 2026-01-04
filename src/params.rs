@@ -373,8 +373,6 @@ pub struct DeviceParams {
     pub synth_pll_track_speed: FloatParam,
     #[id = "synth_pll_damping"]
     pub synth_pll_damping: FloatParam,
-    #[id = "synth_pll_range"]
-    pub synth_pll_range: FloatParam,
     #[id = "synth_pll_mult"]
     pub synth_pll_mult: IntParam,
     #[id = "synth_pll_colored"]
@@ -391,8 +389,8 @@ pub struct DeviceParams {
     pub synth_pll_ref_pulse_width: FloatParam,
     #[id = "synth_pll_feedback"]
     pub synth_pll_feedback: FloatParam,
-    #[id = "synth_pll_ki_multiplier"]
-    pub synth_pll_ki_multiplier: FloatParam,
+    #[id = "synth_pll_influence"]
+    pub synth_pll_influence: FloatParam,
     #[id = "synth_pll_volume"]
     pub synth_pll_volume: FloatParam,
     #[id = "synth_pll_distortion_amount"]
@@ -401,6 +399,8 @@ pub struct DeviceParams {
     pub synth_pll_distortion_threshold: FloatParam,
     #[id = "synth_pll_stereo_damp_offset"]
     pub synth_pll_stereo_damp_offset: FloatParam,
+    #[id = "synth_pll_glide"]
+    pub synth_pll_glide: FloatParam,
 
     #[id = "synth_distortion_amount"]
     pub synth_distortion_amount: FloatParam,
@@ -580,8 +580,7 @@ impl DeviceParams {
             max_constraint = max_constraint.max(constraint_at_point);
         }
 
-        let available = (127.0 - max_constraint).max(0.0);
-        available
+        (127.0 - max_constraint).max(0.0)
     }
 
     pub fn get_division_param(&self, mode: BeatMode, beat_count: usize, beat_index: usize) -> &FloatParam {
@@ -1099,18 +1098,13 @@ impl Default for DeviceParams {
 
             synth_pll_track_speed: FloatParam::new(
                 "PLL Track Speed".to_string(),
-                3.0,
-                FloatRange::Skewed { min: 0.2, max: 10.0, factor: 0.3 }
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_damping: FloatParam::new(
                 "PLL Damping".to_string(),
-                0.2,
+                0.3,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_pll_range: FloatParam::new(
-                "PLL Range".to_string(),
-                1.0,
-                FloatRange::Skewed { min: 0.1, max: 100.0, factor: 0.3 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_mult: IntParam::new(
                 "PLL Multiplier".to_string(),
@@ -1150,10 +1144,10 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 0.1 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_pll_ki_multiplier: FloatParam::new(
-                "PLL Ki Multiplier".to_string(),
-                10000.0,
-                FloatRange::Skewed { min: 1.0, max: 50000.0, factor: 0.3 }
+            synth_pll_influence: FloatParam::new(
+                "PLL Influence".to_string(),
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_volume: FloatParam::new(
                 "PLL Volume".to_string(),
@@ -1174,6 +1168,11 @@ impl Default for DeviceParams {
                 "PLL Stereo Damp Δ".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_glide: FloatParam::new(
+                "PLL Glide".to_string(),
+                0.0,
+                FloatRange::Skewed { min: 0.0, max: 2000.0, factor: 0.3 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_distortion_amount: FloatParam::new(

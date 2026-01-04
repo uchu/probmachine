@@ -7,11 +7,14 @@ edition = "2021"
 members = ["xtask"]
 
 [dependencies]
-nih_plug = { path = "../nih-plug-patched", features = ["standalone"] }
-nih_plug_egui = { path = "../nih-plug-patched/nih_plug_egui" }
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["standalone"] }
+nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 egui_taffy = "0.7"
 synfx-dsp = "0.5"
 rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dirs = "5.0"
 
 [lib]
 crate-type = ["cdylib", "lib"]

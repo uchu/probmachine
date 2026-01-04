@@ -4,7 +4,6 @@ use egui_taffy::TuiBuilderLogic;
 use nih_plug_egui::egui::{self, Color32};
 use crate::params::DeviceParams;
 use crate::ui::SharedUiState;
-use crate::sequencer::NotePool;
 use nih_plug::prelude::*;
 
 #[derive(Clone, PartialEq)]

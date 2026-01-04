@@ -1,4 +1,4 @@
-/// Utilities for converting between MIDI notes and frequencies
+//! Utilities for converting between MIDI notes and frequencies
 
 /// Convert MIDI note number to frequency in Hz
 /// A4 (MIDI note 69) = 440Hz
@@ -7,6 +7,7 @@ pub fn midi_to_frequency(midi_note: u8) -> f32 {
 }
 
 /// Convert note name (e.g., "C4") to MIDI note number
+#[allow(dead_code)]
 pub fn note_name_to_midi(note_name: &str) -> Option<u8> {
     let mut chars = note_name.chars();
     let note_char = chars.next()?;
@@ -45,9 +46,9 @@ pub fn note_name_to_midi(note_name: &str) -> Option<u8> {
         _ => return None,
     };
 
-    let midi_note = (octave + 1) * 12 + base_note + modifier;
+    let midi_note = (octave + 1) as i16 * 12 + base_note as i16 + modifier as i16;
 
-    if midi_note < 0 || midi_note > 127 {
+    if !(0..=127).contains(&midi_note) {
         return None;
     }
 
@@ -55,6 +56,7 @@ pub fn note_name_to_midi(note_name: &str) -> Option<u8> {
 }
 
 /// Get note name from MIDI note number
+#[allow(dead_code)]
 pub fn midi_to_note_name(midi_note: u8) -> String {
     let note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     let octave = (midi_note / 12) as i32 - 1;
@@ -79,6 +81,7 @@ impl NoteSelection {
         }
     }
 
+    #[allow(dead_code)]
     pub fn frequency(&self) -> f32 {
         midi_to_frequency(self.midi_note)
     }
@@ -110,6 +113,7 @@ impl NotePool {
     }
 
     /// Remove a note from the pool
+    #[allow(dead_code)]
     pub fn remove_note(&mut self, midi_note: u8) {
         self.notes.retain(|n| n.midi_note != midi_note);
     }

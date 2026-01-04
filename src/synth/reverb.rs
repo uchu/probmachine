@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use synfx_dsp::{DattorroReverb, DattorroReverbParams};
 
 pub struct ReverbParams {

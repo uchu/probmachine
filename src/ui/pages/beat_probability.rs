@@ -13,7 +13,7 @@ pub fn render(
     params: &Arc<DeviceParams>,
     setter: &nih_plug::prelude::ParamSetter,
 ) {
-    let (beat_mode, num_sliders) = tui.ui(|ui| get_beat_state(ui));
+    let (beat_mode, num_sliders) = tui.ui(get_beat_state);
 
     tui.ui(|ui| {
         ui.add_space(12.0);

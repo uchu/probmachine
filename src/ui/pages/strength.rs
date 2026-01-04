@@ -178,7 +178,7 @@ fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _contain
                 let grid_pos = triplet_to_grid(triplet_pos);
 
                 // Check if this grid position is also used by a straight position
-                let coincides = grid_pos % 3 == 0 && (grid_pos / 3) < 32;
+                let coincides = grid_pos.is_multiple_of(3) && (grid_pos / 3) < 32;
 
                 if !coincides {
                     let value = state.beat_strength_values[grid_pos];
@@ -207,7 +207,7 @@ fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _contain
                 let grid_pos = straight_to_grid(straight_pos);
 
                 // Check if this grid position is also used by a triplet position
-                let coincides = grid_pos % 4 == 0 && (grid_pos / 4) < 24;
+                let coincides = grid_pos.is_multiple_of(4) && (grid_pos / 4) < 24;
 
                 if !coincides {
                     let value = state.beat_strength_values[grid_pos];

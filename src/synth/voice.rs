@@ -1,5 +1,7 @@
-use synfx_dsp::{Oversampling, f_distort};
-use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, PllMode};
+#![allow(clippy::too_many_arguments)]
+
+use synfx_dsp::{Oversampling, f_distort, SlewValue};
+use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator};
 use super::filter::MoogFilter;
 use super::envelope::Envelope;
 use super::reverb::StereoReverb;
@@ -54,7 +56,6 @@ pub struct Voice {
     pll_volume: f64,
     pll_track_speed: f64,
     pll_damping: f64,
-    pll_range: f64,
     pll_multiplier: f64,
     pll_feedback_amount: f64,
     pll_feedback_state: f64,
@@ -101,6 +102,33 @@ pub struct Voice {
 
     // ===== Reverb =====
     reverb: StereoReverb,
+
+    // ===== Slew Limiters =====
+    freq_slew: SlewValue<f64>,
+    pll_volume_slew: SlewValue<f64>,
+    pll_track_slew: SlewValue<f64>,
+    pll_damping_slew: SlewValue<f64>,
+    pll_influence_slew: SlewValue<f64>,
+    pll_feedback_slew: SlewValue<f64>,
+    pll_dist_amount_slew: SlewValue<f64>,
+    pll_dist_thresh_slew: SlewValue<f64>,
+    pll_fine_tune_slew: SlewValue<f64>,
+    pll_pulse_width_slew: SlewValue<f64>,
+    pll_stereo_offset_slew: SlewValue<f64>,
+
+    // ===== Target Values =====
+    glide_time_ms: f64,
+    target_frequency: f64,
+    target_pll_volume: f64,
+    target_pll_track: f64,
+    target_pll_damping: f64,
+    target_pll_influence: f64,
+    target_pll_feedback: f64,
+    target_pll_dist_amount: f64,
+    target_pll_dist_thresh: f64,
+    target_pll_fine_tune: f64,
+    target_pll_pulse_width: f64,
+    target_pll_stereo_offset: f64,
 }
 
 impl Voice {
@@ -152,9 +180,8 @@ impl Voice {
             sub_shape: 0.0,
 
             pll_volume: 0.0,
-            pll_track_speed: 0.2,
-            pll_damping: 0.05,
-            pll_range: 1.0,
+            pll_track_speed: 0.5,
+            pll_damping: 0.3,
             pll_multiplier: 1.0,
             pll_feedback_amount: 0.0,
             pll_feedback_state: 0.0,
@@ -195,16 +222,45 @@ impl Voice {
             filt_env_release_shape: 0.5,
 
             reverb: StereoReverb::new(oversampled_rate as f32),
+
+            freq_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_volume_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_track_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_damping_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_influence_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_feedback_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_dist_amount_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_dist_thresh_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_fine_tune_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_pulse_width_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            pll_stereo_offset_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+
+            glide_time_ms: 0.0,
+            target_frequency: 220.0,
+            target_pll_volume: 0.0,
+            target_pll_track: 0.5,
+            target_pll_damping: 0.3,
+            target_pll_influence: 0.5,
+            target_pll_feedback: 0.0,
+            target_pll_dist_amount: 0.0,
+            target_pll_dist_thresh: 0.9,
+            target_pll_fine_tune: 0.0,
+            target_pll_pulse_width: 0.5,
+            target_pll_stereo_offset: 0.0,
         }
     }
 
     pub fn set_pll_stereo_damp_offset(&mut self, offset: f64) {
-        self.pll_damping_stereo_offset = offset.clamp(0.0, 1.0);
+        self.target_pll_stereo_offset = offset.clamp(0.0, 1.0);
+    }
+
+    pub fn set_glide_time(&mut self, time_ms: f64) {
+        self.glide_time_ms = time_ms.max(0.0);
     }
 
     pub fn set_frequency(&mut self, freq: f64, _pll_feedback: f64, feedback_amount: f64) {
-        self.base_frequency = freq;
-        self.pll_feedback_amount = feedback_amount;
+        self.target_frequency = freq;
+        self.target_pll_feedback = feedback_amount;
     }
 
     pub fn set_osc_params(&mut self, d: f64, v: f64) {
@@ -245,35 +301,26 @@ impl Voice {
     pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f64, pulse_width: f64) {
         self.pll_ref_octave = octave;
         self.pll_ref_tune_semitones = tune;
-        self.pll_ref_fine_tune_cents = fine_tune;
-        self.pll_ref_pulse_width = pulse_width;
+        self.target_pll_fine_tune = fine_tune;
+        self.target_pll_pulse_width = pulse_width;
     }
 
-    pub fn set_pll_params(&mut self, track: f64, damp: f64, mult: f64, range: f64, colored: bool, edge_mode: bool) {
-        self.pll_track_speed = track;
-        self.pll_damping = damp;
+    pub fn set_pll_params(&mut self, track: f64, damp: f64, mult: f64, influence: f64, colored: bool, edge_mode: bool) {
+        self.target_pll_track = track;
+        self.target_pll_damping = damp;
         self.pll_multiplier = mult;
-        self.pll_range = range;
+        self.target_pll_influence = influence;
         self.pll_mode_is_edge = edge_mode;
         self.pll_colored = colored;
-
-        let mode = if edge_mode { PllMode::EdgePFD } else { PllMode::AnalogLikePD };
-        self.pll_oscillator_left.set_params(track, damp, mult, range, colored, mode);
-        self.pll_oscillator_right.set_params(track, damp, mult, range, colored, mode);
     }
 
     pub fn set_pll_volume(&mut self, volume: f64) {
-        self.pll_volume = volume;
-    }
-
-    pub fn set_pll_ki_multiplier(&mut self, ki_mult: f64) {
-        self.pll_oscillator_left.set_ki_multiplier(ki_mult);
-        self.pll_oscillator_right.set_ki_multiplier(ki_mult);
+        self.target_pll_volume = volume;
     }
 
     pub fn set_pll_distortion_params(&mut self, amount: f64, threshold: f64) {
-        self.pll_distortion_amount = amount;
-        self.pll_distortion_threshold = threshold;
+        self.target_pll_dist_amount = amount;
+        self.target_pll_dist_thresh = threshold;
     }
 
     pub fn set_distortion_params(&mut self, amount: f64, threshold: f64) {
@@ -403,6 +450,20 @@ impl Voice {
         let cutoff = (self.filter_cutoff + filter_env * self.filter_envelope_amount)
             .clamp(20.0, 20000.0);
 
+        let glide_ms = if self.glide_time_ms > 0.5 { self.glide_time_ms } else { 0.5 };
+        self.base_frequency = self.freq_slew.next(self.target_frequency, glide_ms / 500.0);
+
+        self.pll_volume = self.pll_volume_slew.next(self.target_pll_volume, 20.0);
+        self.pll_track_speed = self.pll_track_slew.next(self.target_pll_track, 20.0);
+        self.pll_damping = self.pll_damping_slew.next(self.target_pll_damping, 20.0);
+        let slewed_influence = self.pll_influence_slew.next(self.target_pll_influence, 20.0);
+        self.pll_feedback_amount = self.pll_feedback_slew.next(self.target_pll_feedback, 200.0);
+        self.pll_distortion_amount = self.pll_dist_amount_slew.next(self.target_pll_dist_amount, 20.0);
+        self.pll_distortion_threshold = self.pll_dist_thresh_slew.next(self.target_pll_dist_thresh, 20.0);
+        self.pll_ref_fine_tune_cents = self.pll_fine_tune_slew.next(self.target_pll_fine_tune, 10.0);
+        self.pll_ref_pulse_width = self.pll_pulse_width_slew.next(self.target_pll_pulse_width, 20.0);
+        self.pll_damping_stereo_offset = self.pll_stereo_offset_slew.next(self.target_pll_stereo_offset, 60.0);
+
         self.pll_oscillator_left.prepare_block();
         self.pll_oscillator_right.prepare_block();
 
@@ -507,11 +568,11 @@ impl Voice {
                     super::oscillator::PllMode::AnalogLikePD
                 };
 
-                self.pll_oscillator_left.set_params(self.pll_track_speed, damp_left, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
+                self.pll_oscillator_left.set_params(self.pll_track_speed, damp_left, self.pll_multiplier, slewed_influence, self.pll_colored, mode);
                 let pll_raw_l = self.pll_oscillator_left.next(ref_phase, ref_mod, ref_pulse);
 
                 let pll_raw_r = if use_stereo {
-                    self.pll_oscillator_right.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, self.pll_range, self.pll_colored, mode);
+                    self.pll_oscillator_right.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, slewed_influence, self.pll_colored, mode);
                     self.pll_oscillator_right.next(ref_phase, ref_mod, ref_pulse)
                 } else {
                     pll_raw_l // Use same output when no stereo

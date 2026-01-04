@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use crate::params::DeviceParams;
 use egui_taffy::taffy::{prelude::*, style::AlignItems};
 use egui_taffy::TuiBuilderLogic;
@@ -120,7 +122,27 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 setter,
                                 &params.synth_pll_track_speed,
                                 "Trk",
-                                0.01,
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| {
+                                    if v < 0.3 {
+                                        format!("Glide {:.2}", v)
+                                    } else if v > 0.7 {
+                                        format!("OT {:.2}", v)
+                                    } else {
+                                        format!("{:.2}", v)
+                                    }
+                                },
+                                Some(Color32::from_rgb(40, 40, 80)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_damping,
+                                "Dmp",
+                                0.0,
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
@@ -130,12 +152,12 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
-                                &params.synth_pll_damping,
-                                "Dmp",
-                                0.001,
-                                0.3,
+                                &params.synth_pll_influence,
+                                "Inf",
+                                0.0,
+                                1.0,
                                 SliderScale::Linear,
-                                |v| format!("{:.3}", v),
+                                |v| format!("{:.2}", v),
                                 Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_vertical_slider(
@@ -149,26 +171,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 SliderScale::Linear,
                                 |v| format!("{:.3}", v),
                                 Some(Color32::from_rgb(80, 40, 80)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_range,
-                                "Rng",
-                                0.1,
-                                100.0,
-                                SliderScale::Logarithmic,
-                                |v| {
-                                    if v >= 10.0 {
-                                        format!("{:.0}", v)
-                                    } else if v >= 1.0 {
-                                        format!("{:.1}", v)
-                                    } else {
-                                        format!("{:.2}", v)
-                                    }
-                                },
-                                Some(Color32::from_rgb(40, 40, 80)),
                             );
                             render_int_vertical_slider(
                                 ui,
@@ -195,24 +197,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
-                                &params.synth_pll_ki_multiplier,
-                                "Ki",
-                                1.0,
-                                100000.0,
-                                SliderScale::Logarithmic,
-                                |v| {
-                                    if v >= 1000.0 {
-                                        format!("{:.0}k", v / 1000.0)
-                                    } else {
-                                        format!("{:.0}", v)
-                                    }
-                                },
-                                Some(Color32::from_rgb(40, 40, 80)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
                                 &params.synth_pll_distortion_amount,
                                 "Dist",
                                 0.0,
@@ -232,6 +216,26 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),
                                 Some(Color32::from_rgb(80, 40, 40)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_glide,
+                                "Glide",
+                                0.0,
+                                2000.0,
+                                SliderScale::Logarithmic,
+                                |v| {
+                                    if v < 1.0 {
+                                        "Off".to_string()
+                                    } else if v < 1000.0 {
+                                        format!("{:.0}ms", v)
+                                    } else {
+                                        format!("{:.1}s", v / 1000.0)
+                                    }
+                                },
+                                Some(Color32::from_rgb(80, 60, 100)),
                             );
                             render_vertical_slider(
                                 ui,

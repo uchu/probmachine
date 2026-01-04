@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 mod oscillator;
 mod filter;
 mod envelope;
@@ -55,16 +57,12 @@ impl SynthEngine {
         self.voice.set_pll_ref_params(octave, tune, fine_tune as f64, pulse_width as f64);
     }
 
-    pub fn set_pll_params(&mut self, track: f32, damp: f32, mult: f32, range: f32, colored: bool, edge_mode: bool) {
-        self.voice.set_pll_params(track as f64, damp as f64, mult as f64, range as f64, colored, edge_mode);
+    pub fn set_pll_params(&mut self, track: f32, damp: f32, mult: f32, influence: f32, colored: bool, edge_mode: bool) {
+        self.voice.set_pll_params(track as f64, damp as f64, mult as f64, influence as f64, colored, edge_mode);
     }
 
     pub fn set_pll_volume(&mut self, volume: f32) {
         self.voice.set_pll_volume(volume as f64);
-    }
-
-    pub fn set_pll_ki_multiplier(&mut self, ki_mult: f32) {
-        self.voice.set_pll_ki_multiplier(ki_mult as f64);
     }
 
     pub fn set_pll_stereo_damp_offset(&mut self, offset: f32) {
@@ -73,6 +71,10 @@ impl SynthEngine {
 
     pub fn set_pll_distortion_params(&mut self, amount: f32, threshold: f32) {
         self.voice.set_pll_distortion_params(amount as f64, threshold as f64);
+    }
+
+    pub fn set_pll_glide(&mut self, glide_ms: f32) {
+        self.voice.set_glide_time(glide_ms as f64);
     }
 
     pub fn set_sub_params(&mut self, volume: f32, octave: i32, shape: f32) {

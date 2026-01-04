@@ -1,6 +1,7 @@
 #![feature(portable_simd)]
 
 mod params;
+mod preset;
 mod ui;
 mod synth;
 mod sequencer;
@@ -170,7 +171,6 @@ impl Plugin for Device {
                 self.params.synth_pll_ref_pulse_width.modulated_plain_value(),
             );
 
-            let pll_range = self.params.synth_pll_range.modulated_plain_value();
             let pll_mult = match self.params.synth_pll_mult.value() {
                 0 => 1.0,
                 1 => 2.0,
@@ -184,14 +184,12 @@ impl Plugin for Device {
                 self.params.synth_pll_track_speed.modulated_plain_value(),
                 self.params.synth_pll_damping.modulated_plain_value(),
                 pll_mult,
-                pll_range,
+                self.params.synth_pll_influence.modulated_plain_value(),
                 self.params.synth_pll_colored.value(),
                 self.params.synth_pll_mode.value(),
             );
 
             synth.set_pll_volume(self.params.synth_pll_volume.modulated_plain_value());
-
-            synth.set_pll_ki_multiplier(self.params.synth_pll_ki_multiplier.modulated_plain_value());
 
             synth.set_pll_stereo_damp_offset(self.params.synth_pll_stereo_damp_offset.modulated_plain_value());
 
@@ -199,6 +197,8 @@ impl Plugin for Device {
                 self.params.synth_pll_distortion_amount.modulated_plain_value(),
                 self.params.synth_pll_distortion_threshold.modulated_plain_value(),
             );
+
+            synth.set_pll_glide(self.params.synth_pll_glide.modulated_plain_value());
 
             synth.set_distortion_params(
                 self.params.synth_distortion_amount.modulated_plain_value(),

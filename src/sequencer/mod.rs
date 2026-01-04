@@ -3,7 +3,7 @@ mod note_utils;
 use crate::params::{BeatMode, DeviceParams};
 use rand::Rng;
 use nih_plug::prelude::Param;
-pub use note_utils::{NotePool, NoteSelection, midi_to_frequency, note_name_to_midi};
+pub use note_utils::{NotePool, midi_to_frequency};
 
 #[derive(Clone, Debug)]
 struct NoteEvent {

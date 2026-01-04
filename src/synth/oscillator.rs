@@ -99,14 +99,12 @@ pub struct PLLOscillator {
     phase: f64,
     integrator: f64,
     filtered_error: f64,
-    jitter_state: f64,
     base_freq: f64,
-    track_gain: f64,
+    track_speed: f64,
     damping: f64,
+    influence: f64,
     mult: f64,
     desired_mult: f64,
-    range_coeff: f64,
-    ki_multiplier: f64,
     colored: bool,
     color_x: f64,
     sample_rate: f64,
@@ -124,6 +122,13 @@ pub struct PLLOscillator {
     cached_alpha: f64,
     cached_kp: f64,
     cached_ki: f64,
+
+    overtrack_state: f64,
+    freq_slew_state: f64,
+    phase_delta: f64,
+
+    dc_x_prev: f64,
+    dc_y_prev: f64,
 }
 
 impl PLLOscillator {
@@ -132,14 +137,12 @@ impl PLLOscillator {
             phase: 0.0,
             integrator: 0.0,
             filtered_error: 0.0,
-            jitter_state: 0.0,
             base_freq: 110.0,
-            track_gain: 3.0,
-            damping: 0.2,
+            track_speed: 0.5,
+            damping: 0.3,
+            influence: 0.5,
             mult: 1.0,
             desired_mult: 1.0,
-            range_coeff: 1.0,
-            ki_multiplier: 10000.0,
             colored: false,
             color_x: 0.0,
             sample_rate,
@@ -157,48 +160,57 @@ impl PLLOscillator {
             cached_alpha: 0.0,
             cached_kp: 0.0,
             cached_ki: 0.0,
+
+            overtrack_state: 0.0,
+            freq_slew_state: 0.0,
+            phase_delta: 0.0,
+
+            dc_x_prev: 0.0,
+            dc_y_prev: 0.0,
         };
         pll.prepare_block();
         pll
     }
 
-    pub fn set_params(&mut self, track: f64, damp: f64, mult: f64, range: f64, colored: bool, mode: PllMode) {
-        self.track_gain = track;
-        self.damping = damp;
+    pub fn set_params(&mut self, track: f64, damp: f64, mult: f64, influence: f64, colored: bool, mode: PllMode) {
+        self.track_speed = track.clamp(0.0, 1.0);
+        self.damping = damp.clamp(0.0, 1.0);
         self.desired_mult = mult;
-        self.range_coeff = range;
+        self.influence = influence.clamp(0.0, 1.0);
         self.colored = colored;
         self.mode = mode;
     }
 
-    pub fn set_ki_multiplier(&mut self, ki_mult: f64) {
-        self.ki_multiplier = ki_mult;
+    #[allow(dead_code)]
+    pub fn get_phase_delta(&self) -> f64 {
+        self.phase_delta
     }
 
     pub fn prepare_block(&mut self) {
-        self.mult += (self.desired_mult - self.mult) * 0.05;
+        self.mult += (self.desired_mult - self.mult) * 0.02;
 
-        let a = (0.02 + 0.35 * self.track_gain.sqrt()).min(0.985);
-        self.cached_alpha = a;
+        let track_exp = (self.track_speed * 6.0 - 3.0).exp();
+        self.cached_alpha = (track_exp / (1.0 + track_exp)).clamp(0.001, 0.995);
 
-        let mult_penalty = 1.0 / self.mult.max(1.0);
-        let damp_curve = 1.0 - (self.damping * 0.9).tanh();
-        self.cached_kp = self.track_gain * 80.0 * (1.0 + 1.5 * (1.0 - self.damping)) * self.range_coeff * mult_penalty;
-        self.cached_ki = damp_curve * self.track_gain * self.ki_multiplier * self.range_coeff * mult_penalty;
+        let mult_penalty = 1.0 / self.mult.sqrt().max(1.0);
+        let influence_scaled = 0.1 + self.influence * 9.9;
+
+        let damp_factor = 1.0 - self.damping * 0.95;
+        self.cached_kp = influence_scaled * 50.0 * damp_factor * mult_penalty;
+        self.cached_ki = influence_scaled * 5000.0 * damp_factor * mult_penalty;
 
         self.color_x = if self.colored {
-            (self.color_x + 0.05).min(1.0)
+            (self.color_x + 0.02).min(1.0)
         } else {
-            (self.color_x - 0.05).max(0.0)
+            (self.color_x - 0.02).max(0.0)
         };
     }
 
     pub fn trigger(&mut self) {
-        use synfx_dsp::rand_01;
-        self.phase = rand_01() as f64 * 0.2;
-        self.integrator = 0.0;
-        self.filtered_error = 0.0;
-        self.jitter_state = 0.0;
+        self.integrator *= 0.05;
+        self.filtered_error *= 0.05;
+        self.pfd_state *= 0.05;
+        self.overtrack_state = 0.0;
     }
 
     fn wrap_pi(x: f64) -> f64 {
@@ -248,54 +260,75 @@ impl PLLOscillator {
         let effective_freq = (self.base_freq * self.mult).max(1.0);
         let base_period = (self.sample_rate / effective_freq).max(1.0);
         let new_pfd_value = (dt / base_period).tanh();
-        self.pfd_state = 0.8 * self.pfd_state + 0.2 * new_pfd_value;
+        self.pfd_state = self.pfd_state * 0.85 + new_pfd_value * 0.15;
         self.pfd_state
     }
 
     pub fn next(&mut self, input_phase: f64, input_freq: f64, ref_pulse: f64) -> f64 {
         use std::f64::consts::PI;
-        use synfx_dsp::rand_01;
 
         self.base_freq = input_freq;
-
-        let raw_noise = (rand_01() as f64 - 0.5) * 2.0;
-        let j_alpha = 0.005;
-        self.jitter_state = self.jitter_state * (1.0 - j_alpha) + raw_noise * j_alpha;
-        let jitter = self.jitter_state * 0.01;
 
         let phase_error = match self.mode {
             PllMode::AnalogLikePD => {
                 let diff = Self::wrap_pi(input_phase * 2.0 * PI - self.phase * 2.0 * PI);
-                ((diff / PI) + jitter).tanh()
+                (diff / PI).tanh()
             }
             PllMode::EdgePFD => {
                 self.next_pfd(ref_pulse)
             }
         };
 
+        self.phase_delta = phase_error;
+
         self.filtered_error = self.filtered_error * (1.0 - self.cached_alpha) + phase_error * self.cached_alpha;
 
-        self.integrator = self.integrator * 0.9999 + self.filtered_error * (self.cached_ki / self.sample_rate);
-        self.integrator = self.integrator.clamp(-2000.0, 2000.0);
+        let integrator_decay = 0.9999 - self.damping * 0.0098;
+        self.integrator = self.integrator * integrator_decay + self.filtered_error * (self.cached_ki / self.sample_rate);
+        self.integrator = self.integrator.clamp(-1000.0, 1000.0);
 
-        let correction = self.cached_kp * self.filtered_error + self.integrator;
+        let overtrack_amount = (self.track_speed - 0.7).max(0.0) * 3.3;
+        let overtrack_resonance = 1.0 + overtrack_amount * (1.0 - self.damping);
+        let correction = (self.cached_kp * self.filtered_error + self.integrator) * overtrack_resonance;
 
-        let target_freq = self.base_freq * self.mult + correction;
+        let glide_amount = (0.5 - self.track_speed).max(0.0) * 2.0;
+        let glide_alpha = 0.001 + (1.0 - glide_amount) * 0.05;
+        let target_freq = self.base_freq * self.mult;
+        self.freq_slew_state = self.freq_slew_state * (1.0 - glide_alpha) + target_freq * glide_alpha;
+        let base_target = if glide_amount > 0.01 { self.freq_slew_state } else { target_freq };
 
-        let freq_jitter = (rand_01() as f64 - 0.5) * 0.002 * self.base_freq;
-        let nyquist = 0.48 * self.sample_rate;
-        let freq_control = (target_freq + freq_jitter).clamp(20.0, nyquist);
+        let corrected_freq = base_target + correction;
 
-        self.phase += freq_control / self.sample_rate;
+        if overtrack_amount > 0.01 {
+            let overshoot = (correction / self.base_freq.max(20.0)).abs();
+            self.overtrack_state = self.overtrack_state * 0.99 + overshoot * 0.01;
+            let burst = self.overtrack_state * overtrack_amount * 100.0 * (1.0 - self.damping);
+            let burst_freq = corrected_freq + burst * (if self.filtered_error > 0.0 { 1.0 } else { -1.0 });
+            let nyquist = 0.48 * self.sample_rate;
+            self.phase += burst_freq.clamp(20.0, nyquist) / self.sample_rate;
+        } else {
+            let nyquist = 0.48 * self.sample_rate;
+            self.phase += corrected_freq.clamp(20.0, nyquist) / self.sample_rate;
+        }
+
         if self.phase >= 1.0 {
             self.phase -= 1.0;
+        } else if self.phase < 0.0 {
+            self.phase += 1.0;
         }
 
         let clean = (self.phase * 2.0 * PI).sin();
         let colored = ((self.phase * self.mult) * 2.0 * PI).sin();
-        let saturated = colored + 0.3 * colored.powi(3);
+        let saturated = colored + 0.25 * colored.powi(3);
         let colored_out = saturated.clamp(-1.0, 1.0);
 
-        clean * (1.0 - self.color_x) + colored_out * self.color_x
+        let raw_output = clean * (1.0 - self.color_x) + colored_out * self.color_x;
+
+        let dc_coeff = 0.998;
+        let dc_blocked = raw_output - self.dc_x_prev + dc_coeff * self.dc_y_prev;
+        self.dc_x_prev = raw_output;
+        self.dc_y_prev = dc_blocked;
+
+        dc_blocked.clamp(-1.0, 1.0)
     }
 }
