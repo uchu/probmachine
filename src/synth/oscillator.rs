@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use synfx_dsp::{VPSOscillator, PolyBlepOscillator, rand_01};
 
 #[derive(Clone, Copy, PartialEq)]

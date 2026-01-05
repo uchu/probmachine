@@ -187,10 +187,132 @@ impl PresetManager {
         self.banks = create_default_presets();
         self.modified = true;
     }
+
+    pub fn export_preset(&self, bank: Bank, index: usize, path: &std::path::Path) -> Result<(), String> {
+        if index >= 16 {
+            return Err("Invalid preset index".to_string());
+        }
+
+        let preset = &self.banks[bank as usize].presets[index];
+        let json = serde_json::to_string_pretty(preset)
+            .map_err(|e| format!("Failed to serialize preset: {}", e))?;
+
+        std::fs::write(path, json)
+            .map_err(|e| format!("Failed to write preset file: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn import_preset(&mut self, bank: Bank, index: usize, path: &std::path::Path) -> Result<(), String> {
+        if index >= 16 {
+            return Err("Invalid preset index".to_string());
+        }
+
+        let json = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read preset file: {}", e))?;
+
+        let preset: Preset = serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to parse preset file: {}", e))?;
+
+        self.banks[bank as usize].presets[index] = preset;
+        self.modified = true;
+        Ok(())
+    }
+
+    pub fn export_bank(&self, bank: Bank, path: &std::path::Path) -> Result<(), String> {
+        let bank_data = &self.banks[bank as usize];
+        let json = serde_json::to_string_pretty(bank_data)
+            .map_err(|e| format!("Failed to serialize bank: {}", e))?;
+
+        std::fs::write(path, json)
+            .map_err(|e| format!("Failed to write bank file: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn import_bank(&mut self, bank: Bank, path: &std::path::Path) -> Result<(), String> {
+        let json = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read bank file: {}", e))?;
+
+        let bank_data: PresetBank = serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to parse bank file: {}", e))?;
+
+        self.banks[bank as usize] = bank_data;
+        self.modified = true;
+        Ok(())
+    }
+
+    pub fn export_all_banks(&self, path: &std::path::Path) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(&self.banks)
+            .map_err(|e| format!("Failed to serialize banks: {}", e))?;
+
+        std::fs::write(path, json)
+            .map_err(|e| format!("Failed to write banks file: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn import_all_banks(&mut self, path: &std::path::Path) -> Result<(), String> {
+        let json = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read banks file: {}", e))?;
+
+        let banks: [PresetBank; 4] = serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to parse banks file: {}", e))?;
+
+        self.banks = banks;
+        self.modified = true;
+        Ok(())
+    }
+
+    pub fn preset_to_json(&self, bank: Bank, index: usize) -> Result<String, String> {
+        if index >= 16 {
+            return Err("Invalid preset index".to_string());
+        }
+
+        let preset = &self.banks[bank as usize].presets[index];
+        serde_json::to_string_pretty(preset)
+            .map_err(|e| format!("Failed to serialize preset: {}", e))
+    }
+
+    pub fn preset_from_json(&mut self, bank: Bank, index: usize, json: &str) -> Result<(), String> {
+        if index >= 16 {
+            return Err("Invalid preset index".to_string());
+        }
+
+        let preset: Preset = serde_json::from_str(json)
+            .map_err(|e| format!("Failed to parse preset: {}", e))?;
+
+        self.banks[bank as usize].presets[index] = preset;
+        self.modified = true;
+        Ok(())
+    }
 }
 
 impl Default for PresetManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_factory_presets_to_json() {
+        let banks = create_default_presets();
+        let project_root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let presets_dir = std::path::PathBuf::from(&project_root).join("assets/presets");
+
+        std::fs::create_dir_all(&presets_dir).unwrap();
+
+        let bank_names = ["factory_bank_a", "factory_bank_b", "factory_bank_c", "factory_bank_d"];
+
+        for (i, bank) in banks.iter().enumerate() {
+            let path = presets_dir.join(format!("{}.json", bank_names[i]));
+            let json = serde_json::to_string_pretty(bank).unwrap();
+            std::fs::write(&path, json).unwrap();
+            println!("Exported {} to {:?}", bank_names[i], path);
+        }
     }
 }

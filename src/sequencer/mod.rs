@@ -55,6 +55,18 @@ impl Sequencer {
         (seconds_per_bar * sample_rate) as usize
     }
 
+    pub fn get_bpm(&self) -> f64 {
+        self.tempo_bpm
+    }
+
+    #[allow(dead_code)]
+    pub fn set_bpm(&mut self, bpm: f64) {
+        if (bpm - self.tempo_bpm).abs() > 0.01 {
+            self.tempo_bpm = bpm;
+            self.bar_length_samples = Self::calculate_bar_length_samples(self.sample_rate, bpm);
+        }
+    }
+
     fn hash_params(params: &DeviceParams) -> u64 {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};

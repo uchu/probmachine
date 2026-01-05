@@ -5,6 +5,7 @@ mod preset;
 mod ui;
 mod synth;
 mod sequencer;
+mod midi;
 
 use egui_taffy::taffy::{
     prelude::*,
@@ -17,11 +18,13 @@ use params::DeviceParams;
 use std::sync::Arc;
 use ui::{Page, SharedUiState};
 use synth::SynthEngine;
+use midi::MidiCCState;
 
 pub struct Device {
     params: Arc<DeviceParams>,
     synth_engine: Option<SynthEngine>,
     ui_state: Arc<SharedUiState>,
+    midi_state: MidiCCState,
 }
 
 impl Default for Device {
@@ -30,6 +33,7 @@ impl Default for Device {
             params: Arc::new(DeviceParams::default()),
             synth_engine: None,
             ui_state: Arc::new(SharedUiState::new()),
+            midi_state: MidiCCState::new(),
         }
     }
 }
@@ -49,7 +53,7 @@ impl Plugin for Device {
         names: PortNames::const_default(),
     }];
 
-    const MIDI_INPUT: MidiConfig = MidiConfig::None;
+    const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::None;
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
@@ -128,10 +132,13 @@ impl Plugin for Device {
         &mut self,
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
-        _context: &mut impl ProcessContext<Self>,
+        context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        while let Some(event) = context.next_event() {
+            midi::process_midi_event(event, &mut self.midi_state, &self.params);
+        }
+
         if let Some(synth) = &mut self.synth_engine {
-            // Update note pool and strength values from UI
             if let Ok(note_pool) = self.ui_state.note_pool.lock() {
                 synth.update_note_pool(note_pool.clone());
             }
@@ -150,19 +157,18 @@ impl Plugin for Device {
 
             synth.set_vps_stereo_v_offset(self.params.synth_osc_stereo_v_offset.modulated_plain_value());
 
-            synth.set_sub_params(
-                self.params.synth_sub_volume.modulated_plain_value(),
-                self.params.synth_sub_octave.value(),
-                self.params.synth_sub_shape.modulated_plain_value(),
+            synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
+
+            synth.set_pll_fm_params(
+                self.params.synth_pll_fm_amount.modulated_plain_value(),
+                self.params.synth_pll_fm_ratio.value(),
             );
 
-            synth.set_polyblep_params(
-                self.params.synth_polyblep_volume.modulated_plain_value(),
-                self.params.synth_polyblep_pulse_width.modulated_plain_value(),
-                self.params.synth_polyblep_octave.value(),
+            synth.set_formant_params(
+                self.params.synth_formant_mix.modulated_plain_value(),
+                self.params.synth_formant_vowel.modulated_plain_value(),
+                self.params.synth_formant_shift.modulated_plain_value(),
             );
-
-            synth.set_polyblep_stereo_width(self.params.synth_polyblep_stereo_width.modulated_plain_value());
 
             synth.set_pll_ref_params(
                 self.params.synth_pll_ref_octave.value(),
@@ -193,17 +199,11 @@ impl Plugin for Device {
 
             synth.set_pll_stereo_damp_offset(self.params.synth_pll_stereo_damp_offset.modulated_plain_value());
 
-            synth.set_pll_distortion_params(
-                self.params.synth_pll_distortion_amount.modulated_plain_value(),
-                self.params.synth_pll_distortion_threshold.modulated_plain_value(),
-            );
+            synth.set_pll_distortion(self.params.synth_pll_distortion_amount.modulated_plain_value());
 
             synth.set_pll_glide(self.params.synth_pll_glide.modulated_plain_value());
 
-            synth.set_distortion_params(
-                self.params.synth_distortion_amount.modulated_plain_value(),
-                self.params.synth_distortion_threshold.modulated_plain_value(),
-            );
+            synth.set_distortion(self.params.synth_distortion_amount.modulated_plain_value());
 
             let filter_mode = self.params.synth_filter_mode.value();
             synth.set_filter_params(
@@ -253,7 +253,47 @@ impl Plugin for Device {
                 self.params.synth_reverb_diffusion_mix.modulated_plain_value(),
                 self.params.synth_reverb_diffusion.modulated_plain_value(),
                 self.params.synth_reverb_decay.modulated_plain_value(),
+                self.params.synth_reverb_ducking.modulated_plain_value(),
             );
+
+            // LFO 1 params
+            synth.set_lfo_params(
+                0,
+                self.params.lfo1_rate.modulated_plain_value(),
+                self.params.lfo1_waveform.value(),
+                self.params.lfo1_tempo_sync.value(),
+                self.params.lfo1_sync_division.value(),
+                self.params.lfo1_sync_source.value(),
+                self.params.lfo1_phase_mod.modulated_plain_value(),
+            );
+            synth.set_lfo_modulation(0, 0, self.params.lfo1_dest1.value(), self.params.lfo1_amount1.modulated_plain_value());
+            synth.set_lfo_modulation(0, 1, self.params.lfo1_dest2.value(), self.params.lfo1_amount2.modulated_plain_value());
+
+            // LFO 2 params
+            synth.set_lfo_params(
+                1,
+                self.params.lfo2_rate.modulated_plain_value(),
+                self.params.lfo2_waveform.value(),
+                self.params.lfo2_tempo_sync.value(),
+                self.params.lfo2_sync_division.value(),
+                self.params.lfo2_sync_source.value(),
+                self.params.lfo2_phase_mod.modulated_plain_value(),
+            );
+            synth.set_lfo_modulation(1, 0, self.params.lfo2_dest1.value(), self.params.lfo2_amount1.modulated_plain_value());
+            synth.set_lfo_modulation(1, 1, self.params.lfo2_dest2.value(), self.params.lfo2_amount2.modulated_plain_value());
+
+            // LFO 3 params
+            synth.set_lfo_params(
+                2,
+                self.params.lfo3_rate.modulated_plain_value(),
+                self.params.lfo3_waveform.value(),
+                self.params.lfo3_tempo_sync.value(),
+                self.params.lfo3_sync_division.value(),
+                self.params.lfo3_sync_source.value(),
+                self.params.lfo3_phase_mod.modulated_plain_value(),
+            );
+            synth.set_lfo_modulation(2, 0, self.params.lfo3_dest1.value(), self.params.lfo3_amount1.modulated_plain_value());
+            synth.set_lfo_modulation(2, 1, self.params.lfo3_dest2.value(), self.params.lfo3_amount2.modulated_plain_value());
 
             let mut output_l = vec![0.0; buffer.samples()];
             let mut output_r = vec![0.0; buffer.samples()];

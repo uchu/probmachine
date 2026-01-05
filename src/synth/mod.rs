@@ -4,9 +4,12 @@ mod oscillator;
 mod filter;
 mod envelope;
 mod reverb;
+mod formant;
 mod voice;
+pub mod lfo;
 
 pub use voice::Voice;
+pub use lfo::LfoBank;
 use crate::sequencer::Sequencer;
 use crate::params::DeviceParams;
 
@@ -14,6 +17,7 @@ pub struct SynthEngine {
     voice: Voice,
     sequencer: Sequencer,
     pll_feedback: f64,
+    pub lfo_bank: LfoBank,
 }
 
 impl SynthEngine {
@@ -26,6 +30,7 @@ impl SynthEngine {
             voice,
             sequencer: Sequencer::new(sample_rate_f64, 120.0),
             pll_feedback: 0.0,
+            lfo_bank: LfoBank::new(sample_rate_f64),
         }
     }
 
@@ -45,14 +50,6 @@ impl SynthEngine {
         self.voice.set_vps_stereo_v_offset(offset as f64);
     }
 
-    pub fn set_polyblep_params(&mut self, volume: f32, pulse_width: f32, octave: i32) {
-        self.voice.set_polyblep_params(volume as f64, pulse_width as f64, octave);
-    }
-
-    pub fn set_polyblep_stereo_width(&mut self, width: f32) {
-        self.voice.set_polyblep_stereo_width(width as f64);
-    }
-
     pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f32, pulse_width: f32) {
         self.voice.set_pll_ref_params(octave, tune, fine_tune as f64, pulse_width as f64);
     }
@@ -69,20 +66,28 @@ impl SynthEngine {
         self.voice.set_pll_stereo_damp_offset(offset as f64);
     }
 
-    pub fn set_pll_distortion_params(&mut self, amount: f32, threshold: f32) {
-        self.voice.set_pll_distortion_params(amount as f64, threshold as f64);
+    pub fn set_pll_distortion(&mut self, amount: f32) {
+        self.voice.set_pll_distortion(amount as f64);
     }
 
     pub fn set_pll_glide(&mut self, glide_ms: f32) {
         self.voice.set_glide_time(glide_ms as f64);
     }
 
-    pub fn set_sub_params(&mut self, volume: f32, octave: i32, shape: f32) {
-        self.voice.set_sub_params(volume as f64, octave, shape as f64);
+    pub fn set_pll_fm_params(&mut self, amount: f32, ratio: i32) {
+        self.voice.set_pll_fm_params(amount as f64, ratio);
     }
 
-    pub fn set_distortion_params(&mut self, amount: f32, threshold: f32) {
-        self.voice.set_distortion_params(amount as f64, threshold as f64);
+    pub fn set_sub_volume(&mut self, volume: f32) {
+        self.voice.set_sub_volume(volume as f64);
+    }
+
+    pub fn set_distortion(&mut self, amount: f32) {
+        self.voice.set_distortion(amount as f64);
+    }
+
+    pub fn set_formant_params(&mut self, mix: f32, vowel: f32, shift: f32) {
+        self.voice.set_formant_params(mix as f64, vowel as f64, shift as f64);
     }
 
     pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
@@ -126,6 +131,7 @@ impl SynthEngine {
         input_diffusion_mix: f32,
         diffusion: f32,
         decay: f32,
+        ducking: f32,
     ) {
         self.voice.set_reverb_params(
             mix as f64,
@@ -141,10 +147,49 @@ impl SynthEngine {
             input_diffusion_mix as f64,
             diffusion as f64,
             decay as f64,
+            ducking as f64,
         );
     }
 
+    pub fn set_lfo_params(
+        &mut self,
+        lfo_idx: usize,
+        rate: f32,
+        waveform: i32,
+        tempo_sync: bool,
+        sync_division: i32,
+        sync_source: i32,
+        phase_mod_amount: f32,
+    ) {
+        self.lfo_bank.set_lfo_params(
+            lfo_idx,
+            rate as f64,
+            waveform,
+            tempo_sync,
+            sync_division,
+            sync_source,
+            phase_mod_amount as f64,
+        );
+    }
+
+    pub fn set_lfo_modulation(
+        &mut self,
+        lfo_idx: usize,
+        slot: usize,
+        destination: i32,
+        amount: f32,
+    ) {
+        self.lfo_bank.set_modulation(lfo_idx, slot, destination, amount as f64);
+    }
+
+    #[allow(dead_code)]
+    pub fn get_lfo_output(&self, idx: usize) -> f32 {
+        self.lfo_bank.get_lfo_output(idx) as f32
+    }
+
     pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams, feedback_amount: f32, _base_freq: f32) {
+        let bpm = self.sequencer.get_bpm();
+
         for (l, r) in output_l.iter_mut().zip(output_r.iter_mut()) {
             let (should_trigger, should_release, frequency) = self.sequencer.update(params);
 
@@ -156,6 +201,12 @@ impl SynthEngine {
             if should_release {
                 self.voice.release();
             }
+
+            // Process LFOs and get modulation values
+            let mod_values = self.lfo_bank.process(bpm);
+
+            // Apply modulation to voice
+            self.voice.apply_modulation(&mod_values);
 
             let (left_sample, right_sample) = self.voice.process(self.pll_feedback);
 

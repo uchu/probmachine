@@ -5,22 +5,44 @@ use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator};
 use super::filter::MoogFilter;
 use super::envelope::Envelope;
 use super::reverb::StereoReverb;
+use super::formant::FormantFilter;
+use super::lfo::ModulationValues;
+
+struct SineOscillator {
+    phase: f64,
+    sample_rate: f64,
+}
+
+impl SineOscillator {
+    fn new(sample_rate: f64) -> Self {
+        Self { phase: 0.0, sample_rate }
+    }
+
+    fn next(&mut self, freq: f64) -> f64 {
+        let output = (self.phase * std::f64::consts::TAU).sin();
+        self.phase += freq / self.sample_rate;
+        if self.phase >= 1.0 {
+            self.phase -= 1.0;
+        }
+        output
+    }
+}
 
 pub struct Voice {
     // ===== Oscillators =====
     vps_oscillator_left: Oscillator,
     vps_oscillator_right: Oscillator,
-    polyblep_oscillator_left: PolyBlepWrapper,
-    polyblep_oscillator_right: PolyBlepWrapper,
-    sub_oscillator_sine: PolyBlepWrapper,
-    sub_oscillator_square: PolyBlepWrapper,
+    sub_oscillator: SineOscillator,
     pll_oscillator_left: PLLOscillator,
     pll_oscillator_right: PLLOscillator,
     pll_reference_oscillator: PolyBlepWrapper,
+    fm_oscillator: PolyBlepWrapper,
 
     // ===== Processing =====
     filter_left: MoogFilter,
     filter_right: MoogFilter,
+    formant_filter_left: FormantFilter,
+    formant_filter_right: FormantFilter,
     volume_envelope: Envelope,
     filter_envelope: Envelope,
     oversampling_left: Oversampling<4>,
@@ -41,16 +63,8 @@ pub struct Voice {
     vps_volume: f64,
     vps_stereo_v_offset: f64,
 
-    // ===== PolyBLEP Pulse =====
-    polyblep_volume: f64,
-    polyblep_pulse_width: f64,
-    polyblep_octave: i32,
-    polyblep_stereo_width: f64,
-
     // ===== Sub Oscillator =====
     sub_volume: f64,
-    sub_octave: i32,
-    sub_shape: f64,
 
     // ===== PLL =====
     pll_volume: f64,
@@ -60,9 +74,12 @@ pub struct Voice {
     pll_feedback_amount: f64,
     pll_feedback_state: f64,
     pll_distortion_amount: f64,
-    pll_distortion_threshold: f64,
     pll_mode_is_edge: bool,
     pll_colored: bool,
+
+    // ===== PLL FM =====
+    pll_fm_amount: f64,
+    pll_fm_ratio: i32,
 
     // ===== PLL Reference =====
     pll_ref_octave: i32,
@@ -70,9 +87,15 @@ pub struct Voice {
     pll_ref_fine_tune_cents: f64,
     pll_ref_pulse_width: f64,
 
-    // ===== Distortion =====
+    // ===== Formant =====
+    formant_mix: f64,
+    #[allow(dead_code)]
+    formant_vowel: f64,
+    #[allow(dead_code)]
+    formant_shift: f64,
+
+    // ===== VPS Distortion =====
     distortion_amount: f64,
-    distortion_threshold: f64,
 
     // ===== Filter =====
     filter_enabled: bool,
@@ -111,10 +134,33 @@ pub struct Voice {
     pll_influence_slew: SlewValue<f64>,
     pll_feedback_slew: SlewValue<f64>,
     pll_dist_amount_slew: SlewValue<f64>,
-    pll_dist_thresh_slew: SlewValue<f64>,
     pll_fine_tune_slew: SlewValue<f64>,
     pll_pulse_width_slew: SlewValue<f64>,
     pll_stereo_offset_slew: SlewValue<f64>,
+    pll_fm_amount_slew: SlewValue<f64>,
+
+    // VPS slew limiters
+    vps_d_slew: SlewValue<f64>,
+    vps_v_slew: SlewValue<f64>,
+    vps_volume_slew: SlewValue<f64>,
+    vps_stereo_offset_slew: SlewValue<f64>,
+    vps_dist_slew: SlewValue<f64>,
+
+    // Sub slew
+    sub_volume_slew: SlewValue<f64>,
+
+    // Formant slew
+    formant_mix_slew: SlewValue<f64>,
+    formant_vowel_slew: SlewValue<f64>,
+    formant_shift_slew: SlewValue<f64>,
+
+    // Filter slew - not used since nih_plug parameters have built-in smoothing
+    #[allow(dead_code)]
+    filter_cutoff_slew: SlewValue<f64>,
+    #[allow(dead_code)]
+    filter_resonance_slew: SlewValue<f64>,
+    #[allow(dead_code)]
+    filter_drive_slew: SlewValue<f64>,
 
     // ===== Target Values =====
     glide_time_ms: f64,
@@ -125,10 +171,62 @@ pub struct Voice {
     target_pll_influence: f64,
     target_pll_feedback: f64,
     target_pll_dist_amount: f64,
-    target_pll_dist_thresh: f64,
     target_pll_fine_tune: f64,
     target_pll_pulse_width: f64,
     target_pll_stereo_offset: f64,
+    target_pll_fm_amount: f64,
+    target_vps_d: f64,
+    target_vps_v: f64,
+    target_vps_volume: f64,
+    target_vps_stereo_offset: f64,
+    target_vps_dist: f64,
+    target_sub_volume: f64,
+    target_formant_mix: f64,
+    target_formant_vowel: f64,
+    target_formant_shift: f64,
+    target_filter_cutoff: f64,
+    target_filter_resonance: f64,
+    target_filter_drive: f64,
+
+    // ===== Modulation Offsets (applied per-sample from LFOs) =====
+    mod_pll_damping: f64,
+    mod_pll_influence: f64,
+    mod_pll_track_speed: f64,
+    mod_pll_feedback: f64,
+    mod_pll_fm_amount: f64,
+    mod_pll_pulse_width: f64,
+    mod_vps_d: f64,
+    mod_vps_v: f64,
+    mod_filter_cutoff: f64,
+    mod_filter_resonance: f64,
+    mod_filter_drive: f64,
+    mod_formant_vowel: f64,
+    mod_formant_shift: f64,
+    mod_reverb_mix: f64,
+    mod_reverb_decay: f64,
+    mod_pll_volume: f64,
+    mod_vps_volume: f64,
+    mod_sub_volume: f64,
+
+    // Slews for modulation (critical for smooth, crackle-free modulation)
+    mod_slew_pll_damping: SlewValue<f64>,
+    mod_slew_pll_influence: SlewValue<f64>,
+    mod_slew_pll_track: SlewValue<f64>,
+    mod_slew_pll_feedback: SlewValue<f64>,
+    mod_slew_pll_fm: SlewValue<f64>,
+    mod_slew_pll_pw: SlewValue<f64>,
+    mod_slew_vps_d: SlewValue<f64>,
+    mod_slew_vps_v: SlewValue<f64>,
+    mod_slew_filter_cut: SlewValue<f64>,
+    mod_slew_filter_res: SlewValue<f64>,
+    mod_slew_filter_drv: SlewValue<f64>,
+    mod_slew_formant_vow: SlewValue<f64>,
+    mod_slew_formant_shf: SlewValue<f64>,
+    mod_slew_rev_mix: SlewValue<f64>,
+    mod_slew_rev_decay: SlewValue<f64>,
+    mod_slew_pll_vol: SlewValue<f64>,
+    mod_slew_vps_vol: SlewValue<f64>,
+    mod_slew_sub_vol: SlewValue<f64>,
 }
 
 impl Voice {
@@ -141,19 +239,25 @@ impl Voice {
         let sample_rate_f64 = sample_rate as f64;
         let oversampled_rate = sample_rate_f64 * 4.0;
 
+        let make_slew = || {
+            let mut s = SlewValue::new();
+            s.set_sample_rate(sample_rate_f64);
+            s
+        };
+
         Self {
             vps_oscillator_left: Oscillator::new(oversampled_rate),
             vps_oscillator_right: Oscillator::new(oversampled_rate),
-            polyblep_oscillator_left: PolyBlepWrapper::new(oversampled_rate),
-            polyblep_oscillator_right: PolyBlepWrapper::new(oversampled_rate),
-            sub_oscillator_sine: PolyBlepWrapper::new(oversampled_rate),
-            sub_oscillator_square: PolyBlepWrapper::new(oversampled_rate),
+            sub_oscillator: SineOscillator::new(oversampled_rate),
             pll_oscillator_left: PLLOscillator::new(oversampled_rate),
             pll_oscillator_right: PLLOscillator::new(oversampled_rate),
             pll_reference_oscillator: PolyBlepWrapper::new(oversampled_rate),
+            fm_oscillator: PolyBlepWrapper::new(oversampled_rate),
 
             filter_left: MoogFilter::new(oversampled_rate),
             filter_right: MoogFilter::new(oversampled_rate),
+            formant_filter_left: FormantFilter::new(oversampled_rate),
+            formant_filter_right: FormantFilter::new(oversampled_rate),
             volume_envelope: Envelope::new(sample_rate_f64),
             filter_envelope: Envelope::new(sample_rate_f64),
             oversampling_left,
@@ -170,14 +274,7 @@ impl Voice {
             vps_volume: 1.0,
             vps_stereo_v_offset: 0.0,
 
-            polyblep_volume: 0.0,
-            polyblep_pulse_width: 0.5,
-            polyblep_octave: 0,
-            polyblep_stereo_width: 0.0,
-
             sub_volume: 0.0,
-            sub_octave: -1,
-            sub_shape: 0.0,
 
             pll_volume: 0.0,
             pll_track_speed: 0.5,
@@ -186,17 +283,22 @@ impl Voice {
             pll_feedback_amount: 0.0,
             pll_feedback_state: 0.0,
             pll_distortion_amount: 0.0,
-            pll_distortion_threshold: 0.9,
             pll_mode_is_edge: false,
             pll_colored: false,
+
+            pll_fm_amount: 0.0,
+            pll_fm_ratio: 1,
 
             pll_ref_octave: 0,
             pll_ref_tune_semitones: 0,
             pll_ref_fine_tune_cents: 0.0,
             pll_ref_pulse_width: 0.5,
 
+            formant_mix: 0.0,
+            formant_vowel: 0.0,
+            formant_shift: 0.0,
+
             distortion_amount: 0.0,
-            distortion_threshold: 0.9,
 
             filter_enabled: true,
             filter_cutoff: 1000.0,
@@ -223,17 +325,29 @@ impl Voice {
 
             reverb: StereoReverb::new(oversampled_rate as f32),
 
-            freq_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_volume_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_track_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_damping_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_influence_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_feedback_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_dist_amount_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_dist_thresh_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_fine_tune_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_pulse_width_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
-            pll_stereo_offset_slew: { let mut s = SlewValue::new(); s.set_sample_rate(sample_rate_f64); s },
+            freq_slew: make_slew(),
+            pll_volume_slew: make_slew(),
+            pll_track_slew: make_slew(),
+            pll_damping_slew: make_slew(),
+            pll_influence_slew: make_slew(),
+            pll_feedback_slew: make_slew(),
+            pll_dist_amount_slew: make_slew(),
+            pll_fine_tune_slew: make_slew(),
+            pll_pulse_width_slew: make_slew(),
+            pll_stereo_offset_slew: make_slew(),
+            pll_fm_amount_slew: make_slew(),
+            vps_d_slew: make_slew(),
+            vps_v_slew: make_slew(),
+            vps_volume_slew: make_slew(),
+            vps_stereo_offset_slew: make_slew(),
+            vps_dist_slew: make_slew(),
+            sub_volume_slew: make_slew(),
+            formant_mix_slew: make_slew(),
+            formant_vowel_slew: make_slew(),
+            formant_shift_slew: make_slew(),
+            filter_cutoff_slew: make_slew(),
+            filter_resonance_slew: make_slew(),
+            filter_drive_slew: make_slew(),
 
             glide_time_ms: 0.0,
             target_frequency: 220.0,
@@ -243,10 +357,60 @@ impl Voice {
             target_pll_influence: 0.5,
             target_pll_feedback: 0.0,
             target_pll_dist_amount: 0.0,
-            target_pll_dist_thresh: 0.9,
             target_pll_fine_tune: 0.0,
             target_pll_pulse_width: 0.5,
             target_pll_stereo_offset: 0.0,
+            target_pll_fm_amount: 0.0,
+            target_vps_d: 0.5,
+            target_vps_v: 0.5,
+            target_vps_volume: 1.0,
+            target_vps_stereo_offset: 0.0,
+            target_vps_dist: 0.0,
+            target_sub_volume: 0.0,
+            target_formant_mix: 0.0,
+            target_formant_vowel: 0.0,
+            target_formant_shift: 0.0,
+            target_filter_cutoff: 1000.0,
+            target_filter_resonance: 0.0,
+            target_filter_drive: 1.0,
+
+            mod_pll_damping: 0.0,
+            mod_pll_influence: 0.0,
+            mod_pll_track_speed: 0.0,
+            mod_pll_feedback: 0.0,
+            mod_pll_fm_amount: 0.0,
+            mod_pll_pulse_width: 0.0,
+            mod_vps_d: 0.0,
+            mod_vps_v: 0.0,
+            mod_filter_cutoff: 0.0,
+            mod_filter_resonance: 0.0,
+            mod_filter_drive: 0.0,
+            mod_formant_vowel: 0.0,
+            mod_formant_shift: 0.0,
+            mod_reverb_mix: 0.0,
+            mod_reverb_decay: 0.0,
+            mod_pll_volume: 0.0,
+            mod_vps_volume: 0.0,
+            mod_sub_volume: 0.0,
+
+            mod_slew_pll_damping: make_slew(),
+            mod_slew_pll_influence: make_slew(),
+            mod_slew_pll_track: make_slew(),
+            mod_slew_pll_feedback: make_slew(),
+            mod_slew_pll_fm: make_slew(),
+            mod_slew_pll_pw: make_slew(),
+            mod_slew_vps_d: make_slew(),
+            mod_slew_vps_v: make_slew(),
+            mod_slew_filter_cut: make_slew(),
+            mod_slew_filter_res: make_slew(),
+            mod_slew_filter_drv: make_slew(),
+            mod_slew_formant_vow: make_slew(),
+            mod_slew_formant_shf: make_slew(),
+            mod_slew_rev_mix: make_slew(),
+            mod_slew_rev_decay: make_slew(),
+            mod_slew_pll_vol: make_slew(),
+            mod_slew_vps_vol: make_slew(),
+            mod_slew_sub_vol: make_slew(),
         }
     }
 
@@ -264,38 +428,24 @@ impl Voice {
     }
 
     pub fn set_osc_params(&mut self, d: f64, v: f64) {
-        self.vps_d_param = d;
-        self.vps_v_param = v;
-        self.vps_oscillator_left.set_params(d, v);
-        self.vps_oscillator_right.set_params(d, v);
+        self.target_vps_d = d;
+        self.target_vps_v = v;
     }
 
     pub fn set_vps_stereo_v_offset(&mut self, offset: f64) {
-        self.vps_stereo_v_offset = offset.clamp(0.0, 1.0);
+        self.target_vps_stereo_offset = offset.clamp(0.0, 1.0);
     }
 
     pub fn set_osc_volume(&mut self, volume: f64) {
-        self.vps_volume = volume;
+        self.target_vps_volume = volume;
     }
 
     pub fn set_osc_octave(&mut self, octave: i32) {
         self.vps_octave = octave;
     }
 
-    pub fn set_polyblep_params(&mut self, volume: f64, pulse_width: f64, octave: i32) {
-        self.polyblep_volume = volume;
-        self.polyblep_pulse_width = pulse_width;
-        self.polyblep_octave = octave;
-    }
-
-    pub fn set_polyblep_stereo_width(&mut self, width: f64) {
-        self.polyblep_stereo_width = width.clamp(0.0, 1.0);
-    }
-
-    pub fn set_sub_params(&mut self, volume: f64, octave: i32, shape: f64) {
-        self.sub_volume = volume;
-        self.sub_octave = octave;
-        self.sub_shape = shape;
+    pub fn set_sub_volume(&mut self, volume: f64) {
+        self.target_sub_volume = volume;
     }
 
     pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f64, pulse_width: f64) {
@@ -318,22 +468,31 @@ impl Voice {
         self.target_pll_volume = volume;
     }
 
-    pub fn set_pll_distortion_params(&mut self, amount: f64, threshold: f64) {
+    pub fn set_pll_distortion(&mut self, amount: f64) {
         self.target_pll_dist_amount = amount;
-        self.target_pll_dist_thresh = threshold;
     }
 
-    pub fn set_distortion_params(&mut self, amount: f64, threshold: f64) {
-        self.distortion_amount = amount;
-        self.distortion_threshold = threshold;
+    pub fn set_pll_fm_params(&mut self, amount: f64, ratio: i32) {
+        self.target_pll_fm_amount = amount;
+        self.pll_fm_ratio = ratio;
+    }
+
+    pub fn set_distortion(&mut self, amount: f64) {
+        self.target_vps_dist = amount;
+    }
+
+    pub fn set_formant_params(&mut self, mix: f64, vowel: f64, shift: f64) {
+        self.target_formant_mix = mix;
+        self.target_formant_vowel = vowel;
+        self.target_formant_shift = shift;
     }
 
     pub fn set_filter_params(&mut self, enabled: bool, cutoff: f64, resonance: f64, env_amount: f64, drive: f64, mode: i32) {
         self.filter_enabled = enabled;
-        self.filter_cutoff = cutoff;
-        self.filter_resonance = resonance;
+        self.target_filter_cutoff = cutoff;
+        self.target_filter_resonance = resonance;
         self.filter_envelope_amount = env_amount;
-        self.filter_drive = drive;
+        self.target_filter_drive = drive;
         self.filter_mode = mode;
     }
 
@@ -352,6 +511,7 @@ impl Voice {
         input_diffusion_mix: f64,
         diffusion: f64,
         decay: f64,
+        ducking: f64,
     ) {
         self.reverb.set_params(
             mix,
@@ -367,7 +527,33 @@ impl Voice {
             input_diffusion_mix,
             diffusion,
             decay,
+            ducking,
         );
+    }
+
+    pub fn apply_modulation(&mut self, mod_values: &ModulationValues) {
+        // Apply slew to all modulation values for smooth, crackle-free modulation
+        // Using fast slew (5ms) for responsive modulation while avoiding artifacts
+        const MOD_SLEW_MS: f64 = 5.0;
+
+        self.mod_pll_damping = self.mod_slew_pll_damping.next(mod_values.pll_damping, MOD_SLEW_MS);
+        self.mod_pll_influence = self.mod_slew_pll_influence.next(mod_values.pll_influence, MOD_SLEW_MS);
+        self.mod_pll_track_speed = self.mod_slew_pll_track.next(mod_values.pll_track_speed, MOD_SLEW_MS);
+        self.mod_pll_feedback = self.mod_slew_pll_feedback.next(mod_values.pll_feedback, MOD_SLEW_MS);
+        self.mod_pll_fm_amount = self.mod_slew_pll_fm.next(mod_values.pll_fm_amount, MOD_SLEW_MS);
+        self.mod_pll_pulse_width = self.mod_slew_pll_pw.next(mod_values.pll_pulse_width, MOD_SLEW_MS);
+        self.mod_vps_d = self.mod_slew_vps_d.next(mod_values.vps_d, MOD_SLEW_MS);
+        self.mod_vps_v = self.mod_slew_vps_v.next(mod_values.vps_v, MOD_SLEW_MS);
+        self.mod_filter_cutoff = self.mod_slew_filter_cut.next(mod_values.filter_cutoff, MOD_SLEW_MS);
+        self.mod_filter_resonance = self.mod_slew_filter_res.next(mod_values.filter_resonance, MOD_SLEW_MS);
+        self.mod_filter_drive = self.mod_slew_filter_drv.next(mod_values.filter_drive, MOD_SLEW_MS);
+        self.mod_formant_vowel = self.mod_slew_formant_vow.next(mod_values.formant_vowel, MOD_SLEW_MS);
+        self.mod_formant_shift = self.mod_slew_formant_shf.next(mod_values.formant_shift, MOD_SLEW_MS);
+        self.mod_reverb_mix = self.mod_slew_rev_mix.next(mod_values.reverb_mix, MOD_SLEW_MS);
+        self.mod_reverb_decay = self.mod_slew_rev_decay.next(mod_values.reverb_decay, MOD_SLEW_MS);
+        self.mod_pll_volume = self.mod_slew_pll_vol.next(mod_values.pll_volume, MOD_SLEW_MS);
+        self.mod_vps_volume = self.mod_slew_vps_vol.next(mod_values.vps_volume, MOD_SLEW_MS);
+        self.mod_sub_volume = self.mod_slew_sub_vol.next(mod_values.sub_volume, MOD_SLEW_MS);
     }
 
     pub fn set_volume(&mut self, volume: f64) {
@@ -442,30 +628,57 @@ impl Voice {
         self.filter_envelope.release();
     }
 
-
     pub fn process(&mut self, _pll_feedback: f64) -> (f64, f64) {
         let volume_env = self.volume_envelope.next();
         let filter_env = self.filter_envelope.next();
 
-        let cutoff = (self.filter_cutoff + filter_env * self.filter_envelope_amount)
-            .clamp(20.0, 20000.0);
-
+        // Slew all continuous parameters
         let glide_ms = if self.glide_time_ms > 0.5 { self.glide_time_ms } else { 0.5 };
         self.base_frequency = self.freq_slew.next(self.target_frequency, glide_ms / 500.0);
 
-        self.pll_volume = self.pll_volume_slew.next(self.target_pll_volume, 20.0);
-        self.pll_track_speed = self.pll_track_slew.next(self.target_pll_track, 20.0);
-        self.pll_damping = self.pll_damping_slew.next(self.target_pll_damping, 20.0);
-        let slewed_influence = self.pll_influence_slew.next(self.target_pll_influence, 20.0);
-        self.pll_feedback_amount = self.pll_feedback_slew.next(self.target_pll_feedback, 200.0);
+        // PLL slews + modulation
+        self.pll_volume = (self.pll_volume_slew.next(self.target_pll_volume, 20.0) + self.mod_pll_volume).clamp(0.0, 1.0);
+        self.pll_track_speed = (self.pll_track_slew.next(self.target_pll_track, 20.0) + self.mod_pll_track_speed).clamp(0.0, 1.0);
+        self.pll_damping = (self.pll_damping_slew.next(self.target_pll_damping, 20.0) + self.mod_pll_damping).clamp(0.0, 1.0);
+        let slewed_influence = (self.pll_influence_slew.next(self.target_pll_influence, 20.0) + self.mod_pll_influence).clamp(0.0, 1.0);
+        self.pll_feedback_amount = (self.pll_feedback_slew.next(self.target_pll_feedback, 200.0) + self.mod_pll_feedback).clamp(0.0, 1.0);
         self.pll_distortion_amount = self.pll_dist_amount_slew.next(self.target_pll_dist_amount, 20.0);
-        self.pll_distortion_threshold = self.pll_dist_thresh_slew.next(self.target_pll_dist_thresh, 20.0);
         self.pll_ref_fine_tune_cents = self.pll_fine_tune_slew.next(self.target_pll_fine_tune, 10.0);
-        self.pll_ref_pulse_width = self.pll_pulse_width_slew.next(self.target_pll_pulse_width, 20.0);
+        self.pll_ref_pulse_width = (self.pll_pulse_width_slew.next(self.target_pll_pulse_width, 20.0) + self.mod_pll_pulse_width).clamp(0.05, 0.95);
         self.pll_damping_stereo_offset = self.pll_stereo_offset_slew.next(self.target_pll_stereo_offset, 60.0);
+        self.pll_fm_amount = (self.pll_fm_amount_slew.next(self.target_pll_fm_amount, 20.0) + self.mod_pll_fm_amount).clamp(0.0, 1.0);
+
+        // VPS slews + modulation
+        self.vps_d_param = (self.vps_d_slew.next(self.target_vps_d, 20.0) + self.mod_vps_d).clamp(0.0, 1.0);
+        self.vps_v_param = (self.vps_v_slew.next(self.target_vps_v, 20.0) + self.mod_vps_v).clamp(0.0, 1.0);
+        self.vps_volume = (self.vps_volume_slew.next(self.target_vps_volume, 20.0) + self.mod_vps_volume).clamp(0.0, 1.0);
+        self.vps_stereo_v_offset = self.vps_stereo_offset_slew.next(self.target_vps_stereo_offset, 20.0);
+        self.distortion_amount = self.vps_dist_slew.next(self.target_vps_dist, 20.0);
+
+        // Sub slew + modulation
+        self.sub_volume = (self.sub_volume_slew.next(self.target_sub_volume, 20.0) + self.mod_sub_volume).clamp(0.0, 1.0);
+
+        // Formant slews + modulation
+        self.formant_mix = self.formant_mix_slew.next(self.target_formant_mix, 20.0);
+        let formant_vowel_mod = (self.formant_vowel_slew.next(self.target_formant_vowel, 30.0) + self.mod_formant_vowel).clamp(0.0, 1.0);
+        let formant_shift_mod = (self.formant_shift_slew.next(self.target_formant_shift, 20.0) + self.mod_formant_shift).clamp(-2.0, 2.0);
+
+        // Filter parameters - cutoff already smoothed by nih_plug parameter smoother
+        // Using target values directly to avoid double-smoothing issues
+        let cutoff_mod_hz = self.mod_filter_cutoff * 10000.0; // Scale modulation to ±10kHz
+        self.filter_cutoff = self.target_filter_cutoff;
+        self.filter_resonance = (self.target_filter_resonance + self.mod_filter_resonance).clamp(0.0, 0.99);
+        self.filter_drive = (self.target_filter_drive + self.mod_filter_drive).clamp(1.0, 15.0);
+
+        let cutoff = (self.filter_cutoff + filter_env * self.filter_envelope_amount + cutoff_mod_hz)
+            .clamp(20.0, 20000.0);
 
         self.pll_oscillator_left.prepare_block();
         self.pll_oscillator_right.prepare_block();
+
+        // Update formant filters with modulated vowel and shift
+        self.formant_filter_left.set_vowel(formant_vowel_mod, formant_shift_mod);
+        self.formant_filter_right.set_vowel(formant_vowel_mod, formant_shift_mod);
 
         let buf_l = self.oversampling_left.resample_buffer();
         let buf_r = self.oversampling_right.resample_buffer();
@@ -475,11 +688,10 @@ impl Voice {
             let mut mixed_oscillators_l = 0.0_f64;
             let mut mixed_oscillators_r = 0.0_f64;
 
-            // VPS Oscillators
-            if self.vps_volume > 0.0 {
+            // VPS Oscillators (no FM or formant applied)
+            if self.vps_volume > 0.001 {
                 let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave);
 
-                // When stereo offset is 0, use identical parameters for both channels
                 let use_stereo = self.vps_stereo_v_offset > 0.0001;
 
                 let v_left = if use_stereo {
@@ -500,66 +712,45 @@ impl Voice {
                 let raw_r = if use_stereo {
                     self.vps_oscillator_right.next(self.vps_d_param, v_right)
                 } else {
-                    raw_l // Use same output when no stereo
+                    raw_l
                 };
 
-                let distortion_gain = 0.1 + self.distortion_amount * 4.9;
-                let left = f_distort(distortion_gain as f32, self.distortion_threshold as f32, raw_l as f32) as f64;
-                let right = f_distort(distortion_gain as f32, self.distortion_threshold as f32, raw_r as f32) as f64;
+                // Distortion with fixed threshold 0.7
+                let distortion_gain = 1.0 + self.distortion_amount * 49.0;
+                let left = f_distort(distortion_gain as f32, 0.7, raw_l as f32) as f64;
+                let right = f_distort(distortion_gain as f32, 0.7, raw_r as f32) as f64;
 
                 mixed_oscillators_l += left * self.vps_volume * volume_env;
                 mixed_oscillators_r += right * self.vps_volume * volume_env;
             }
 
-            // PolyBLEP Oscillators
-            if self.polyblep_volume > 0.0 {
-                let base_freq = self.base_frequency * 2.0_f64.powi(self.polyblep_octave);
-
-                // When stereo width is 0, use identical parameters for both channels
-                let use_stereo = self.polyblep_stereo_width > 0.0001;
-
-                let detune_amount = if use_stereo { self.polyblep_stereo_width * 0.01 } else { 0.0 };
-                let pw_offset = if use_stereo { self.polyblep_stereo_width * 0.15 } else { 0.0 };
-
-                let pw_left = (self.polyblep_pulse_width - pw_offset).clamp(0.01, 0.99);
-                let pw_right = (self.polyblep_pulse_width + pw_offset).clamp(0.01, 0.99);
-
-                self.polyblep_oscillator_left.set_frequency(base_freq * (1.0 - detune_amount));
-                let raw_l = self.polyblep_oscillator_left.next(pw_left);
-
-                if use_stereo {
-                    self.polyblep_oscillator_right.set_frequency(base_freq * (1.0 + detune_amount));
-                    let raw_r = self.polyblep_oscillator_right.next(pw_right);
-                    mixed_oscillators_l += raw_l * self.polyblep_volume * volume_env;
-                    mixed_oscillators_r += raw_r * self.polyblep_volume * volume_env;
-                } else {
-                    // Use same output for both channels when no stereo
-                    let mono_out = raw_l * self.polyblep_volume * volume_env;
-                    mixed_oscillators_l += mono_out;
-                    mixed_oscillators_r += mono_out;
-                }
-            }
-
-            // PLL Oscillators
-            if self.pll_volume > 0.0 {
+            // PLL Oscillators with FM and Formant (both applied only to PLL)
+            if self.pll_volume > 0.001 {
                 let tune_oct = (self.pll_ref_tune_semitones as f64 + self.pll_ref_fine_tune_cents) / 12.0;
                 let ref_freq = self.base_frequency * 2.0_f64.powi(self.pll_ref_octave) * 2.0_f64.powf(tune_oct);
 
+                // FM modulation - modulate the reference frequency (only affects PLL)
+                let fm_freq = ref_freq * self.pll_fm_ratio as f64;
+                self.fm_oscillator.set_frequency(fm_freq);
+                let fm_signal = self.fm_oscillator.next_sin();
+                // FM index scaled for musical results
+                let fm_index = self.pll_fm_amount * 4.0 * self.pll_fm_ratio as f64;
+                let fm_mod = fm_signal * fm_index * ref_freq;
+
                 let fb_mod = feedback * self.pll_feedback_amount * 5.0;
-                let ref_mod = (ref_freq * (1.0 + fb_mod)).clamp(20.0, self.sample_rate * 2.0);
+                let ref_mod = ((ref_freq + fm_mod) * (1.0 + fb_mod)).clamp(20.0, self.sample_rate * 2.0);
 
                 self.pll_reference_oscillator.set_frequency(ref_mod);
                 let ref_pulse = self.pll_reference_oscillator.next(self.pll_ref_pulse_width);
                 let ref_phase = self.pll_reference_oscillator.get_phase();
 
-                // When stereo offset is 0, use identical parameters for both channels
                 let use_stereo = self.pll_damping_stereo_offset > 0.0001;
 
                 let damp_left = (self.pll_damping - self.pll_damping_stereo_offset).clamp(0.001, 1.0);
                 let damp_right = if use_stereo {
                     (self.pll_damping + self.pll_damping_stereo_offset).clamp(0.001, 1.0)
                 } else {
-                    damp_left // Use same damping for both when no stereo
+                    damp_left
                 };
 
                 let mode = if self.pll_mode_is_edge {
@@ -575,16 +766,25 @@ impl Voice {
                     self.pll_oscillator_right.set_params(self.pll_track_speed, damp_right, self.pll_multiplier, slewed_influence, self.pll_colored, mode);
                     self.pll_oscillator_right.next(ref_phase, ref_mod, ref_pulse)
                 } else {
-                    pll_raw_l // Use same output when no stereo
+                    pll_raw_l
                 };
 
-                let pll_dist_gain = 0.1 + self.pll_distortion_amount * 4.9;
-                let pll_out_l = f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_l as f32) as f64;
-                let pll_out_r = if use_stereo {
-                    f_distort(pll_dist_gain as f32, self.pll_distortion_threshold as f32, pll_raw_r as f32) as f64
+                // PLL Distortion with fixed threshold 0.7
+                let pll_dist_gain = 1.0 + self.pll_distortion_amount * 49.0;
+                let mut pll_out_l = f_distort(pll_dist_gain as f32, 0.7, pll_raw_l as f32) as f64;
+                let mut pll_out_r = if use_stereo {
+                    f_distort(pll_dist_gain as f32, 0.7, pll_raw_r as f32) as f64
                 } else {
-                    pll_out_l // Use same distorted output when no stereo
+                    pll_out_l
                 };
+
+                // Apply formant filter ONLY to PLL output
+                if self.formant_mix > 0.001 {
+                    let formant_l = self.formant_filter_left.process(pll_out_l);
+                    let formant_r = self.formant_filter_right.process(pll_out_r);
+                    pll_out_l = pll_out_l * (1.0 - self.formant_mix) + formant_l * self.formant_mix;
+                    pll_out_r = pll_out_r * (1.0 - self.formant_mix) + formant_r * self.formant_mix;
+                }
 
                 mixed_oscillators_l += pll_out_l * self.pll_volume * volume_env;
                 mixed_oscillators_r += pll_out_r * self.pll_volume * volume_env;
@@ -596,7 +796,7 @@ impl Voice {
             buf_r[i] = mixed_oscillators_r as f32;
         }
 
-        // Apply filter at oversampled rate (only if enabled)
+        // Apply filter at oversampled rate (always process when enabled to avoid crackling)
         if self.filter_enabled {
             self.filter_left.process_buffer(
                 unsafe { &mut *(buf_l.as_mut_ptr() as *mut [f32; 4]) },
@@ -614,7 +814,7 @@ impl Voice {
             );
         }
 
-        // Apply reverb at oversampled rate (processes the buffer in-place with dry/wet mix)
+        // Apply reverb at oversampled rate
         if self.reverb.mix > 0.0 {
             for i in 0..4 {
                 let dry_l = buf_l[i] as f64;
@@ -627,17 +827,12 @@ impl Voice {
             }
         }
 
-        // Add sub oscillator at oversampled rate (after reverb, so it's never processed through reverb)
-        if self.sub_volume > 0.0 {
-            let sub_freq = self.base_frequency * 2.0_f64.powi(self.sub_octave);
+        // Add sub oscillator at oversampled rate (pure sine at -1 octave)
+        // Sub is added after filter/reverb so it remains clean and punchy
+        if self.sub_volume > 0.001 {
+            let sub_freq = self.base_frequency * 0.5; // -1 octave
             for i in 0..4 {
-                self.sub_oscillator_sine.set_frequency(sub_freq);
-                self.sub_oscillator_square.set_frequency(sub_freq);
-                let sine_sample = self.sub_oscillator_sine.next_sin();
-                let square_sample = self.sub_oscillator_square.next(0.5);
-                let sub_sample = (sine_sample * (1.0 - self.sub_shape) + square_sample * self.sub_shape)
-                    * self.sub_volume * volume_env;
-
+                let sub_sample = self.sub_oscillator.next(sub_freq) * self.sub_volume * volume_env;
                 buf_l[i] += sub_sample as f32;
                 buf_r[i] += sub_sample as f32;
             }

@@ -16,6 +16,7 @@ enum BeatStrengthMode {
 struct StrengthState {
     beat_strength_mode: BeatStrengthMode,
     beat_strength_values: [u8; 96], // LCM of 32 and 24 = 96
+    last_preset_version: u64,
 }
 
 impl Default for StrengthState {
@@ -36,6 +37,15 @@ impl Default for StrengthState {
         Self {
             beat_strength_mode: BeatStrengthMode::Straight,
             beat_strength_values: values,
+            last_preset_version: 0,
+        }
+    }
+}
+
+fn sync_state_from_shared(state: &mut StrengthState, ui_state: &Arc<SharedUiState>) {
+    if let Ok(strength_values) = ui_state.strength_values.lock() {
+        for i in 0..96 {
+            state.beat_strength_values[i] = (strength_values[i] * 127.0) as u8;
         }
     }
 }
@@ -57,6 +67,7 @@ pub fn render(
     ui_state: &Arc<SharedUiState>,
 ) {
     let state_id = egui::Id::new("strength_state");
+    let current_version = ui_state.get_preset_version();
 
     tui.ui(|ui| {
         ui.add_space(12.0);
@@ -71,6 +82,13 @@ pub fn render(
     })
     .ui(|ui| {
         let mut state = ui.ctx().data_mut(|d| d.get_temp::<StrengthState>(state_id).unwrap_or_default());
+
+        if state.last_preset_version != current_version {
+            sync_state_from_shared(&mut state, ui_state);
+            state.last_preset_version = current_version;
+            ui.ctx().data_mut(|d| d.insert_temp(state_id, state.clone()));
+        }
+
         let state_before = state.clone();
 
         render_beat_strength(ui, &mut state);

@@ -71,6 +71,8 @@ pub struct StereoReverb {
     reverb: DattorroReverb,
     params: ReverbParams,
     pub mix: f64,
+    pub ducking: f64,
+    ducking_envelope: f64,
 }
 
 impl StereoReverb {
@@ -96,6 +98,8 @@ impl StereoReverb {
                 decay: 0.8,
             },
             mix: 0.0,
+            ducking: 0.0,
+            ducking_envelope: 0.0,
         }
     }
 
@@ -114,8 +118,10 @@ impl StereoReverb {
         input_diffusion_mix: f64,
         diffusion: f64,
         decay: f64,
+        ducking: f64,
     ) {
         self.mix = mix;
+        self.ducking = ducking;
         self.params.pre_delay_ms = pre_delay_ms;
         self.params.time_scale = time_scale;
         self.params.input_hpf_hz = input_hpf_hz;
@@ -134,6 +140,23 @@ impl StereoReverb {
 
     pub fn process(&mut self, left: f64, right: f64) -> (f64, f64) {
         let (wet_l, wet_r) = self.reverb.process(&mut self.params, left, right);
+
+        // Apply ducking - reduce reverb when dry signal is loud
+        if self.ducking > 0.001 {
+            let dry_level = (left.abs() + right.abs()) * 0.5;
+            // Envelope follower for smooth ducking
+            let attack = 0.01;
+            let release = 0.995;
+            if dry_level > self.ducking_envelope {
+                self.ducking_envelope = self.ducking_envelope * (1.0 - attack) + dry_level * attack;
+            } else {
+                self.ducking_envelope *= release;
+            }
+            // Apply ducking amount
+            let duck_factor = 1.0 - (self.ducking_envelope * self.ducking).min(0.95);
+            return (wet_l * duck_factor, wet_r * duck_factor);
+        }
+
         (wet_l, wet_r)
     }
 }

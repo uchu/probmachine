@@ -355,19 +355,18 @@ pub struct DeviceParams {
     pub synth_osc_octave: IntParam,
     #[id = "synth_sub_volume"]
     pub synth_sub_volume: FloatParam,
-    #[id = "synth_sub_octave"]
-    pub synth_sub_octave: IntParam,
-    #[id = "synth_sub_shape"]
-    pub synth_sub_shape: FloatParam,
 
-    #[id = "synth_polyblep_volume"]
-    pub synth_polyblep_volume: FloatParam,
-    #[id = "synth_polyblep_pulse_width"]
-    pub synth_polyblep_pulse_width: FloatParam,
-    #[id = "synth_polyblep_octave"]
-    pub synth_polyblep_octave: IntParam,
-    #[id = "synth_polyblep_stereo_width"]
-    pub synth_polyblep_stereo_width: FloatParam,
+    #[id = "synth_pll_fm_amount"]
+    pub synth_pll_fm_amount: FloatParam,
+    #[id = "synth_pll_fm_ratio"]
+    pub synth_pll_fm_ratio: IntParam,
+
+    #[id = "synth_formant_mix"]
+    pub synth_formant_mix: FloatParam,
+    #[id = "synth_formant_vowel"]
+    pub synth_formant_vowel: FloatParam,
+    #[id = "synth_formant_shift"]
+    pub synth_formant_shift: FloatParam,
 
     #[id = "synth_pll_track_speed"]
     pub synth_pll_track_speed: FloatParam,
@@ -395,8 +394,6 @@ pub struct DeviceParams {
     pub synth_pll_volume: FloatParam,
     #[id = "synth_pll_distortion_amount"]
     pub synth_pll_distortion_amount: FloatParam,
-    #[id = "synth_pll_distortion_threshold"]
-    pub synth_pll_distortion_threshold: FloatParam,
     #[id = "synth_pll_stereo_damp_offset"]
     pub synth_pll_stereo_damp_offset: FloatParam,
     #[id = "synth_pll_glide"]
@@ -404,8 +401,6 @@ pub struct DeviceParams {
 
     #[id = "synth_distortion_amount"]
     pub synth_distortion_amount: FloatParam,
-    #[id = "synth_distortion_threshold"]
-    pub synth_distortion_threshold: FloatParam,
 
     #[id = "synth_filter_enable"]
     pub synth_filter_enable: BoolParam,
@@ -479,6 +474,74 @@ pub struct DeviceParams {
     pub synth_reverb_diffusion: FloatParam,
     #[id = "synth_reverb_decay"]
     pub synth_reverb_decay: FloatParam,
+    #[id = "synth_reverb_ducking"]
+    pub synth_reverb_ducking: FloatParam,
+
+    // ===== LFO 1 =====
+    #[id = "lfo1_rate"]
+    pub lfo1_rate: FloatParam,
+    #[id = "lfo1_waveform"]
+    pub lfo1_waveform: IntParam,
+    #[id = "lfo1_tempo_sync"]
+    pub lfo1_tempo_sync: BoolParam,
+    #[id = "lfo1_sync_division"]
+    pub lfo1_sync_division: IntParam,
+    #[id = "lfo1_sync_source"]
+    pub lfo1_sync_source: IntParam,
+    #[id = "lfo1_phase_mod"]
+    pub lfo1_phase_mod: FloatParam,
+    #[id = "lfo1_dest1"]
+    pub lfo1_dest1: IntParam,
+    #[id = "lfo1_amount1"]
+    pub lfo1_amount1: FloatParam,
+    #[id = "lfo1_dest2"]
+    pub lfo1_dest2: IntParam,
+    #[id = "lfo1_amount2"]
+    pub lfo1_amount2: FloatParam,
+
+    // ===== LFO 2 =====
+    #[id = "lfo2_rate"]
+    pub lfo2_rate: FloatParam,
+    #[id = "lfo2_waveform"]
+    pub lfo2_waveform: IntParam,
+    #[id = "lfo2_tempo_sync"]
+    pub lfo2_tempo_sync: BoolParam,
+    #[id = "lfo2_sync_division"]
+    pub lfo2_sync_division: IntParam,
+    #[id = "lfo2_sync_source"]
+    pub lfo2_sync_source: IntParam,
+    #[id = "lfo2_phase_mod"]
+    pub lfo2_phase_mod: FloatParam,
+    #[id = "lfo2_dest1"]
+    pub lfo2_dest1: IntParam,
+    #[id = "lfo2_amount1"]
+    pub lfo2_amount1: FloatParam,
+    #[id = "lfo2_dest2"]
+    pub lfo2_dest2: IntParam,
+    #[id = "lfo2_amount2"]
+    pub lfo2_amount2: FloatParam,
+
+    // ===== LFO 3 =====
+    #[id = "lfo3_rate"]
+    pub lfo3_rate: FloatParam,
+    #[id = "lfo3_waveform"]
+    pub lfo3_waveform: IntParam,
+    #[id = "lfo3_tempo_sync"]
+    pub lfo3_tempo_sync: BoolParam,
+    #[id = "lfo3_sync_division"]
+    pub lfo3_sync_division: IntParam,
+    #[id = "lfo3_sync_source"]
+    pub lfo3_sync_source: IntParam,
+    #[id = "lfo3_phase_mod"]
+    pub lfo3_phase_mod: FloatParam,
+    #[id = "lfo3_dest1"]
+    pub lfo3_dest1: IntParam,
+    #[id = "lfo3_amount1"]
+    pub lfo3_amount1: FloatParam,
+    #[id = "lfo3_dest2"]
+    pub lfo3_dest2: IntParam,
+    #[id = "lfo3_amount2"]
+    pub lfo3_amount2: FloatParam,
 
     #[id = "note_length_percent"]
     pub note_length_percent: FloatParam,
@@ -865,7 +928,7 @@ impl DeviceParams {
 impl Default for DeviceParams {
     fn default() -> Self {
         Self {
-            editor_state: EguiState::from_size(800, 480),
+            editor_state: EguiState::from_size(1280, 720),
 
             div1_beat1: Self::create_param("1/1 Beat 1".to_string(), 0.0),
 
@@ -1064,36 +1127,32 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_sub_octave: IntParam::new(
-                "Sub Octave".to_string(),
-                -1,
-                IntRange::Linear { min: -2, max: 2 }
-            ),
-            synth_sub_shape: FloatParam::new(
-                "Sub Shape".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
 
-            synth_polyblep_volume: FloatParam::new(
-                "PolyBlep Volume".to_string(),
+            synth_pll_fm_amount: FloatParam::new(
+                "PLL FM Amount".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_polyblep_pulse_width: FloatParam::new(
-                "PolyBlep Pulse Width".to_string(),
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_polyblep_octave: IntParam::new(
-                "PolyBlep Octave".to_string(),
-                0,
-                IntRange::Linear { min: -2, max: 2 }
+            synth_pll_fm_ratio: IntParam::new(
+                "PLL FM Ratio".to_string(),
+                1,
+                IntRange::Linear { min: 1, max: 8 }
             ),
-            synth_polyblep_stereo_width: FloatParam::new(
-                "PolyBlep Stereo Width".to_string(),
+
+            synth_formant_mix: FloatParam::new(
+                "Formant Mix".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_formant_vowel: FloatParam::new(
+                "Formant Vowel".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_formant_shift: FloatParam::new(
+                "Formant Shift".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_pll_track_speed: FloatParam::new(
@@ -1157,12 +1216,7 @@ impl Default for DeviceParams {
             synth_pll_distortion_amount: FloatParam::new(
                 "PLL Distortion Amount".to_string(),
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_pll_distortion_threshold: FloatParam::new(
-                "PLL Distortion Threshold".to_string(),
-                0.9,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
+                FloatRange::Linear { min: 0.0, max: 0.1 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_stereo_damp_offset: FloatParam::new(
                 "PLL Stereo Damp Δ".to_string(),
@@ -1178,12 +1232,7 @@ impl Default for DeviceParams {
             synth_distortion_amount: FloatParam::new(
                 "Distortion Amount".to_string(),
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_distortion_threshold: FloatParam::new(
-                "Distortion Threshold".to_string(),
-                0.9,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
+                FloatRange::Linear { min: 0.0, max: 0.1 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_filter_enable: BoolParam::new(
@@ -1359,6 +1408,95 @@ impl Default for DeviceParams {
                 0.8,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_reverb_ducking: FloatParam::new(
+                "Reverb Ducking".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            // LFO 1
+            lfo1_rate: FloatParam::new(
+                "LFO 1 Rate".to_string(),
+                1.0,
+                FloatRange::Skewed { min: 0.01, max: 50.0, factor: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo1_waveform: IntParam::new("LFO 1 Waveform".to_string(), 0, IntRange::Linear { min: 0, max: 4 }),
+            lfo1_tempo_sync: BoolParam::new("LFO 1 Tempo Sync".to_string(), false),
+            lfo1_sync_division: IntParam::new("LFO 1 Division".to_string(), 2, IntRange::Linear { min: 0, max: 13 }),
+            lfo1_sync_source: IntParam::new("LFO 1 Sync Source".to_string(), -1, IntRange::Linear { min: -1, max: 2 }),
+            lfo1_phase_mod: FloatParam::new(
+                "LFO 1 Phase Mod".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo1_dest1: IntParam::new("LFO 1 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo1_amount1: FloatParam::new(
+                "LFO 1 Amount 1".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo1_dest2: IntParam::new("LFO 1 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo1_amount2: FloatParam::new(
+                "LFO 1 Amount 2".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+
+            // LFO 2
+            lfo2_rate: FloatParam::new(
+                "LFO 2 Rate".to_string(),
+                2.0,
+                FloatRange::Skewed { min: 0.01, max: 50.0, factor: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo2_waveform: IntParam::new("LFO 2 Waveform".to_string(), 0, IntRange::Linear { min: 0, max: 4 }),
+            lfo2_tempo_sync: BoolParam::new("LFO 2 Tempo Sync".to_string(), false),
+            lfo2_sync_division: IntParam::new("LFO 2 Division".to_string(), 3, IntRange::Linear { min: 0, max: 13 }),
+            lfo2_sync_source: IntParam::new("LFO 2 Sync Source".to_string(), -1, IntRange::Linear { min: -1, max: 2 }),
+            lfo2_phase_mod: FloatParam::new(
+                "LFO 2 Phase Mod".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo2_dest1: IntParam::new("LFO 2 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo2_amount1: FloatParam::new(
+                "LFO 2 Amount 1".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo2_dest2: IntParam::new("LFO 2 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo2_amount2: FloatParam::new(
+                "LFO 2 Amount 2".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+
+            // LFO 3
+            lfo3_rate: FloatParam::new(
+                "LFO 3 Rate".to_string(),
+                0.5,
+                FloatRange::Skewed { min: 0.01, max: 50.0, factor: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo3_waveform: IntParam::new("LFO 3 Waveform".to_string(), 0, IntRange::Linear { min: 0, max: 4 }),
+            lfo3_tempo_sync: BoolParam::new("LFO 3 Tempo Sync".to_string(), false),
+            lfo3_sync_division: IntParam::new("LFO 3 Division".to_string(), 0, IntRange::Linear { min: 0, max: 13 }),
+            lfo3_sync_source: IntParam::new("LFO 3 Sync Source".to_string(), -1, IntRange::Linear { min: -1, max: 2 }),
+            lfo3_phase_mod: FloatParam::new(
+                "LFO 3 Phase Mod".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo3_dest1: IntParam::new("LFO 3 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo3_amount1: FloatParam::new(
+                "LFO 3 Amount 1".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            lfo3_dest2: IntParam::new("LFO 3 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo3_amount2: FloatParam::new(
+                "LFO 3 Amount 2".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
 
             note_length_percent: FloatParam::new(
                 "Note Length %".to_string(),

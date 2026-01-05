@@ -14,6 +14,7 @@ struct NoteState {
     note_beats: HashMap<u8, u8>,
     note_beat_lengths: HashMap<u8, u8>,
     scroll_offset: f32,
+    last_preset_version: u64,
 }
 
 impl Default for NoteState {
@@ -25,6 +26,36 @@ impl Default for NoteState {
             note_beats: HashMap::new(),
             note_beat_lengths: HashMap::new(),
             scroll_offset: 18.0, // Position to show C3 area
+            last_preset_version: 0,
+        }
+    }
+}
+
+fn sync_state_from_shared(state: &mut NoteState, ui_state: &Arc<SharedUiState>) {
+    if let Ok(note_pool) = ui_state.note_pool.lock() {
+        state.note_chances.clear();
+        state.note_beats.clear();
+        state.note_beat_lengths.clear();
+
+        if let Some(root) = note_pool.root_note {
+            state.root_note = root;
+            state.selected_note = Some(root);
+        }
+
+        for note in &note_pool.notes {
+            if Some(note.midi_note) == note_pool.root_note {
+                continue;
+            }
+
+            let chance = (note.chance * 127.0) as u8;
+            let beat = ((note.strength_bias * 63.0) + 64.0) as u8;
+
+            if chance > 0 {
+                state.note_chances.insert(note.midi_note, chance);
+            }
+            if beat != 64 {
+                state.note_beats.insert(note.midi_note, beat);
+            }
         }
     }
 }
@@ -36,6 +67,7 @@ pub fn render(
     ui_state: &Arc<SharedUiState>,
 ) {
     let state_id = egui::Id::new("note_state");
+    let current_version = ui_state.get_preset_version();
 
     tui.ui(|ui| {
         ui.add_space(12.0);
@@ -45,6 +77,13 @@ pub fn render(
 
     tui.ui(|ui| {
         let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
+
+        if state.last_preset_version != current_version {
+            sync_state_from_shared(&mut state, ui_state);
+            state.last_preset_version = current_version;
+            ui.ctx().data_mut(|d| d.insert_temp(state_id, state.clone()));
+        }
+
         let state_before = state.clone();
 
         render_piano_container(ui, &mut state);

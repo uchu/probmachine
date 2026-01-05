@@ -46,9 +46,10 @@ pub struct PresetData {
     pub synth_pll_feedback: f32,
     pub synth_pll_volume: f32,
     pub synth_pll_distortion_amount: f32,
-    pub synth_pll_distortion_threshold: f32,
     pub synth_pll_stereo_damp_offset: f32,
     pub synth_pll_glide: f32,
+    pub synth_pll_fm_amount: f32,
+    pub synth_pll_fm_ratio: i32,
 
     pub synth_osc_octave: i32,
     pub synth_osc_d: f32,
@@ -56,16 +57,12 @@ pub struct PresetData {
     pub synth_osc_stereo_v_offset: f32,
     pub synth_osc_volume: f32,
     pub synth_distortion_amount: f32,
-    pub synth_distortion_threshold: f32,
 
-    pub synth_sub_octave: i32,
-    pub synth_sub_shape: f32,
     pub synth_sub_volume: f32,
 
-    pub synth_polyblep_octave: i32,
-    pub synth_polyblep_pulse_width: f32,
-    pub synth_polyblep_stereo_width: f32,
-    pub synth_polyblep_volume: f32,
+    pub synth_formant_mix: f32,
+    pub synth_formant_vowel: f32,
+    pub synth_formant_shift: f32,
 
     pub synth_filter_enable: bool,
     pub synth_filter_cutoff: f32,
@@ -92,8 +89,72 @@ pub struct PresetData {
     pub synth_reverb_mod_depth: f32,
     pub synth_reverb_hpf: f32,
     pub synth_reverb_lpf: f32,
+    pub synth_reverb_ducking: f32,
 
     pub synth_volume: f32,
+
+    #[serde(default)]
+    pub lfo1_rate: f32,
+    #[serde(default)]
+    pub lfo1_waveform: i32,
+    #[serde(default)]
+    pub lfo1_tempo_sync: bool,
+    #[serde(default)]
+    pub lfo1_sync_division: i32,
+    #[serde(default)]
+    pub lfo1_sync_source: i32,
+    #[serde(default)]
+    pub lfo1_phase_mod: f32,
+    #[serde(default)]
+    pub lfo1_dest1: i32,
+    #[serde(default)]
+    pub lfo1_amount1: f32,
+    #[serde(default)]
+    pub lfo1_dest2: i32,
+    #[serde(default)]
+    pub lfo1_amount2: f32,
+
+    #[serde(default)]
+    pub lfo2_rate: f32,
+    #[serde(default)]
+    pub lfo2_waveform: i32,
+    #[serde(default)]
+    pub lfo2_tempo_sync: bool,
+    #[serde(default)]
+    pub lfo2_sync_division: i32,
+    #[serde(default)]
+    pub lfo2_sync_source: i32,
+    #[serde(default)]
+    pub lfo2_phase_mod: f32,
+    #[serde(default)]
+    pub lfo2_dest1: i32,
+    #[serde(default)]
+    pub lfo2_amount1: f32,
+    #[serde(default)]
+    pub lfo2_dest2: i32,
+    #[serde(default)]
+    pub lfo2_amount2: f32,
+
+    #[serde(default)]
+    pub lfo3_rate: f32,
+    #[serde(default)]
+    pub lfo3_waveform: i32,
+    #[serde(default)]
+    pub lfo3_tempo_sync: bool,
+    #[serde(default)]
+    pub lfo3_sync_division: i32,
+    #[serde(default)]
+    pub lfo3_sync_source: i32,
+    #[serde(default)]
+    pub lfo3_phase_mod: f32,
+    #[serde(default)]
+    pub lfo3_dest1: i32,
+    #[serde(default)]
+    pub lfo3_amount1: f32,
+    #[serde(default)]
+    pub lfo3_dest2: i32,
+    #[serde(default)]
+    pub lfo3_amount2: f32,
 }
 
 impl Default for PresetData {
@@ -146,9 +207,10 @@ impl Default for PresetData {
             synth_pll_feedback: 0.0,
             synth_pll_volume: 0.0,
             synth_pll_distortion_amount: 0.0,
-            synth_pll_distortion_threshold: 0.9,
             synth_pll_stereo_damp_offset: 0.0,
             synth_pll_glide: 0.0,
+            synth_pll_fm_amount: 0.0,
+            synth_pll_fm_ratio: 1,
 
             synth_osc_octave: 0,
             synth_osc_d: 0.5,
@@ -156,16 +218,12 @@ impl Default for PresetData {
             synth_osc_stereo_v_offset: 0.0,
             synth_osc_volume: 0.0,
             synth_distortion_amount: 0.0,
-            synth_distortion_threshold: 0.9,
 
-            synth_sub_octave: -1,
-            synth_sub_shape: 0.0,
             synth_sub_volume: 0.0,
 
-            synth_polyblep_octave: 0,
-            synth_polyblep_pulse_width: 0.5,
-            synth_polyblep_stereo_width: 0.0,
-            synth_polyblep_volume: 0.0,
+            synth_formant_mix: 0.0,
+            synth_formant_vowel: 0.0,
+            synth_formant_shift: 0.0,
 
             synth_filter_enable: false,
             synth_filter_cutoff: 1000.0,
@@ -192,8 +250,42 @@ impl Default for PresetData {
             synth_reverb_mod_depth: 0.2,
             synth_reverb_hpf: 100.0,
             synth_reverb_lpf: 8000.0,
+            synth_reverb_ducking: 0.0,
 
             synth_volume: 0.7,
+
+            lfo1_rate: 1.0,
+            lfo1_waveform: 0,
+            lfo1_tempo_sync: false,
+            lfo1_sync_division: 2,
+            lfo1_sync_source: -1,
+            lfo1_phase_mod: 0.0,
+            lfo1_dest1: 0,
+            lfo1_amount1: 0.0,
+            lfo1_dest2: 0,
+            lfo1_amount2: 0.0,
+
+            lfo2_rate: 1.0,
+            lfo2_waveform: 0,
+            lfo2_tempo_sync: false,
+            lfo2_sync_division: 2,
+            lfo2_sync_source: -1,
+            lfo2_phase_mod: 0.0,
+            lfo2_dest1: 0,
+            lfo2_amount1: 0.0,
+            lfo2_dest2: 0,
+            lfo2_amount2: 0.0,
+
+            lfo3_rate: 1.0,
+            lfo3_waveform: 0,
+            lfo3_tempo_sync: false,
+            lfo3_sync_division: 2,
+            lfo3_sync_source: -1,
+            lfo3_phase_mod: 0.0,
+            lfo3_dest1: 0,
+            lfo3_amount1: 0.0,
+            lfo3_dest2: 0,
+            lfo3_amount2: 0.0,
         }
     }
 }
@@ -232,6 +324,7 @@ pub struct PresetBank {
     pub presets: [Preset; 16],
 }
 
+#[allow(dead_code)]
 impl PresetBank {
     pub fn new(name: &str) -> Self {
         Self {

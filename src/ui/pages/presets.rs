@@ -90,8 +90,12 @@ pub fn render(
 
                 ui.add_space(15.0);
 
+                let mut clicked_preset: Option<usize> = None;
+                let mut selected_preset_name = String::new();
+
                 if let Ok(manager) = ui_state.preset_manager.lock() {
                     let bank = manager.get_bank(state.current_bank);
+                    selected_preset_name = bank.presets[state.selected_preset].name.clone();
 
                     ui.horizontal_wrapped(|ui| {
                         for i in 0..16 {
@@ -117,6 +121,7 @@ pub fn render(
                             if ui.add(button).clicked() {
                                 state.selected_preset = i;
                                 state.editing_name = false;
+                                clicked_preset = Some(i);
                             }
 
                             if (i + 1) % 8 == 0 && i < 15 {
@@ -125,124 +130,133 @@ pub fn render(
                             }
                         }
                     });
+                }
 
-                    ui.add_space(15.0);
+                // Auto-load clicked preset after releasing manager borrow
+                if let Some(preset_idx) = clicked_preset {
+                    if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                        mgr.set_current_bank(state.current_bank);
+                        mgr.set_current_preset(preset_idx);
+                        let preset = mgr.get_current_preset().clone();
+                        selected_preset_name = preset.name.clone();
+                        drop(mgr);
+                        load_preset_to_params(&preset.data, params, setter, ui_state);
+                        state.status_message = Some((format!("Loaded: {}", preset.name), std::time::Instant::now()));
+                    }
+                }
 
-                    ui.separator();
-                    ui.add_space(10.0);
+                ui.add_space(15.0);
 
-                    let preset = &bank.presets[state.selected_preset];
+                ui.separator();
+                ui.add_space(10.0);
 
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Name:").size(12.0));
-                        ui.add_space(5.0);
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("Name:").size(12.0));
+                    ui.add_space(5.0);
 
-                        if state.editing_name {
-                            let response = ui.add(
-                                egui::TextEdit::singleline(&mut state.name_buffer)
-                                    .desired_width(200.0)
-                                    .font(egui::TextStyle::Body)
-                            );
+                    if state.editing_name {
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut state.name_buffer)
+                                .desired_width(200.0)
+                                .font(egui::TextStyle::Body)
+                        );
 
-                            if response.lost_focus() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                                state.editing_name = false;
-                            }
-                        } else {
-                            ui.label(egui::RichText::new(&preset.name).size(14.0).strong());
+                        if response.lost_focus() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            state.editing_name = false;
                         }
-                    });
+                    } else {
+                        ui.label(egui::RichText::new(&selected_preset_name).size(14.0).strong());
+                    }
+                });
 
-                    ui.add_space(15.0);
+                ui.add_space(15.0);
 
-                    ui.horizontal(|ui| {
-                        let load_btn = egui::Button::new(
-                            egui::RichText::new("Load").size(12.0)
-                        ).min_size(egui::vec2(70.0, 28.0));
+                ui.horizontal(|ui| {
+                    let load_btn = egui::Button::new(
+                        egui::RichText::new("Load").size(12.0)
+                    ).min_size(egui::vec2(70.0, 28.0));
 
-                        let save_btn = egui::Button::new(
-                            egui::RichText::new("Save").size(12.0)
-                        ).min_size(egui::vec2(70.0, 28.0));
+                    let save_btn = egui::Button::new(
+                        egui::RichText::new("Save").size(12.0)
+                    ).min_size(egui::vec2(70.0, 28.0));
 
-                        let rename_btn = egui::Button::new(
-                            egui::RichText::new("Rename").size(12.0)
-                        ).min_size(egui::vec2(70.0, 28.0));
+                    let rename_btn = egui::Button::new(
+                        egui::RichText::new("Rename").size(12.0)
+                    ).min_size(egui::vec2(70.0, 28.0));
 
-                        let save_file_btn = egui::Button::new(
-                            egui::RichText::new("Save to File").size(12.0)
-                        ).min_size(egui::vec2(90.0, 28.0));
+                    let save_file_btn = egui::Button::new(
+                        egui::RichText::new("Save to File").size(12.0)
+                    ).min_size(egui::vec2(90.0, 28.0));
 
-                        let reset_btn = egui::Button::new(
-                            egui::RichText::new("Reset All").size(12.0)
-                        ).min_size(egui::vec2(80.0, 28.0))
-                        .fill(Color32::from_rgb(100, 50, 50));
+                    let reset_btn = egui::Button::new(
+                        egui::RichText::new("Reset All").size(12.0)
+                    ).min_size(egui::vec2(80.0, 28.0))
+                    .fill(Color32::from_rgb(100, 50, 50));
 
-                        drop(manager);
-
-                        if ui.add(load_btn).clicked() {
-                            if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                                mgr.set_current_bank(state.current_bank);
-                                mgr.set_current_preset(state.selected_preset);
-                                let preset = mgr.get_current_preset().clone();
-                                drop(mgr);
-                                load_preset_to_params(&preset.data, params, setter, ui_state);
-                                state.status_message = Some((format!("Loaded: {}", preset.name), std::time::Instant::now()));
-                            }
-                        }
-
-                        ui.add_space(5.0);
-
-                        if ui.add(save_btn).clicked() {
-                            let data = save_params_to_preset_data(params, ui_state);
-                            if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                                let current_name = mgr.get_preset(state.current_bank, state.selected_preset)
-                                    .map(|p| p.name.clone())
-                                    .unwrap_or_else(|| format!("Preset {}", state.selected_preset + 1));
-                                let preset = crate::preset::Preset::with_data(&current_name, data);
-                                mgr.save_to_slot(state.current_bank, state.selected_preset, preset);
-                                state.status_message = Some(("Saved!".to_string(), std::time::Instant::now()));
-                            }
-                        }
-
-                        ui.add_space(5.0);
-
-                        if ui.add(rename_btn).clicked() {
-                            if let Ok(mgr) = ui_state.preset_manager.lock() {
-                                if let Some(preset) = mgr.get_preset(state.current_bank, state.selected_preset) {
-                                    state.name_buffer = preset.name.clone();
-                                    state.editing_name = true;
-                                }
-                            }
-                        }
-
-                        ui.add_space(15.0);
-
-                        if ui.add(save_file_btn).clicked() {
-                            if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                                match mgr.save_to_file() {
-                                    Ok(_) => {
-                                        state.status_message = Some(("Saved to file!".to_string(), std::time::Instant::now()));
-                                    }
-                                    Err(e) => {
-                                        state.status_message = Some((format!("Error: {}", e), std::time::Instant::now()));
-                                    }
-                                }
-                            }
-                        }
-
-                        ui.add_space(15.0);
-
-                        if ui.add(reset_btn).clicked() {
-                            if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                                mgr.reset_to_defaults();
-                                state.status_message = Some(("Reset to defaults!".to_string(), std::time::Instant::now()));
-                            }
-                        }
-                    });
-
-                    if state.editing_name && !state.name_buffer.is_empty() {
+                    if ui.add(load_btn).clicked() {
                         if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                            mgr.rename_preset(state.current_bank, state.selected_preset, &state.name_buffer);
+                            mgr.set_current_bank(state.current_bank);
+                            mgr.set_current_preset(state.selected_preset);
+                            let preset = mgr.get_current_preset().clone();
+                            drop(mgr);
+                            load_preset_to_params(&preset.data, params, setter, ui_state);
+                            state.status_message = Some((format!("Loaded: {}", preset.name), std::time::Instant::now()));
                         }
+                    }
+
+                    ui.add_space(5.0);
+
+                    if ui.add(save_btn).clicked() {
+                        let data = save_params_to_preset_data(params, ui_state);
+                        if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                            let current_name = mgr.get_preset(state.current_bank, state.selected_preset)
+                                .map(|p| p.name.clone())
+                                .unwrap_or_else(|| format!("Preset {}", state.selected_preset + 1));
+                            let preset = crate::preset::Preset::with_data(&current_name, data);
+                            mgr.save_to_slot(state.current_bank, state.selected_preset, preset);
+                            state.status_message = Some(("Saved!".to_string(), std::time::Instant::now()));
+                        }
+                    }
+
+                    ui.add_space(5.0);
+
+                    if ui.add(rename_btn).clicked() {
+                        if let Ok(mgr) = ui_state.preset_manager.lock() {
+                            if let Some(preset) = mgr.get_preset(state.current_bank, state.selected_preset) {
+                                state.name_buffer = preset.name.clone();
+                                state.editing_name = true;
+                            }
+                        }
+                    }
+
+                    ui.add_space(15.0);
+
+                    if ui.add(save_file_btn).clicked() {
+                        if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                            match mgr.save_to_file() {
+                                Ok(_) => {
+                                    state.status_message = Some(("Saved to file!".to_string(), std::time::Instant::now()));
+                                }
+                                Err(e) => {
+                                    state.status_message = Some((format!("Error: {}", e), std::time::Instant::now()));
+                                }
+                            }
+                        }
+                    }
+
+                    ui.add_space(15.0);
+
+                    if ui.add(reset_btn).clicked() {
+                        if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                            mgr.reset_to_defaults();
+                            state.status_message = Some(("Reset to defaults!".to_string(), std::time::Instant::now()));
+                        }
+                    }
+                });
+
+                if state.editing_name && !state.name_buffer.is_empty() {
+                    if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                        mgr.rename_preset(state.current_bank, state.selected_preset, &state.name_buffer);
                     }
                 }
             });
@@ -374,9 +388,10 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_feedback, data.synth_pll_feedback);
     setter.set_parameter(&params.synth_pll_volume, data.synth_pll_volume);
     setter.set_parameter(&params.synth_pll_distortion_amount, data.synth_pll_distortion_amount);
-    setter.set_parameter(&params.synth_pll_distortion_threshold, data.synth_pll_distortion_threshold);
     setter.set_parameter(&params.synth_pll_stereo_damp_offset, data.synth_pll_stereo_damp_offset);
     setter.set_parameter(&params.synth_pll_glide, data.synth_pll_glide);
+    setter.set_parameter(&params.synth_pll_fm_amount, data.synth_pll_fm_amount);
+    setter.set_parameter(&params.synth_pll_fm_ratio, data.synth_pll_fm_ratio);
 
     setter.set_parameter(&params.synth_osc_octave, data.synth_osc_octave);
     setter.set_parameter(&params.synth_osc_d, data.synth_osc_d);
@@ -384,16 +399,12 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_osc_stereo_v_offset, data.synth_osc_stereo_v_offset);
     setter.set_parameter(&params.synth_osc_volume, data.synth_osc_volume);
     setter.set_parameter(&params.synth_distortion_amount, data.synth_distortion_amount);
-    setter.set_parameter(&params.synth_distortion_threshold, data.synth_distortion_threshold);
 
-    setter.set_parameter(&params.synth_sub_octave, data.synth_sub_octave);
-    setter.set_parameter(&params.synth_sub_shape, data.synth_sub_shape);
     setter.set_parameter(&params.synth_sub_volume, data.synth_sub_volume);
 
-    setter.set_parameter(&params.synth_polyblep_octave, data.synth_polyblep_octave);
-    setter.set_parameter(&params.synth_polyblep_pulse_width, data.synth_polyblep_pulse_width);
-    setter.set_parameter(&params.synth_polyblep_stereo_width, data.synth_polyblep_stereo_width);
-    setter.set_parameter(&params.synth_polyblep_volume, data.synth_polyblep_volume);
+    setter.set_parameter(&params.synth_formant_mix, data.synth_formant_mix);
+    setter.set_parameter(&params.synth_formant_vowel, data.synth_formant_vowel);
+    setter.set_parameter(&params.synth_formant_shift, data.synth_formant_shift);
 
     setter.set_parameter(&params.synth_filter_enable, data.synth_filter_enable);
     setter.set_parameter(&params.synth_filter_cutoff, data.synth_filter_cutoff);
@@ -420,8 +431,42 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_reverb_mod_depth, data.synth_reverb_mod_depth);
     setter.set_parameter(&params.synth_reverb_hpf, data.synth_reverb_hpf);
     setter.set_parameter(&params.synth_reverb_lpf, data.synth_reverb_lpf);
+    setter.set_parameter(&params.synth_reverb_ducking, data.synth_reverb_ducking);
 
     setter.set_parameter(&params.synth_volume, data.synth_volume);
+
+    setter.set_parameter(&params.lfo1_rate, data.lfo1_rate);
+    setter.set_parameter(&params.lfo1_waveform, data.lfo1_waveform);
+    setter.set_parameter(&params.lfo1_tempo_sync, data.lfo1_tempo_sync);
+    setter.set_parameter(&params.lfo1_sync_division, data.lfo1_sync_division);
+    setter.set_parameter(&params.lfo1_sync_source, data.lfo1_sync_source);
+    setter.set_parameter(&params.lfo1_phase_mod, data.lfo1_phase_mod);
+    setter.set_parameter(&params.lfo1_dest1, data.lfo1_dest1);
+    setter.set_parameter(&params.lfo1_amount1, data.lfo1_amount1);
+    setter.set_parameter(&params.lfo1_dest2, data.lfo1_dest2);
+    setter.set_parameter(&params.lfo1_amount2, data.lfo1_amount2);
+
+    setter.set_parameter(&params.lfo2_rate, data.lfo2_rate);
+    setter.set_parameter(&params.lfo2_waveform, data.lfo2_waveform);
+    setter.set_parameter(&params.lfo2_tempo_sync, data.lfo2_tempo_sync);
+    setter.set_parameter(&params.lfo2_sync_division, data.lfo2_sync_division);
+    setter.set_parameter(&params.lfo2_sync_source, data.lfo2_sync_source);
+    setter.set_parameter(&params.lfo2_phase_mod, data.lfo2_phase_mod);
+    setter.set_parameter(&params.lfo2_dest1, data.lfo2_dest1);
+    setter.set_parameter(&params.lfo2_amount1, data.lfo2_amount1);
+    setter.set_parameter(&params.lfo2_dest2, data.lfo2_dest2);
+    setter.set_parameter(&params.lfo2_amount2, data.lfo2_amount2);
+
+    setter.set_parameter(&params.lfo3_rate, data.lfo3_rate);
+    setter.set_parameter(&params.lfo3_waveform, data.lfo3_waveform);
+    setter.set_parameter(&params.lfo3_tempo_sync, data.lfo3_tempo_sync);
+    setter.set_parameter(&params.lfo3_sync_division, data.lfo3_sync_division);
+    setter.set_parameter(&params.lfo3_sync_source, data.lfo3_sync_source);
+    setter.set_parameter(&params.lfo3_phase_mod, data.lfo3_phase_mod);
+    setter.set_parameter(&params.lfo3_dest1, data.lfo3_dest1);
+    setter.set_parameter(&params.lfo3_amount1, data.lfo3_amount1);
+    setter.set_parameter(&params.lfo3_dest2, data.lfo3_dest2);
+    setter.set_parameter(&params.lfo3_amount2, data.lfo3_amount2);
 
     if let Ok(mut strength_values) = ui_state.strength_values.lock() {
         for (i, &v) in data.strength_values.iter().enumerate() {
@@ -441,6 +486,8 @@ fn load_preset_to_params(
             note_pool.set_note(note_data.midi_note, chance, strength_bias);
         }
     }
+
+    ui_state.increment_preset_version();
 }
 
 fn save_params_to_preset_data(
@@ -541,9 +588,10 @@ fn save_params_to_preset_data(
     data.synth_pll_feedback = params.synth_pll_feedback.modulated_plain_value();
     data.synth_pll_volume = params.synth_pll_volume.modulated_plain_value();
     data.synth_pll_distortion_amount = params.synth_pll_distortion_amount.modulated_plain_value();
-    data.synth_pll_distortion_threshold = params.synth_pll_distortion_threshold.modulated_plain_value();
     data.synth_pll_stereo_damp_offset = params.synth_pll_stereo_damp_offset.modulated_plain_value();
     data.synth_pll_glide = params.synth_pll_glide.modulated_plain_value();
+    data.synth_pll_fm_amount = params.synth_pll_fm_amount.modulated_plain_value();
+    data.synth_pll_fm_ratio = params.synth_pll_fm_ratio.value();
 
     data.synth_osc_octave = params.synth_osc_octave.value();
     data.synth_osc_d = params.synth_osc_d.modulated_plain_value();
@@ -551,16 +599,12 @@ fn save_params_to_preset_data(
     data.synth_osc_stereo_v_offset = params.synth_osc_stereo_v_offset.modulated_plain_value();
     data.synth_osc_volume = params.synth_osc_volume.modulated_plain_value();
     data.synth_distortion_amount = params.synth_distortion_amount.modulated_plain_value();
-    data.synth_distortion_threshold = params.synth_distortion_threshold.modulated_plain_value();
 
-    data.synth_sub_octave = params.synth_sub_octave.value();
-    data.synth_sub_shape = params.synth_sub_shape.modulated_plain_value();
     data.synth_sub_volume = params.synth_sub_volume.modulated_plain_value();
 
-    data.synth_polyblep_octave = params.synth_polyblep_octave.value();
-    data.synth_polyblep_pulse_width = params.synth_polyblep_pulse_width.modulated_plain_value();
-    data.synth_polyblep_stereo_width = params.synth_polyblep_stereo_width.modulated_plain_value();
-    data.synth_polyblep_volume = params.synth_polyblep_volume.modulated_plain_value();
+    data.synth_formant_mix = params.synth_formant_mix.modulated_plain_value();
+    data.synth_formant_vowel = params.synth_formant_vowel.modulated_plain_value();
+    data.synth_formant_shift = params.synth_formant_shift.modulated_plain_value();
 
     data.synth_filter_enable = params.synth_filter_enable.value();
     data.synth_filter_cutoff = params.synth_filter_cutoff.modulated_plain_value();
@@ -587,8 +631,42 @@ fn save_params_to_preset_data(
     data.synth_reverb_mod_depth = params.synth_reverb_mod_depth.modulated_plain_value();
     data.synth_reverb_hpf = params.synth_reverb_hpf.modulated_plain_value();
     data.synth_reverb_lpf = params.synth_reverb_lpf.modulated_plain_value();
+    data.synth_reverb_ducking = params.synth_reverb_ducking.modulated_plain_value();
 
     data.synth_volume = params.synth_volume.modulated_plain_value();
+
+    data.lfo1_rate = params.lfo1_rate.modulated_plain_value();
+    data.lfo1_waveform = params.lfo1_waveform.value();
+    data.lfo1_tempo_sync = params.lfo1_tempo_sync.value();
+    data.lfo1_sync_division = params.lfo1_sync_division.value();
+    data.lfo1_sync_source = params.lfo1_sync_source.value();
+    data.lfo1_phase_mod = params.lfo1_phase_mod.modulated_plain_value();
+    data.lfo1_dest1 = params.lfo1_dest1.value();
+    data.lfo1_amount1 = params.lfo1_amount1.modulated_plain_value();
+    data.lfo1_dest2 = params.lfo1_dest2.value();
+    data.lfo1_amount2 = params.lfo1_amount2.modulated_plain_value();
+
+    data.lfo2_rate = params.lfo2_rate.modulated_plain_value();
+    data.lfo2_waveform = params.lfo2_waveform.value();
+    data.lfo2_tempo_sync = params.lfo2_tempo_sync.value();
+    data.lfo2_sync_division = params.lfo2_sync_division.value();
+    data.lfo2_sync_source = params.lfo2_sync_source.value();
+    data.lfo2_phase_mod = params.lfo2_phase_mod.modulated_plain_value();
+    data.lfo2_dest1 = params.lfo2_dest1.value();
+    data.lfo2_amount1 = params.lfo2_amount1.modulated_plain_value();
+    data.lfo2_dest2 = params.lfo2_dest2.value();
+    data.lfo2_amount2 = params.lfo2_amount2.modulated_plain_value();
+
+    data.lfo3_rate = params.lfo3_rate.modulated_plain_value();
+    data.lfo3_waveform = params.lfo3_waveform.value();
+    data.lfo3_tempo_sync = params.lfo3_tempo_sync.value();
+    data.lfo3_sync_division = params.lfo3_sync_division.value();
+    data.lfo3_sync_source = params.lfo3_sync_source.value();
+    data.lfo3_phase_mod = params.lfo3_phase_mod.modulated_plain_value();
+    data.lfo3_dest1 = params.lfo3_dest1.value();
+    data.lfo3_amount1 = params.lfo3_amount1.modulated_plain_value();
+    data.lfo3_dest2 = params.lfo3_dest2.value();
+    data.lfo3_amount2 = params.lfo3_amount2.modulated_plain_value();
 
     if let Ok(strength_values) = ui_state.strength_values.lock() {
         for (i, &v) in strength_values.iter().enumerate() {

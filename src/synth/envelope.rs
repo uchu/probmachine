@@ -23,13 +23,14 @@ impl Envelope {
     }
 
     pub fn trigger(&mut self, attack_ms: f64, attack_shape: f64, decay_ms: f64, decay_shape: f64, sustain: f64, release_ms: f64, release_shape: f64) {
+        // Enforce minimum 1ms for attack and release to avoid clicks
         self.params = EnvADSRParams {
-            attack_ms: attack_ms as f32,
+            attack_ms: attack_ms.max(1.0) as f32,
             attack_shape: attack_shape as f32,
-            decay_ms: decay_ms as f32,
+            decay_ms: decay_ms.max(1.0) as f32,
             decay_shape: decay_shape as f32,
             sustain: sustain as f32,
-            release_ms: release_ms as f32,
+            release_ms: release_ms.max(1.0) as f32,
             release_shape: release_shape as f32,
         };
 
