@@ -46,6 +46,11 @@ impl Envelope {
         self.retrigger_countdown = 0;
     }
 
+    #[allow(dead_code)]
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.adsr.set_sample_rate(sample_rate as f32);
+    }
+
     pub fn next(&mut self) -> f64 {
         if self.retrigger_countdown > 0 {
             if self.retrigger_countdown == 2 {

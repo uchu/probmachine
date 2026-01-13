@@ -66,6 +66,8 @@ fn render_grid_container(
     ui.set_min_size(egui::vec2(742.0, container_height));
     ui.set_max_width(742.0);
 
+    let swing = params.swing_amount.modulated_plain_value();
+
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
         .inner_margin(0.0)
@@ -75,9 +77,9 @@ fn render_grid_container(
         ))
         .corner_radius(15.0)
         .show(ui, |ui| {
-            render_grid_lines(ui, beat_mode, num_sliders, container_height);
+            render_grid_lines(ui, beat_mode, num_sliders, container_height, swing);
             render_occupied_space(ui, params, beat_mode, num_sliders, container_height);
-            render_sliders(ui, params, setter, beat_mode, num_sliders, container_height);
+            render_sliders(ui, params, setter, beat_mode, num_sliders, container_height, swing);
         });
 }
 
@@ -86,6 +88,7 @@ fn render_grid_lines(
     beat_mode: BeatMode,
     num_sliders: usize,
     container_height: f32,
+    swing: f32,
 ) {
     let container_rect = ui.available_rect_before_wrap();
     let painter = ui.painter();
@@ -97,10 +100,11 @@ fn render_grid_lines(
         BeatMode::Straight | BeatMode::Dotted => (33, 32.0),
         BeatMode::Triplet => (25, 24.0),
     };
-    let slider_width = grid_width / grid_spaces;
 
     for i in 0..num_v_grid_positions {
-        let x = container_rect.min.x + grid_padding + i as f32 * slider_width;
+        let normalized_pos = i as f32 / grid_spaces;
+        let swung_pos = DeviceParams::apply_swing(normalized_pos, swing);
+        let x = container_rect.min.x + grid_padding + swung_pos * grid_width;
         let line_num = i + 1;
 
         let color = match beat_mode {
@@ -286,6 +290,7 @@ fn render_sliders(
     beat_mode: BeatMode,
     num_sliders: usize,
     container_height: f32,
+    swing: f32,
 ) {
     let container_width = 738.0;
     let grid_padding = 10.0;
@@ -304,9 +309,9 @@ fn render_sliders(
             };
 
             for i in 0..num_sliders {
-                let grid_pos = match beat_mode {
-                    BeatMode::Straight => i as f32 * (grid_base / num_sliders as f32),
-                    BeatMode::Triplet => i as f32 * (grid_base / num_sliders as f32),
+                let normalized_pos = match beat_mode {
+                    BeatMode::Straight => i as f32 / num_sliders as f32,
+                    BeatMode::Triplet => i as f32 / num_sliders as f32,
                     BeatMode::Dotted => {
                         let dotted_duration = match num_sliders {
                             2 => 24.0,
@@ -316,9 +321,12 @@ fn render_sliders(
                             22 => 1.5,
                             _ => panic!("Invalid dotted division: {}", num_sliders),
                         };
-                        i as f32 * dotted_duration
+                        (i as f32 * dotted_duration) / 32.0
                     }
                 };
+
+                let swung_pos = DeviceParams::apply_swing(normalized_pos, swing);
+                let grid_pos = swung_pos * grid_base;
 
                 let grid_spaces = match beat_mode {
                     BeatMode::Straight | BeatMode::Dotted => 32.0,
@@ -438,9 +446,48 @@ fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_p
                 ui.add_space(5.0);
                 render_mode_buttons(ui, params, beat_mode);
                 ui.add_space(5.0);
+                render_swing_control(ui, params, setter);
+                ui.add_space(5.0);
                 render_clear_button(ui, params, setter);
             });
         });
+}
+
+fn render_swing_control(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter) {
+    ui.horizontal(|ui| {
+        ui.add_space(200.0);
+        ui.label(egui::RichText::new("Swing:").size(12.0));
+        ui.add_space(5.0);
+
+        let mut swing = params.swing_amount.modulated_plain_value();
+        let response = ui.add(
+            egui::Slider::new(&mut swing, 50.0..=75.0)
+                .suffix("%")
+                .fixed_decimals(0)
+                .clamping(egui::SliderClamping::Always)
+        );
+        if response.changed() {
+            setter.set_parameter(&params.swing_amount, swing);
+        }
+
+        ui.add_space(10.0);
+
+        // Quick preset buttons
+        let btn_50 = egui::Button::new("50").min_size(egui::vec2(32.0, 20.0)).selected((swing - 50.0).abs() < 0.5);
+        if ui.add(btn_50).clicked() {
+            setter.set_parameter(&params.swing_amount, 50.0);
+        }
+
+        let btn_66 = egui::Button::new("66").min_size(egui::vec2(32.0, 20.0)).selected((swing - 66.0).abs() < 0.5);
+        if ui.add(btn_66).clicked() {
+            setter.set_parameter(&params.swing_amount, 66.0);
+        }
+
+        let btn_75 = egui::Button::new("75").min_size(egui::vec2(32.0, 20.0)).selected((swing - 75.0).abs() < 0.5);
+        if ui.add(btn_75).clicked() {
+            setter.set_parameter(&params.swing_amount, 75.0);
+        }
+    });
 }
 
 fn render_division_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode: BeatMode, num_sliders: usize) {

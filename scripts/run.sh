@@ -7,6 +7,7 @@ BINARY="$PROJECT_DIR/target/release/device"
 
 BUFFER_SIZE="${BUFFER_SIZE:-256}"
 SAMPLE_RATE="${SAMPLE_RATE:-48000}"
+BACKEND="${BACKEND:-jack}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -33,22 +34,23 @@ detect_platform() {
 }
 
 check_jack_installed() {
-    if command -v jackd &>/dev/null; then
-        return 0
-    fi
-    return 1
+    command -v jackd &>/dev/null
 }
 
-is_jack_running() {
+stop_jack() {
     if pgrep -x jackd &>/dev/null; then
-        return 0
+        log_info "Stopping existing JACK server..."
+        pkill -TERM -x jackd 2>/dev/null || true
+        sleep 1
+        pkill -KILL -x jackd 2>/dev/null || true
+        sleep 1
     fi
-    return 1
 }
 
 start_jack() {
     local platform=$1
-    log_info "Starting JACK server (buffer: $BUFFER_SIZE, rate: $SAMPLE_RATE)..."
+    stop_jack
+    log_info "Starting JACK server at ${SAMPLE_RATE}Hz, buffer ${BUFFER_SIZE}..."
 
     case "$platform" in
         macos)
@@ -70,21 +72,13 @@ start_jack() {
             ;;
     esac
 
-    sleep 2
+    sleep 3
 
-    if is_jack_running; then
+    if pgrep -x jackd &>/dev/null; then
         log_info "JACK server started successfully"
     else
         log_error "Failed to start JACK server"
         exit 1
-    fi
-}
-
-stop_jack() {
-    if is_jack_running; then
-        log_info "Stopping JACK server..."
-        pkill -x jackd 2>/dev/null || true
-        sleep 1
     fi
 }
 
@@ -120,9 +114,30 @@ build_if_needed() {
     fi
 }
 
-run_device() {
-    local platform=$1
-    log_info "Starting Device..."
+cleanup() {
+    echo ""
+    log_info "Shutting down..."
+
+    pkill -TERM -f "target/release/device" 2>/dev/null || true
+    sleep 1
+    pkill -KILL -f "target/release/device" 2>/dev/null || true
+    sleep 1
+
+    if [ "$BACKEND" = "jack" ]; then
+        stop_jack
+    fi
+
+    log_info "Stopped"
+}
+
+main() {
+    local platform=$(detect_platform)
+    log_info "Detected platform: $platform"
+    log_info "Backend: $BACKEND, Sample rate: $SAMPLE_RATE, Buffer: $BUFFER_SIZE"
+
+    build_if_needed
+
+    trap cleanup EXIT INT TERM
 
     case "$platform" in
         macos)
@@ -130,43 +145,22 @@ run_device() {
             ;;
     esac
 
-    exec "$BINARY" -b jack "$@"
-}
-
-cleanup() {
-    echo ""
-    log_info "Shutting down..."
-
-    # Kill device first, give it time to disconnect from JACK
-    pkill -TERM -f "device" 2>/dev/null || true
-    sleep 1
-    pkill -KILL -f "device" 2>/dev/null || true
-    sleep 0.5
-
-    # Then stop JACK
-    stop_jack
-}
-
-main() {
-    local platform=$(detect_platform)
-    log_info "Detected platform: $platform"
-
-    if ! check_jack_installed; then
-        install_instructions "$platform"
-        exit 1
-    fi
-
-    build_if_needed
-
-    trap cleanup EXIT INT TERM
-
-    if ! is_jack_running; then
+    if [ "$BACKEND" = "jack" ]; then
+        if ! check_jack_installed; then
+            install_instructions "$platform"
+            exit 1
+        fi
         start_jack "$platform"
+        exec "$BINARY" -b jack "$@"
+    elif [ "$BACKEND" = "coreaudio" ] || [ "$BACKEND" = "core-audio" ]; then
+        log_info "Using CoreAudio at ${SAMPLE_RATE}Hz, buffer ${BUFFER_SIZE}"
+        exec "$BINARY" -b core-audio -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
+    elif [ "$BACKEND" = "alsa" ]; then
+        log_info "Using ALSA at ${SAMPLE_RATE}Hz, buffer ${BUFFER_SIZE}"
+        exec "$BINARY" -b alsa -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
     else
-        log_info "JACK server already running"
+        exec "$BINARY" -b "$BACKEND" -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
     fi
-
-    run_device "$platform" "$@"
 }
 
 main "$@"

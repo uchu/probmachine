@@ -68,22 +68,43 @@ pub fn midi_to_note_name(midi_note: u8) -> String {
 #[derive(Debug, Clone)]
 pub struct NoteSelection {
     pub midi_note: u8,
+    pub octave_offset: i8,  // -1, 0, or 1 relative to root octave
     pub chance: f32,        // 0.0 to 1.0
     pub strength_bias: f32, // -1.0 (weak) to 1.0 (strong)
+    pub length_bias: f32,   // -1.0 (short) to 1.0 (long)
 }
 
+#[allow(dead_code)]
 impl NoteSelection {
     pub fn new(midi_note: u8, chance: f32, strength_bias: f32) -> Self {
         Self {
             midi_note,
+            octave_offset: 0,
             chance: chance.clamp(0.0, 1.0),
             strength_bias: strength_bias.clamp(-1.0, 1.0),
+            length_bias: 0.0,
         }
+    }
+
+    pub fn new_full(midi_note: u8, octave_offset: i8, chance: f32, strength_bias: f32, length_bias: f32) -> Self {
+        Self {
+            midi_note,
+            octave_offset: octave_offset.clamp(-1, 1),
+            chance: chance.clamp(0.0, 1.0),
+            strength_bias: strength_bias.clamp(-1.0, 1.0),
+            length_bias: length_bias.clamp(-1.0, 1.0),
+        }
+    }
+
+    pub fn effective_midi_note(&self) -> u8 {
+        let base = self.midi_note as i16;
+        let shifted = base + (self.octave_offset as i16 * 12);
+        shifted.clamp(0, 127) as u8
     }
 
     #[allow(dead_code)]
     pub fn frequency(&self) -> f32 {
-        midi_to_frequency(self.midi_note)
+        midi_to_frequency(self.effective_midi_note())
     }
 }
 
@@ -91,7 +112,7 @@ impl NoteSelection {
 #[derive(Debug, Clone)]
 pub struct NotePool {
     pub notes: Vec<NoteSelection>,
-    pub root_note: Option<u8>, // MIDI note number of root
+    pub root_note: Option<u8>,
 }
 
 impl NotePool {
@@ -102,55 +123,50 @@ impl NotePool {
         }
     }
 
-    /// Add or update a note in the pool
     pub fn set_note(&mut self, midi_note: u8, chance: f32, strength_bias: f32) {
-        if let Some(existing) = self.notes.iter_mut().find(|n| n.midi_note == midi_note) {
+        self.set_note_full(midi_note, 0, chance, strength_bias, 0.0);
+    }
+
+    pub fn set_note_full(&mut self, midi_note: u8, octave_offset: i8, chance: f32, strength_bias: f32, length_bias: f32) {
+        if let Some(existing) = self.notes.iter_mut().find(|n| n.midi_note == midi_note && n.octave_offset == octave_offset) {
             existing.chance = chance.clamp(0.0, 1.0);
             existing.strength_bias = strength_bias.clamp(-1.0, 1.0);
+            existing.length_bias = length_bias.clamp(-1.0, 1.0);
         } else {
-            self.notes.push(NoteSelection::new(midi_note, chance, strength_bias));
+            self.notes.push(NoteSelection::new_full(midi_note, octave_offset, chance, strength_bias, length_bias));
         }
     }
 
-    /// Remove a note from the pool
     #[allow(dead_code)]
     pub fn remove_note(&mut self, midi_note: u8) {
         self.notes.retain(|n| n.midi_note != midi_note);
     }
 
-    /// Set the root note and ensure it's in the pool with 100% chance
+    #[allow(dead_code)]
+    pub fn remove_note_with_octave(&mut self, midi_note: u8, octave_offset: i8) {
+        self.notes.retain(|n| !(n.midi_note == midi_note && n.octave_offset == octave_offset));
+    }
+
     pub fn set_root_note(&mut self, midi_note: u8) {
         self.root_note = Some(midi_note);
-        // Ensure root note is in the pool with 100% chance and no strength bias
         self.set_note(midi_note, 1.0, 0.0);
     }
 
-    /// Select a note based on chance and strength
-    /// strength_value: 0.0 (weakest) to 1.0 (strongest)
+    #[allow(dead_code)]
     pub fn select_note(&self, strength_value: f32, rng: &mut impl rand::Rng) -> Option<f32> {
-        // Calculate effective probability for each note based on strength
+        self.select_note_with_length(strength_value, 0.5, rng)
+    }
+
+    pub fn select_note_with_length(&self, strength_value: f32, length_value: f32, rng: &mut impl rand::Rng) -> Option<f32> {
         let mut weighted_notes = Vec::new();
 
         for note in &self.notes {
-            // Calculate strength modifier
-            // If note prefers strong beats (bias > 0) and beat is strong, increase probability
-            // If note prefers weak beats (bias < 0) and beat is weak, increase probability
-            let strength_modifier = if note.strength_bias > 0.0 {
-                // Note prefers strong beats
-                let alignment = strength_value; // 0.0 to 1.0
-                1.0 + (note.strength_bias * alignment)
-            } else if note.strength_bias < 0.0 {
-                // Note prefers weak beats
-                let alignment = 1.0 - strength_value; // Inverted: weak beats have high alignment
-                1.0 + (-note.strength_bias * alignment)
-            } else {
-                // No preference
-                1.0
-            };
+            let strength_modifier = self.calculate_bias_modifier(note.strength_bias, strength_value);
+            let length_modifier = self.calculate_bias_modifier(note.length_bias, length_value);
 
-            let effective_chance = note.chance * strength_modifier;
+            let effective_chance = note.chance * strength_modifier * length_modifier;
             if effective_chance > 0.0 {
-                weighted_notes.push((note.midi_note, effective_chance));
+                weighted_notes.push((note.effective_midi_note(), effective_chance));
             }
         }
 
@@ -158,10 +174,7 @@ impl NotePool {
             return None;
         }
 
-        // Calculate total weight
         let total_weight: f32 = weighted_notes.iter().map(|(_, w)| w).sum();
-
-        // Random selection
         let mut random_value = rng.gen::<f32>() * total_weight;
 
         for (midi_note, weight) in &weighted_notes {
@@ -171,8 +184,19 @@ impl NotePool {
             }
         }
 
-        // Fallback to last note (shouldn't happen)
         Some(midi_to_frequency(weighted_notes.last()?.0))
+    }
+
+    fn calculate_bias_modifier(&self, bias: f32, value: f32) -> f32 {
+        if bias.abs() < 0.01 {
+            return 1.0;
+        }
+
+        if bias > 0.0 {
+            1.0 + (bias * value)
+        } else {
+            1.0 + (-bias * (1.0 - value))
+        }
     }
 }
 

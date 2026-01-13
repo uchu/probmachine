@@ -103,6 +103,10 @@ impl StereoReverb {
         }
     }
 
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.reverb.set_sample_rate(sample_rate);
+    }
+
     pub fn set_params(
         &mut self,
         mix: f64,

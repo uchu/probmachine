@@ -10,10 +10,13 @@ const DIVISION_NAMES: [&str; 14] = [
     "1/2.", "1/4.", "1/8.", "1/16.",
     "1/2T", "1/4T", "1/8T", "1/16T",
 ];
-const DEST_NAMES: [&str; 19] = [
+const DEST_NAMES: [&str; 27] = [
     "None", "PLL Damp", "PLL Infl", "PLL Track", "PLL FB", "PLL FM", "PLL PW",
+    "PLL StPh", "PLL XFB", "PLL FMEnv",
     "VPS D", "VPS V", "Filt Cut", "Filt Res", "Filt Drv",
-    "Fmt Vowel", "Fmt Shift", "Rev Mix", "Rev Decay",
+    "Fmt Vowel", "Fmt Shift",
+    "Ring Mod", "Wavefold", "Drift", "Noise", "Tube",
+    "Rev Mix", "Rev Decay",
     "PLL Vol", "VPS Vol", "Sub Vol",
 ];
 
@@ -194,7 +197,7 @@ fn render_mod_slot(
     dest: &IntParam,
     amount: &FloatParam,
 ) {
-    ui.label(egui::RichText::new(format!("→")).size(12.0).color(Color32::from_rgb(100, 150, 200)));
+    ui.label(egui::RichText::new("→").size(12.0).color(Color32::from_rgb(100, 150, 200)));
 
     let dest_idx = dest.value() as usize;
     egui::ComboBox::from_id_salt(format!("lfo{}_{}_dest", lfo_num, slot))

@@ -29,6 +29,10 @@ impl Oscillator {
         }
     }
 
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
+    }
+
     pub fn set_frequency(&mut self, freq: f64) {
         self.freq = freq;
     }
@@ -68,6 +72,10 @@ impl PolyBlepWrapper {
             freq: 220.0,
             phase: rand_01() as f64 * 0.25,
         }
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
     }
 
     pub fn set_frequency(&mut self, freq: f64) {
@@ -131,6 +139,14 @@ pub struct PLLOscillator {
 
     dc_x_prev: f64,
     dc_y_prev: f64,
+
+    // New experimental parameters
+    retrigger_amount: f64,
+    burst_threshold: f64,
+    burst_amount: f64,
+    loop_saturation: f64,
+    color_amount: f64,
+    edge_sensitivity: f64,
 }
 
 impl PLLOscillator {
@@ -169,9 +185,22 @@ impl PLLOscillator {
 
             dc_x_prev: 0.0,
             dc_y_prev: 0.0,
+
+            // Initialize new experimental parameters with defaults
+            retrigger_amount: 0.05,
+            burst_threshold: 0.7,
+            burst_amount: 3.3,
+            loop_saturation: 1000.0,
+            color_amount: 0.25,
+            edge_sensitivity: 0.02,
         };
         pll.prepare_block();
         pll
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
+        self.prepare_block();
     }
 
     pub fn set_params(&mut self, track: f64, damp: f64, mult: f64, influence: f64, colored: bool, mode: PllMode) {
@@ -181,6 +210,23 @@ impl PLLOscillator {
         self.influence = influence.clamp(0.0, 1.0);
         self.colored = colored;
         self.mode = mode;
+    }
+
+    pub fn set_experimental_params(
+        &mut self,
+        retrigger: f64,
+        burst_threshold: f64,
+        burst_amount: f64,
+        loop_saturation: f64,
+        color_amount: f64,
+        edge_sensitivity: f64,
+    ) {
+        self.retrigger_amount = retrigger.clamp(0.0, 1.0);
+        self.burst_threshold = burst_threshold.clamp(0.0, 1.0);
+        self.burst_amount = burst_amount.clamp(0.0, 10.0);
+        self.loop_saturation = loop_saturation.clamp(1.0, 500.0);
+        self.color_amount = color_amount.clamp(0.0, 1.0);
+        self.edge_sensitivity = edge_sensitivity.clamp(0.001, 0.2);
     }
 
     #[allow(dead_code)]
@@ -209,10 +255,15 @@ impl PLLOscillator {
     }
 
     pub fn trigger(&mut self) {
-        self.integrator *= 0.05;
-        self.filtered_error *= 0.05;
-        self.pfd_state *= 0.05;
-        self.overtrack_state = 0.0;
+        // retrigger_amount: 0.0 = hard reset, 0.05 = default soft, 1.0 = legato (no reset)
+        let keep = self.retrigger_amount;
+        self.integrator *= keep;
+        self.filtered_error *= keep;
+        self.pfd_state *= keep;
+        // Only reset overtrack if doing hard/soft retrigger
+        if keep < 0.5 {
+            self.overtrack_state *= keep * 2.0;
+        }
     }
 
     fn wrap_pi(x: f64) -> f64 {
@@ -237,8 +288,8 @@ impl PLLOscillator {
         self.sample_counter += 1;
         let pll_sig = ((self.phase * 2.0 * std::f64::consts::PI).sin()).signum();
 
-        let rising_threshold = 0.02;
-        let falling_threshold = -0.02;
+        let rising_threshold = self.edge_sensitivity;
+        let falling_threshold = -self.edge_sensitivity;
 
         let (ref_rising, ref_falling, ref_high) = Self::detect_edges(
             self.last_ref_phase, ref_sig, rising_threshold, falling_threshold, self.last_ref_phase > 0.0
@@ -287,19 +338,15 @@ impl PLLOscillator {
 
         let integrator_decay = 0.9999 - self.damping * 0.0098;
         self.integrator = self.integrator * integrator_decay + self.filtered_error * (self.cached_ki / self.sample_rate);
-        self.integrator = self.integrator.clamp(-1000.0, 1000.0);
+        self.integrator = self.integrator.clamp(-self.loop_saturation, self.loop_saturation);
 
-        let overtrack_amount = (self.track_speed - 0.7).max(0.0) * 3.3;
+        // Use configurable burst threshold and amount
+        let overtrack_amount = (self.track_speed - self.burst_threshold).max(0.0) * self.burst_amount;
         let overtrack_resonance = 1.0 + overtrack_amount * (1.0 - self.damping);
         let correction = (self.cached_kp * self.filtered_error + self.integrator) * overtrack_resonance;
 
-        let glide_amount = (0.5 - self.track_speed).max(0.0) * 2.0;
-        let glide_alpha = 0.001 + (1.0 - glide_amount) * 0.05;
         let target_freq = self.base_freq * self.mult;
-        self.freq_slew_state = self.freq_slew_state * (1.0 - glide_alpha) + target_freq * glide_alpha;
-        let base_target = if glide_amount > 0.01 { self.freq_slew_state } else { target_freq };
-
-        let corrected_freq = base_target + correction;
+        let corrected_freq = target_freq + correction;
 
         if overtrack_amount > 0.01 {
             let overshoot = (correction / self.base_freq.max(20.0)).abs();
@@ -321,7 +368,8 @@ impl PLLOscillator {
 
         let clean = (self.phase * 2.0 * PI).sin();
         let colored = ((self.phase * self.mult) * 2.0 * PI).sin();
-        let saturated = colored + 0.25 * colored.powi(3);
+        // Use configurable color_amount for saturation coefficient
+        let saturated = colored + self.color_amount * colored.powi(3);
         let colored_out = saturated.clamp(-1.0, 1.0);
 
         let raw_output = clean * (1.0 - self.color_x) + colored_out * self.color_x;

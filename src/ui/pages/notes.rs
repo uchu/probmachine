@@ -4,7 +4,7 @@ use egui_taffy::TuiBuilderLogic;
 use nih_plug_egui::egui::{self, Color32};
 use crate::params::DeviceParams;
 use crate::ui::SharedUiState;
-use nih_plug::prelude::*;
+use crate::sequencer::scales::{Scale, StabilityPattern, OctaveRandomization, OctaveDirection};
 
 #[derive(Clone, PartialEq)]
 struct NoteState {
@@ -15,18 +15,24 @@ struct NoteState {
     note_beat_lengths: HashMap<u8, u8>,
     scroll_offset: f32,
     last_preset_version: u64,
+    scale: Scale,
+    stability_pattern: StabilityPattern,
+    octave_randomization: OctaveRandomization,
 }
 
 impl Default for NoteState {
     fn default() -> Self {
         Self {
-            selected_note: Some(48), // C3
-            root_note: 48,           // C3 (default root note)
+            selected_note: Some(48),
+            root_note: 48,
             note_chances: HashMap::new(),
             note_beats: HashMap::new(),
             note_beat_lengths: HashMap::new(),
-            scroll_offset: 18.0, // Position to show C3 area
+            scroll_offset: 18.0,
             last_preset_version: 0,
+            scale: Scale::default(),
+            stability_pattern: StabilityPattern::default(),
+            octave_randomization: OctaveRandomization::default(),
         }
     }
 }
@@ -43,20 +49,38 @@ fn sync_state_from_shared(state: &mut NoteState, ui_state: &Arc<SharedUiState>) 
         }
 
         for note in &note_pool.notes {
-            if Some(note.midi_note) == note_pool.root_note {
-                continue;
-            }
+            let is_root = Some(note.midi_note) == note_pool.root_note && note.octave_offset == 0;
 
             let chance = (note.chance * 127.0) as u8;
             let beat = ((note.strength_bias * 63.0) + 64.0) as u8;
+            let beat_length = ((note.length_bias * 63.0) + 64.0) as u8;
 
-            if chance > 0 {
+            // For non-root notes, store chance if > 0
+            // Root note chance is always 127 (fixed), so we don't store it
+            if !is_root && chance > 0 {
                 state.note_chances.insert(note.midi_note, chance);
             }
+
+            // Store strength and length biases for all notes including root
             if beat != 64 {
                 state.note_beats.insert(note.midi_note, beat);
             }
+            if beat_length != 64 {
+                state.note_beat_lengths.insert(note.midi_note, beat_length);
+            }
         }
+    }
+
+    if let Ok(scale) = ui_state.scale.lock() {
+        state.scale = *scale;
+    }
+
+    if let Ok(pattern) = ui_state.stability_pattern.lock() {
+        state.stability_pattern = *pattern;
+    }
+
+    if let Ok(oct_rand) = ui_state.octave_randomization.lock() {
+        state.octave_randomization = oct_rand.clone();
     }
 }
 
@@ -71,7 +95,7 @@ pub fn render(
 
     tui.ui(|ui| {
         ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Note Probability").size(14.0));
+        ui.heading(egui::RichText::new("    Note Stability").size(14.0));
         ui.add_space(8.0);
     });
 
@@ -84,6 +108,21 @@ pub fn render(
             ui.ctx().data_mut(|d| d.insert_temp(state_id, state.clone()));
         }
 
+        let state_before = state.clone();
+
+        render_scale_pattern_dropdowns(ui, &mut state);
+
+        if state != state_before {
+            if state.scale != state_before.scale || state.stability_pattern != state_before.stability_pattern {
+                apply_scale_and_pattern(&mut state);
+                update_shared_state(&state, ui_state);
+            }
+            ui.ctx().data_mut(|d| d.insert_temp(state_id, state.clone()));
+        }
+    });
+
+    tui.ui(|ui| {
+        let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
         let state_before = state.clone();
 
         render_piano_container(ui, &mut state);
@@ -109,7 +148,6 @@ pub fn render(
             let root_changed = state.root_note != state_before.root_note;
 
             if chances_changed || beats_changed || beat_lengths_changed || root_changed {
-                log_note_values(&state);
                 update_shared_state(&state, ui_state);
             }
 
@@ -117,6 +155,162 @@ pub fn render(
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
         }
     });
+
+    tui.ui(|ui| {
+        let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
+        let state_before = state.clone();
+
+        render_octave_randomization(ui, &mut state);
+
+        if state != state_before {
+            if state.octave_randomization != state_before.octave_randomization {
+                update_octave_randomization_shared(&state.octave_randomization, ui_state);
+            }
+            ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
+        }
+    });
+}
+
+fn render_scale_pattern_dropdowns(ui: &mut egui::Ui, state: &mut NoteState) {
+    egui::Frame::default()
+        .fill(Color32::from_rgb(30, 30, 30))
+        .inner_margin(8.0)
+        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
+        .corner_radius(15.0)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add_space(12.0);
+
+                ui.label(egui::RichText::new("Scale:").size(12.0));
+                ui.add_space(4.0);
+
+                egui::ComboBox::from_id_salt("scale_select")
+                    .selected_text(egui::RichText::new(state.scale.name()).size(12.0))
+                    .width(140.0)
+                    .show_ui(ui, |ui| {
+                        for scale in Scale::all() {
+                            let is_selected = state.scale == *scale;
+                            if ui.selectable_label(is_selected, scale.name()).clicked() {
+                                state.scale = *scale;
+                            }
+                        }
+                    });
+
+                ui.add_space(24.0);
+
+                ui.label(egui::RichText::new("Pattern:").size(12.0));
+                ui.add_space(4.0);
+
+                egui::ComboBox::from_id_salt("pattern_select")
+                    .selected_text(egui::RichText::new(state.stability_pattern.name()).size(12.0))
+                    .width(120.0)
+                    .show_ui(ui, |ui| {
+                        for pattern in StabilityPattern::all() {
+                            let is_selected = state.stability_pattern == *pattern;
+                            if ui.selectable_label(is_selected, pattern.name()).clicked() {
+                                state.stability_pattern = *pattern;
+                            }
+                        }
+                    });
+            });
+        });
+}
+
+fn apply_scale_and_pattern(state: &mut NoteState) {
+    state.note_chances.clear();
+    state.note_beats.clear();
+    state.note_beat_lengths.clear();
+
+    let root_pitch_class = state.root_note % 12;
+    let root_octave = state.root_note / 12;
+
+    for &interval in state.scale.intervals() {
+        let midi_note = root_octave * 12 + root_pitch_class + interval;
+        if midi_note > 127 {
+            continue;
+        }
+
+        if let Some(degree) = state.scale.degree_for_interval(interval) {
+            let base_chance = state.scale.base_chance_for_degree(degree);
+            let settings = state.stability_pattern.get_stability_settings(degree);
+
+            if midi_note != state.root_note {
+                state.note_chances.insert(midi_note, base_chance);
+                state.note_beats.insert(midi_note, settings.strength_pref);
+                state.note_beat_lengths.insert(midi_note, settings.length_pref);
+            }
+        }
+    }
+}
+
+fn render_octave_randomization(ui: &mut egui::Ui, state: &mut NoteState) {
+    egui::Frame::default()
+        .fill(ui.visuals().extreme_bg_color)
+        .inner_margin(10.0)
+        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+        .corner_radius(15.0)
+        .show(ui, |ui| {
+            ui.label(egui::RichText::new("Octave Randomization").size(12.0).color(Color32::from_gray(180)));
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Chance:").size(11.0));
+                ui.add_space(4.0);
+                let mut chance = state.octave_randomization.chance;
+                if ui.add(egui::Slider::new(&mut chance, 0..=127).show_value(true)).changed() {
+                    state.octave_randomization.chance = chance;
+                }
+            });
+
+            ui.add_space(4.0);
+
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Strength:").size(11.0));
+                ui.add_space(4.0);
+                let mut strength = state.octave_randomization.strength_pref;
+                if ui.add(egui::Slider::new(&mut strength, 0..=127).show_value(true)).changed() {
+                    state.octave_randomization.strength_pref = strength;
+                }
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new("Weak").size(9.0).color(Color32::from_gray(120)));
+                ui.add_space(40.0);
+                ui.label(egui::RichText::new("Any").size(9.0).color(Color32::from_gray(120)));
+                ui.add_space(40.0);
+                ui.label(egui::RichText::new("Strong").size(9.0).color(Color32::from_gray(120)));
+            });
+
+            ui.add_space(4.0);
+
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Length:").size(11.0));
+                ui.add_space(4.0);
+                let mut length = state.octave_randomization.length_pref;
+                if ui.add(egui::Slider::new(&mut length, 0..=127).show_value(true)).changed() {
+                    state.octave_randomization.length_pref = length;
+                }
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new("Short").size(9.0).color(Color32::from_gray(120)));
+                ui.add_space(40.0);
+                ui.label(egui::RichText::new("Any").size(9.0).color(Color32::from_gray(120)));
+                ui.add_space(40.0);
+                ui.label(egui::RichText::new("Long").size(9.0).color(Color32::from_gray(120)));
+            });
+
+            ui.add_space(4.0);
+
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Direction:").size(11.0));
+                ui.add_space(4.0);
+                for dir in OctaveDirection::all() {
+                    let is_selected = state.octave_randomization.direction == *dir;
+                    if ui.selectable_label(is_selected, dir.name()).clicked() {
+                        state.octave_randomization.direction = *dir;
+                    }
+                    ui.add_space(8.0);
+                }
+            });
+        });
 }
 
 fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
@@ -125,10 +319,7 @@ fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
         .inner_margin(10.0)
-        .stroke(egui::Stroke::new(
-            1.0,
-            ui.visuals().window_stroke.color,
-        ))
+        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
         .corner_radius(15.0)
         .show(ui, |ui| {
             render_piano_keys(ui, state);
@@ -240,7 +431,6 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
             let midi_note = (octave * 12) as u8 + note_offset;
 
             let label = if note_in_octave == 0 {
-                // Use proper MIDI octave numbering (MIDI note 12 = C0, 24 = C1, etc.)
                 let midi_octave = (midi_note / 12) as i32 - 1;
                 Some(format!("C{}", midi_octave))
             } else {
@@ -441,81 +631,56 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
 
 fn midi_note_to_name(midi_note: u8) -> String {
     let note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-    let octave = (midi_note / 12) as i32 - 1; // Fixed: Proper MIDI octave calculation
+    let octave = (midi_note / 12) as i32 - 1;
     let note_index = (midi_note % 12) as usize;
     format!("{}{}", note_names[note_index], octave)
 }
 
-fn log_note_values(state: &NoteState) {
-    let mut values = Vec::new();
-
-    for midi_note in 0..=127 {
-        let chance = state.note_chances.get(&midi_note).copied().unwrap_or(0);
-        let beat = state.note_beats.get(&midi_note).copied().unwrap_or(64);
-        let beat_length = state.note_beat_lengths.get(&midi_note).copied().unwrap_or(64);
-        let is_root = midi_note == state.root_note;
-
-        let has_non_default = if is_root {
-            false
-        } else {
-            chance != 0 || beat != 64 || beat_length != 64
-        };
-
-        if is_root || has_non_default {
-            let note_name = midi_note_to_name(midi_note);
-            if is_root {
-                values.push(format!("{}(root)", note_name));
-            } else {
-                let mut parts = Vec::new();
-                if chance != 0 {
-                    parts.push(format!("chance={}", chance));
-                }
-                if beat != 64 {
-                    parts.push(format!("beat={}", beat));
-                }
-                if beat_length != 64 {
-                    parts.push(format!("beat_length={}", beat_length));
-                }
-                values.push(format!("{}[{}]", note_name, parts.join(", ")));
-            }
-        }
-    }
-
-    if !values.is_empty() {
-        nih_log!("Notes: {}", values.join(", "));
-    }
-}
-
 fn update_shared_state(state: &NoteState, ui_state: &Arc<SharedUiState>) {
     if let Ok(mut note_pool) = ui_state.note_pool.lock() {
-        // Clear existing pool
         note_pool.notes.clear();
-
-        // Set root note
         note_pool.set_root_note(state.root_note);
 
-        // Add all notes with their parameters
+        // Update root note's biases (chance stays at 1.0)
+        let root_beat = state.note_beats.get(&state.root_note).copied().unwrap_or(64);
+        let root_beat_length = state.note_beat_lengths.get(&state.root_note).copied().unwrap_or(64);
+        let root_strength_bias = (root_beat as f32 - 64.0) / 63.0;
+        let root_length_bias = (root_beat_length as f32 - 64.0) / 63.0;
+        note_pool.set_note_full(state.root_note, 0, 1.0, root_strength_bias, root_length_bias);
+
         for midi_note in 0..=127 {
+            if midi_note == state.root_note {
+                continue; // Already handled above
+            }
+
             let chance = state.note_chances.get(&midi_note).copied().unwrap_or(0);
             let beat = state.note_beats.get(&midi_note).copied().unwrap_or(64);
+            let beat_length = state.note_beat_lengths.get(&midi_note).copied().unwrap_or(64);
 
-            // Skip notes with 0 chance (except root note which is already handled)
-            if midi_note != state.root_note && chance == 0 {
+            if chance == 0 {
                 continue;
             }
 
-            // Convert chance from 0-127 to 0.0-1.0
             let chance_normalized = chance as f32 / 127.0;
-
-            // Convert beat from 0-127 to -1.0 to 1.0 (strength bias)
-            // 0 = fully weak (-1.0), 64 = neutral (0.0), 127 = fully strong (1.0)
             let strength_bias = (beat as f32 - 64.0) / 63.0;
+            let length_bias = (beat_length as f32 - 64.0) / 63.0;
 
-            // Update the note in the pool
-            if midi_note != state.root_note {
-                note_pool.set_note(midi_note, chance_normalized, strength_bias);
-            }
+            note_pool.set_note_full(midi_note, 0, chance_normalized, strength_bias, length_bias);
         }
+    }
+
+    if let Ok(mut scale) = ui_state.scale.lock() {
+        *scale = state.scale;
+    }
+
+    if let Ok(mut pattern) = ui_state.stability_pattern.lock() {
+        *pattern = state.stability_pattern;
+    }
+}
+
+fn update_octave_randomization_shared(oct_rand: &OctaveRandomization, ui_state: &Arc<SharedUiState>) {
+    if let Ok(mut shared_oct_rand) = ui_state.octave_randomization.lock() {
+        *shared_oct_rand = oct_rand.clone();
     }
 }
 
@@ -523,139 +688,113 @@ fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
         .inner_margin(10.0)
-        .stroke(egui::Stroke::new(
-            1.0,
-            ui.visuals().window_stroke.color,
-        ))
+        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
         .corner_radius(15.0)
         .show(ui, |ui| {
             ui.vertical(|ui| {
-            ui.horizontal(|ui| {
-                let selected_note_name = if let Some(note) = state.selected_note {
-                    midi_note_to_name(note)
-                } else {
-                    "None".to_string()
-                };
+                ui.horizontal(|ui| {
+                    let selected_note_name = if let Some(note) = state.selected_note {
+                        midi_note_to_name(note)
+                    } else {
+                        "None".to_string()
+                    };
 
-                let root_note_name = midi_note_to_name(state.root_note);
+                    let root_note_name = midi_note_to_name(state.root_note);
 
-                ui.label(egui::RichText::new(format!("Selected: {}", selected_note_name)).size(12.0));
-                ui.add_space(16.0);
-                ui.label(egui::RichText::new(format!("Root: {}", root_note_name)).size(12.0));
+                    ui.label(egui::RichText::new(format!("Selected: {}", selected_note_name)).size(12.0));
+                    ui.add_space(16.0);
+                    ui.label(egui::RichText::new(format!("Root: {}", root_note_name)).size(12.0));
 
-                ui.add_space(16.0);
+                    ui.add_space(16.0);
+
+                    if let Some(selected) = state.selected_note {
+                        if ui.button("Set as Root").clicked() {
+                            state.root_note = selected;
+                        }
+                    }
+                });
+
+                ui.add_space(8.0);
 
                 if let Some(selected) = state.selected_note {
-                    if ui.button("Set as Root").clicked() {
-                        state.root_note = selected;
-                    }
-                }
-            });
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("Chance:").size(12.0));
+                        ui.add_space(8.0);
 
-            ui.add_space(8.0);
+                        let is_root = selected == state.root_note;
+                        let mut chance_value = if is_root {
+                            127
+                        } else {
+                            *state.note_chances.get(&selected).unwrap_or(&0)
+                        };
 
-            if let Some(selected) = state.selected_note {
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("Chance:").size(12.0));
+                        let slider = egui::Slider::new(&mut chance_value, 0..=127).show_value(true);
+
+                        let slider_response = if is_root {
+                            ui.add_enabled(false, slider)
+                        } else {
+                            ui.add(slider)
+                        };
+
+                        if slider_response.changed() && !is_root {
+                            state.note_chances.insert(selected, chance_value);
+                        }
+                    });
+
                     ui.add_space(8.0);
 
-                    let is_root = selected == state.root_note;
-                    let mut chance_value = if is_root {
-                        127
-                    } else {
-                        *state.note_chances.get(&selected).unwrap_or(&0)
-                    };
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Strength:").size(12.0));
+                            ui.add_space(8.0);
 
-                    let slider = egui::Slider::new(&mut chance_value, 0..=127)
-                        .show_value(true);
+                            let mut beat_value = *state.note_beats.get(&selected).unwrap_or(&64);
 
-                    let slider_response = if is_root {
-                        ui.add_enabled(false, slider)
-                    } else {
-                        ui.add(slider)
-                    };
+                            let slider = egui::Slider::new(&mut beat_value, 0..=127).show_value(true);
+                            let slider_response = ui.add(slider);
 
-                    if slider_response.changed() && !is_root {
-                        state.note_chances.insert(selected, chance_value);
-                    }
-                });
+                            if slider_response.changed() {
+                                state.note_beats.insert(selected, beat_value);
+                            }
+                        });
 
-                ui.add_space(8.0);
-
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Beat:").size(12.0));
-                        ui.add_space(8.0);
-
-                        let is_root = selected == state.root_note;
-                        let mut beat_value = if is_root {
-                            64
-                        } else {
-                            *state.note_beats.get(&selected).unwrap_or(&64)
-                        };
-
-                        let slider = egui::Slider::new(&mut beat_value, 0..=127)
-                            .show_value(true);
-
-                        let slider_response = if is_root {
-                            ui.add_enabled(false, slider)
-                        } else {
-                            ui.add(slider)
-                        };
-
-                        if slider_response.changed() && !is_root {
-                            state.note_beats.insert(selected, beat_value);
-                        }
+                        ui.horizontal(|ui| {
+                            ui.add_space(64.0);
+                            ui.label(egui::RichText::new("Weak (0)").size(10.0).color(Color32::from_gray(150)));
+                            ui.add_space(60.0);
+                            ui.label(egui::RichText::new("Any (64)").size(10.0).color(Color32::from_gray(150)));
+                            ui.add_space(55.0);
+                            ui.label(egui::RichText::new("Strong (127)").size(10.0).color(Color32::from_gray(150)));
+                        });
                     });
 
-                    ui.horizontal(|ui| {
-                        ui.add_space(40.0);
-                        ui.label(egui::RichText::new("Weak (0)").size(10.0).color(Color32::from_gray(150)));
-                        ui.add_space(60.0);
-                        ui.label(egui::RichText::new("Any (64)").size(10.0).color(Color32::from_gray(150)));
-                        ui.add_space(55.0);
-                        ui.label(egui::RichText::new("Strong (127)").size(10.0).color(Color32::from_gray(150)));
+                    ui.add_space(8.0);
+
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Length:").size(12.0));
+                            ui.add_space(8.0);
+
+                            let mut beat_length_value = *state.note_beat_lengths.get(&selected).unwrap_or(&64);
+
+                            let slider = egui::Slider::new(&mut beat_length_value, 0..=127).show_value(true);
+                            let slider_response = ui.add(slider);
+
+                            if slider_response.changed() {
+                                state.note_beat_lengths.insert(selected, beat_length_value);
+                            }
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.add_space(52.0);
+                            ui.label(egui::RichText::new("Short (0)").size(10.0).color(Color32::from_gray(150)));
+                            ui.add_space(60.0);
+                            ui.label(egui::RichText::new("Any (64)").size(10.0).color(Color32::from_gray(150)));
+                            ui.add_space(60.0);
+                            ui.label(egui::RichText::new("Long (127)").size(10.0).color(Color32::from_gray(150)));
+                        });
                     });
-                });
-
-                ui.add_space(8.0);
-
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Beat Length:").size(12.0));
-                        ui.add_space(8.0);
-
-                        let is_root = selected == state.root_note;
-                        let mut beat_length_value = if is_root {
-                            64
-                        } else {
-                            *state.note_beat_lengths.get(&selected).unwrap_or(&64)
-                        };
-
-                        let slider = egui::Slider::new(&mut beat_length_value, 0..=127)
-                            .show_value(true);
-
-                        let slider_response = if is_root {
-                            ui.add_enabled(false, slider)
-                        } else {
-                            ui.add(slider)
-                        };
-
-                        if slider_response.changed() && !is_root {
-                            state.note_beat_lengths.insert(selected, beat_length_value);
-                        }
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.add_space(78.0);
-                        ui.label(egui::RichText::new("Long (0)").size(10.0).color(Color32::from_gray(150)));
-                        ui.add_space(60.0);
-                        ui.label(egui::RichText::new("Any (64)").size(10.0).color(Color32::from_gray(150)));
-                        ui.add_space(60.0);
-                        ui.label(egui::RichText::new("Short (127)").size(10.0).color(Color32::from_gray(150)));
-                    });
-                });
-            }
+                }
             });
         });
 }

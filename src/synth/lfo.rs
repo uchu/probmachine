@@ -183,6 +183,11 @@ impl Lfo {
         self.slew_time_ms = ms.clamp(0.5, 100.0);
     }
 
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
+        self.output_slew.set_sample_rate(sample_rate);
+    }
+
     pub fn get_phase(&self) -> f64 {
         self.phase
     }
@@ -245,7 +250,7 @@ impl Lfo {
                 // Detect rising edge for hard sync
                 if sync_val > 0.0 && self.last_sync_value <= 0.0 {
                     // Soft sync - blend towards reset based on amount
-                    self.phase = self.phase * (1.0 - self.phase_mod_amount);
+                    self.phase *= 1.0 - self.phase_mod_amount;
                 }
                 self.last_sync_value = sync_val;
             }
@@ -289,6 +294,9 @@ pub enum ModDestination {
     PllFeedback,
     PllFmAmount,
     PllPulseWidth,
+    PllStereoPhase,
+    PllCrossFeedback,
+    PllFmEnvAmount,
     // VPS parameters
     VpsD,
     VpsV,
@@ -296,9 +304,12 @@ pub enum ModDestination {
     FilterCutoff,
     FilterResonance,
     FilterDrive,
-    // Formant
-    FormantVowel,
-    FormantShift,
+    // Coloration
+    RingMod,
+    Wavefold,
+    DriftAmount,
+    NoiseAmount,
+    TubeDrive,
     // Reverb
     ReverbMix,
     ReverbDecay,
@@ -318,18 +329,24 @@ impl ModDestination {
             4 => ModDestination::PllFeedback,
             5 => ModDestination::PllFmAmount,
             6 => ModDestination::PllPulseWidth,
-            7 => ModDestination::VpsD,
-            8 => ModDestination::VpsV,
-            9 => ModDestination::FilterCutoff,
-            10 => ModDestination::FilterResonance,
-            11 => ModDestination::FilterDrive,
-            12 => ModDestination::FormantVowel,
-            13 => ModDestination::FormantShift,
-            14 => ModDestination::ReverbMix,
-            15 => ModDestination::ReverbDecay,
-            16 => ModDestination::PllVolume,
-            17 => ModDestination::VpsVolume,
-            18 => ModDestination::SubVolume,
+            7 => ModDestination::PllStereoPhase,
+            8 => ModDestination::PllCrossFeedback,
+            9 => ModDestination::PllFmEnvAmount,
+            10 => ModDestination::VpsD,
+            11 => ModDestination::VpsV,
+            12 => ModDestination::FilterCutoff,
+            13 => ModDestination::FilterResonance,
+            14 => ModDestination::FilterDrive,
+            15 => ModDestination::RingMod,
+            16 => ModDestination::Wavefold,
+            17 => ModDestination::DriftAmount,
+            18 => ModDestination::NoiseAmount,
+            19 => ModDestination::TubeDrive,
+            20 => ModDestination::ReverbMix,
+            21 => ModDestination::ReverbDecay,
+            22 => ModDestination::PllVolume,
+            23 => ModDestination::VpsVolume,
+            24 => ModDestination::SubVolume,
             _ => ModDestination::None,
         }
     }
@@ -343,13 +360,19 @@ impl ModDestination {
             ModDestination::PllFeedback => "PLL FB",
             ModDestination::PllFmAmount => "PLL FM",
             ModDestination::PllPulseWidth => "PLL PW",
+            ModDestination::PllStereoPhase => "PLL StPh",
+            ModDestination::PllCrossFeedback => "PLL XFB",
+            ModDestination::PllFmEnvAmount => "PLL FMEnv",
             ModDestination::VpsD => "VPS D",
             ModDestination::VpsV => "VPS V",
             ModDestination::FilterCutoff => "Filt Cut",
             ModDestination::FilterResonance => "Filt Res",
             ModDestination::FilterDrive => "Filt Drv",
-            ModDestination::FormantVowel => "Fmt Vowel",
-            ModDestination::FormantShift => "Fmt Shift",
+            ModDestination::RingMod => "Ring Mod",
+            ModDestination::Wavefold => "Wavefold",
+            ModDestination::DriftAmount => "Drift",
+            ModDestination::NoiseAmount => "Noise",
+            ModDestination::TubeDrive => "Tube",
             ModDestination::ReverbMix => "Rev Mix",
             ModDestination::ReverbDecay => "Rev Decay",
             ModDestination::PllVolume => "PLL Vol",
@@ -368,13 +391,19 @@ pub struct ModulationValues {
     pub pll_feedback: f64,
     pub pll_fm_amount: f64,
     pub pll_pulse_width: f64,
+    pub pll_stereo_phase: f64,
+    pub pll_cross_feedback: f64,
+    pub pll_fm_env_amount: f64,
     pub vps_d: f64,
     pub vps_v: f64,
     pub filter_cutoff: f64,
     pub filter_resonance: f64,
     pub filter_drive: f64,
-    pub formant_vowel: f64,
-    pub formant_shift: f64,
+    pub ring_mod: f64,
+    pub wavefold: f64,
+    pub drift_amount: f64,
+    pub noise_amount: f64,
+    pub tube_drive: f64,
     pub reverb_mix: f64,
     pub reverb_decay: f64,
     pub pll_volume: f64,
@@ -393,13 +422,19 @@ impl ModulationValues {
             ModDestination::PllFeedback => self.pll_feedback += mod_value,
             ModDestination::PllFmAmount => self.pll_fm_amount += mod_value,
             ModDestination::PllPulseWidth => self.pll_pulse_width += mod_value,
+            ModDestination::PllStereoPhase => self.pll_stereo_phase += mod_value,
+            ModDestination::PllCrossFeedback => self.pll_cross_feedback += mod_value,
+            ModDestination::PllFmEnvAmount => self.pll_fm_env_amount += mod_value,
             ModDestination::VpsD => self.vps_d += mod_value,
             ModDestination::VpsV => self.vps_v += mod_value,
             ModDestination::FilterCutoff => self.filter_cutoff += mod_value,
             ModDestination::FilterResonance => self.filter_resonance += mod_value,
             ModDestination::FilterDrive => self.filter_drive += mod_value,
-            ModDestination::FormantVowel => self.formant_vowel += mod_value,
-            ModDestination::FormantShift => self.formant_shift += mod_value,
+            ModDestination::RingMod => self.ring_mod += mod_value,
+            ModDestination::Wavefold => self.wavefold += mod_value,
+            ModDestination::DriftAmount => self.drift_amount += mod_value,
+            ModDestination::NoiseAmount => self.noise_amount += mod_value,
+            ModDestination::TubeDrive => self.tube_drive += mod_value,
             ModDestination::ReverbMix => self.reverb_mix += mod_value,
             ModDestination::ReverbDecay => self.reverb_decay += mod_value,
             ModDestination::PllVolume => self.pll_volume += mod_value,
@@ -522,5 +557,17 @@ impl LfoBank {
 
     pub fn get_lfo_output(&self, idx: usize) -> f64 {
         if idx < 3 { self.lfo_outputs[idx] } else { 0.0 }
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
+        for lfo in &mut self.lfos {
+            lfo.set_sample_rate(sample_rate);
+        }
+        for slots in &mut self.amount_slews {
+            for slew in slots {
+                slew.set_sample_rate(sample_rate);
+            }
+        }
     }
 }

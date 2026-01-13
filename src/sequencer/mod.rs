@@ -1,15 +1,19 @@
 mod note_utils;
+pub mod scales;
 
 use crate::params::{BeatMode, DeviceParams};
 use rand::Rng;
 use nih_plug::prelude::Param;
 pub use note_utils::{NotePool, midi_to_frequency};
+#[allow(unused_imports)]
+pub use scales::{Scale, StabilityPattern, OctaveRandomization, OctaveDirection};
 
 #[derive(Clone, Debug)]
 struct NoteEvent {
     sample_position: usize,
     frequency: f64,
     duration_samples: usize,
+    decay_multiplier: f32,
 }
 
 pub struct Sequencer {
@@ -67,6 +71,14 @@ impl Sequencer {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        if (sample_rate - self.sample_rate).abs() > 0.1 {
+            self.sample_rate = sample_rate;
+            self.bar_length_samples = Self::calculate_bar_length_samples(sample_rate, self.tempo_bpm);
+        }
+    }
+
     fn hash_params(params: &DeviceParams) -> u64 {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -83,6 +95,9 @@ impl Sequencer {
                 }
             }
         }
+
+        // Include swing in the hash so bars regenerate when swing changes
+        params.swing_amount.modulated_plain_value().to_bits().hash(&mut hasher);
 
         hasher.finish()
     }
@@ -159,16 +174,36 @@ impl Sequencer {
                         if random_value < cumulative {
                             let (start, end) = DeviceParams::get_beat_time_span(mode, count, index);
                             let duration_normalized = end - start;
-                            let note_length_percent = params.note_length_percent.modulated_plain_value();
-                            let duration_multiplier = note_length_percent / 100.0;
-                            let duration_samples = ((duration_normalized * total_samples as f32) * duration_multiplier) as usize;
-                            let sample_position = (start_time * total_samples as f32) as usize;
 
-                            // Get the strength value at this position
+                            // Get the strength value at this position (for note selection and length modifiers)
                             let strength = self.get_strength_at_position(start_time);
 
-                            // Select a note from the pool based on strength
-                            let frequency = if let Some(freq) = self.note_pool.select_note(strength, &mut rng) {
+                            // Calculate base duration
+                            let note_length_percent = params.note_length_percent.modulated_plain_value();
+                            let base_multiplier = note_length_percent / 100.0;
+
+                            // Apply length modifiers based on strength
+                            let length_mod_multiplier = params.calculate_length_multiplier(strength, &mut rng);
+                            let final_multiplier = base_multiplier * length_mod_multiplier;
+
+                            // Cap at 200% of beat duration to allow legato but prevent overflow
+                            let capped_multiplier = final_multiplier.min(2.0);
+                            let duration_samples = ((duration_normalized * total_samples as f32) * capped_multiplier) as usize;
+
+                            // Apply position modifier (humanization)
+                            let position_shift = params.calculate_position_shift(strength, duration_normalized, &mut rng);
+                            let shifted_time = (start_time + position_shift).clamp(0.0, 1.0);
+
+                            // Apply swing to the shifted time
+                            let swing_amount = params.swing_amount.modulated_plain_value();
+                            let swung_start_time = DeviceParams::apply_swing(shifted_time, swing_amount);
+                            let sample_position = (swung_start_time * total_samples as f32) as usize;
+
+                            // Calculate length value for note selection (0.0 = short, 0.5 = normal, 1.0 = long)
+                            let length_value = (capped_multiplier / 2.0).clamp(0.0, 1.0);
+
+                            // Select a note from the pool based on strength and length
+                            let frequency = if let Some(freq) = self.note_pool.select_note_with_length(strength, length_value, &mut rng) {
                                 freq as f64
                             } else if let Some(root_midi) = self.note_pool.root_note {
                                 // Fallback to root note if no notes selected from pool
@@ -178,10 +213,14 @@ impl Sequencer {
                                 130.81
                             };
 
+                            // Calculate decay multiplier for volume envelope
+                            let decay_multiplier = params.calculate_decay_multiplier(strength, &mut rng);
+
                             events.push(NoteEvent {
                                 sample_position,
                                 frequency,
                                 duration_samples,
+                                decay_multiplier,
                             });
                             break;
                         }
@@ -205,7 +244,7 @@ impl Sequencer {
         events
     }
 
-    pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64) {
+    pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64, f32) {
         let new_hash = Self::hash_params(params);
         let params_changed = new_hash != self.params_hash;
 
@@ -217,11 +256,13 @@ impl Sequencer {
         let mut should_trigger = false;
         let mut should_release = false;
         let mut frequency = 130.81; // Default frequency (C3)
+        let mut decay_multiplier = 1.0_f32;
 
         for event in &self.current_bar {
             if event.sample_position == self.bar_position_samples {
                 should_trigger = true;
                 frequency = event.frequency;
+                decay_multiplier = event.decay_multiplier;
                 self.current_note = Some((
                     event.sample_position,
                     event.sample_position + event.duration_samples,
@@ -248,6 +289,6 @@ impl Sequencer {
             self.current_note = None;
         }
 
-        (should_trigger, should_release, frequency)
+        (should_trigger, should_release, frequency, decay_multiplier)
     }
 }

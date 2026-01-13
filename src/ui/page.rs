@@ -60,7 +60,7 @@ impl Page {
                 super::pages::strength::render(tui, params, setter, ui_state)
             }
             Page::Synth => {
-                super::pages::synth::render(tui, params, setter)
+                super::pages::synth::render(tui, params, setter, ui_state)
             }
             Page::Modulation => {
                 super::pages::modulation::render(tui, params, setter)

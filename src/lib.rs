@@ -17,7 +17,7 @@ use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
 use ui::{Page, SharedUiState};
-use synth::SynthEngine;
+use synth::{SynthEngine, MasterLimiter};
 use midi::MidiCCState;
 
 pub struct Device {
@@ -25,6 +25,11 @@ pub struct Device {
     synth_engine: Option<SynthEngine>,
     ui_state: Arc<SharedUiState>,
     midi_state: MidiCCState,
+    sample_rate: f32,
+    cpu_load_smoothed: f32,
+    volume_slew: f32,
+    output_level_smoothed: f32,
+    limiter: MasterLimiter,
 }
 
 impl Default for Device {
@@ -34,6 +39,11 @@ impl Default for Device {
             synth_engine: None,
             ui_state: Arc::new(SharedUiState::new()),
             midi_state: MidiCCState::new(),
+            sample_rate: 44100.0,
+            cpu_load_smoothed: 0.0,
+            volume_slew: 0.5,
+            output_level_smoothed: 0.0,
+            limiter: MasterLimiter::new(44100.0),
         }
     }
 }
@@ -100,7 +110,7 @@ impl Plugin for Device {
                             });
 
                             tui.ui(|ui| {
-                                ui::navigation::render(ui, &mut current_page);
+                                ui::navigation::render(ui, &mut current_page, &params, setter, &ui_state);
                             });
 
                             tui.ui(|ui| {
@@ -122,7 +132,21 @@ impl Plugin for Device {
         buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        self.synth_engine = Some(SynthEngine::new(buffer_config.sample_rate));
+        // Workaround for jack crate bug on macOS: use SAMPLE_RATE env var if set
+        let new_sample_rate = std::env::var("SAMPLE_RATE")
+            .ok()
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(buffer_config.sample_rate);
+
+        let sample_rate_changed = (new_sample_rate - self.sample_rate).abs() > 0.1;
+
+        self.sample_rate = new_sample_rate;
+
+        if self.synth_engine.is_none() || sample_rate_changed {
+            self.synth_engine = Some(SynthEngine::new(new_sample_rate));
+            self.limiter.set_sample_rate(new_sample_rate);
+        }
+
         true
     }
 
@@ -164,16 +188,43 @@ impl Plugin for Device {
                 self.params.synth_pll_fm_ratio.value(),
             );
 
-            synth.set_formant_params(
-                self.params.synth_formant_mix.modulated_plain_value(),
-                self.params.synth_formant_vowel.modulated_plain_value(),
-                self.params.synth_formant_shift.modulated_plain_value(),
+            synth.set_pll_experimental_params(
+                self.params.synth_pll_retrigger.modulated_plain_value(),
+                self.params.synth_pll_burst_threshold.modulated_plain_value(),
+                self.params.synth_pll_burst_amount.modulated_plain_value(),
+                self.params.synth_pll_loop_saturation.modulated_plain_value(),
+                self.params.synth_pll_color_amount.modulated_plain_value(),
+                self.params.synth_pll_edge_sensitivity.modulated_plain_value(),
+                self.params.synth_pll_stereo_track_offset.modulated_plain_value(),
             );
+
+            synth.set_pll_stereo_phase(self.params.synth_pll_stereo_phase.modulated_plain_value());
+            synth.set_pll_cross_feedback(self.params.synth_pll_cross_feedback.modulated_plain_value());
+            synth.set_pll_fm_env_amount(self.params.synth_pll_fm_env_amount.modulated_plain_value());
+
+            synth.set_coloration_params(
+                self.params.synth_ring_mod.modulated_plain_value(),
+                self.params.synth_wavefold.modulated_plain_value(),
+                self.params.synth_drift_amount.modulated_plain_value(),
+                self.params.synth_drift_rate.modulated_plain_value(),
+                self.params.synth_noise_amount.modulated_plain_value(),
+                self.params.synth_tube_drive.modulated_plain_value(),
+                self.params.synth_color_distortion_amount.modulated_plain_value(),
+                self.params.synth_color_distortion_threshold.modulated_plain_value(),
+            );
+
+            synth.set_bypass_switches(
+                self.params.synth_pll_enable.value(),
+                self.params.synth_vps_enable.value(),
+                self.params.synth_coloration_enable.value(),
+                self.params.synth_reverb_enable.value(),
+                self.params.synth_oversampling_factor.value(),
+            );
+
+            synth.set_base_rate(self.params.synth_base_rate.value());
 
             synth.set_pll_ref_params(
                 self.params.synth_pll_ref_octave.value(),
-                self.params.synth_pll_ref_tune.value(),
-                self.params.synth_pll_ref_fine_tune.modulated_plain_value(),
                 self.params.synth_pll_ref_pulse_width.modulated_plain_value(),
             );
 
@@ -183,6 +234,8 @@ impl Plugin for Device {
                 2 => 4.0,
                 3 => 8.0,
                 4 => 16.0,
+                5 => 32.0,
+                6 => 64.0,
                 _ => 1.0,
             };
 
@@ -199,23 +252,17 @@ impl Plugin for Device {
 
             synth.set_pll_stereo_damp_offset(self.params.synth_pll_stereo_damp_offset.modulated_plain_value());
 
-            synth.set_pll_distortion(self.params.synth_pll_distortion_amount.modulated_plain_value());
-
             synth.set_pll_glide(self.params.synth_pll_glide.modulated_plain_value());
 
-            synth.set_distortion(self.params.synth_distortion_amount.modulated_plain_value());
-
-            let filter_mode = self.params.synth_filter_mode.value();
             synth.set_filter_params(
                 self.params.synth_filter_enable.value(),
                 self.params.synth_filter_cutoff.modulated_plain_value(),
                 self.params.synth_filter_resonance.modulated_plain_value(),
                 self.params.synth_filter_env_amount.modulated_plain_value(),
                 self.params.synth_filter_drive.modulated_plain_value(),
-                filter_mode,
             );
 
-            synth.set_volume(self.params.synth_volume.modulated_plain_value());
+            synth.set_volume(1.0);
 
             synth.set_volume_envelope(
                 self.params.synth_vol_attack.modulated_plain_value(),
@@ -301,9 +348,35 @@ impl Plugin for Device {
             let pll_feedback_amt = self.params.synth_pll_feedback.modulated_plain_value();
             let base_freq = 220.0;
 
+            let start_time = std::time::Instant::now();
             synth.process_block(&mut output_l, &mut output_r, &self.params, pll_feedback_amt, base_freq);
+            let elapsed = start_time.elapsed();
 
+            let buffer_time_secs = buffer.samples() as f32 / self.sample_rate;
+            let cpu_load = (elapsed.as_secs_f32() / buffer_time_secs) * 100.0;
+
+            let smoothing_time = 1.5;
+            let alpha = 1.0 - (-buffer_time_secs / smoothing_time).exp();
+            self.cpu_load_smoothed = alpha * cpu_load + (1.0 - alpha) * self.cpu_load_smoothed;
+            self.ui_state.set_cpu_load(self.cpu_load_smoothed);
+
+            let target_volume = self.params.global_volume.modulated_plain_value();
+            let slew_coeff = 1.0 - (-1.0 / (self.sample_rate * 0.01)).exp();
+
+            for i in 0..output_l.len() {
+                self.volume_slew += (target_volume - self.volume_slew) * slew_coeff;
+                output_l[i] *= self.volume_slew;
+                output_r[i] *= self.volume_slew;
+            }
+
+            if self.params.limiter_enable.value() {
+                self.limiter.process_block(&mut output_l, &mut output_r);
+            }
+
+            let mut peak: f32 = 0.0;
             for (i, channel_samples) in buffer.iter_samples().enumerate() {
+                peak = peak.max(output_l[i].abs()).max(output_r[i].abs());
+
                 let mut iter = channel_samples.into_iter();
                 if let Some(left) = iter.next() {
                     *left = output_l[i];
@@ -312,6 +385,15 @@ impl Plugin for Device {
                     *right = output_r[i];
                 }
             }
+
+            let decay_time = 0.3;
+            let decay_coeff = (-buffer_time_secs / decay_time).exp();
+            if peak > self.output_level_smoothed {
+                self.output_level_smoothed = peak;
+            } else {
+                self.output_level_smoothed *= decay_coeff;
+            }
+            self.ui_state.set_output_level(self.output_level_smoothed.min(1.0));
         } else {
             for channel_samples in buffer.iter_samples() {
                 for sample_out in channel_samples {

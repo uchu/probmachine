@@ -4,12 +4,13 @@ mod oscillator;
 mod filter;
 mod envelope;
 mod reverb;
-mod formant;
 mod voice;
 pub mod lfo;
+mod limiter;
 
 pub use voice::Voice;
 pub use lfo::LfoBank;
+pub use limiter::MasterLimiter;
 use crate::sequencer::Sequencer;
 use crate::params::DeviceParams;
 
@@ -34,6 +35,13 @@ impl SynthEngine {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn set_sample_rate(&mut self, sample_rate: f32) {
+        self.voice.set_sample_rate(sample_rate);
+        self.sequencer.set_sample_rate(sample_rate as f64);
+        self.lfo_bank.set_sample_rate(sample_rate as f64);
+    }
+
     pub fn set_osc_params(&mut self, d: f32, v: f32) {
         self.voice.set_osc_params(d as f64, v as f64);
     }
@@ -50,8 +58,8 @@ impl SynthEngine {
         self.voice.set_vps_stereo_v_offset(offset as f64);
     }
 
-    pub fn set_pll_ref_params(&mut self, octave: i32, tune: i32, fine_tune: f32, pulse_width: f32) {
-        self.voice.set_pll_ref_params(octave, tune, fine_tune as f64, pulse_width as f64);
+    pub fn set_pll_ref_params(&mut self, octave: i32, pulse_width: f32) {
+        self.voice.set_pll_ref_params(octave, pulse_width as f64);
     }
 
     pub fn set_pll_params(&mut self, track: f32, damp: f32, mult: f32, influence: f32, colored: bool, edge_mode: bool) {
@@ -66,10 +74,6 @@ impl SynthEngine {
         self.voice.set_pll_stereo_damp_offset(offset as f64);
     }
 
-    pub fn set_pll_distortion(&mut self, amount: f32) {
-        self.voice.set_pll_distortion(amount as f64);
-    }
-
     pub fn set_pll_glide(&mut self, glide_ms: f32) {
         self.voice.set_glide_time(glide_ms as f64);
     }
@@ -78,20 +82,83 @@ impl SynthEngine {
         self.voice.set_pll_fm_params(amount as f64, ratio);
     }
 
+    pub fn set_pll_experimental_params(
+        &mut self,
+        retrigger: f32,
+        burst_threshold: f32,
+        burst_amount: f32,
+        loop_saturation: f32,
+        color_amount: f32,
+        edge_sensitivity: f32,
+        stereo_track_offset: f32,
+    ) {
+        self.voice.set_pll_experimental_params(
+            retrigger as f64,
+            burst_threshold as f64,
+            burst_amount as f64,
+            loop_saturation as f64,
+            color_amount as f64,
+            edge_sensitivity as f64,
+            stereo_track_offset as f64,
+        );
+    }
+
+    pub fn set_pll_stereo_phase(&mut self, phase: f32) {
+        self.voice.set_pll_stereo_phase(phase as f64);
+    }
+
+    pub fn set_pll_cross_feedback(&mut self, amount: f32) {
+        self.voice.set_pll_cross_feedback(amount as f64);
+    }
+
+    pub fn set_pll_fm_env_amount(&mut self, amount: f32) {
+        self.voice.set_pll_fm_env_amount(amount as f64);
+    }
+
+    pub fn set_coloration_params(
+        &mut self,
+        ring_mod: f32,
+        wavefold: f32,
+        drift_amount: f32,
+        drift_rate: f32,
+        noise: f32,
+        tube: f32,
+        distortion_amount: f32,
+        distortion_threshold: f32,
+    ) {
+        self.voice.set_coloration_params(
+            ring_mod as f64,
+            wavefold as f64,
+            drift_amount as f64,
+            drift_rate as f64,
+            noise as f64,
+            tube as f64,
+            distortion_amount as f64,
+            distortion_threshold as f64,
+        );
+    }
+
+    pub fn set_bypass_switches(
+        &mut self,
+        pll: bool,
+        vps: bool,
+        coloration: bool,
+        reverb: bool,
+        oversampling_factor: i32,
+    ) {
+        self.voice.set_bypass_switches(pll, vps, coloration, reverb, oversampling_factor);
+    }
+
+    pub fn set_base_rate(&mut self, rate_option: i32) {
+        self.voice.set_base_rate(rate_option);
+    }
+
     pub fn set_sub_volume(&mut self, volume: f32) {
         self.voice.set_sub_volume(volume as f64);
     }
 
-    pub fn set_distortion(&mut self, amount: f32) {
-        self.voice.set_distortion(amount as f64);
-    }
-
-    pub fn set_formant_params(&mut self, mix: f32, vowel: f32, shift: f32) {
-        self.voice.set_formant_params(mix as f64, vowel as f64, shift as f64);
-    }
-
-    pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, mode: i32) {
-        self.voice.set_filter_params(enabled, cutoff as f64, resonance as f64, env_amount as f64, drive as f64, mode);
+    pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32) {
+        self.voice.set_filter_params(enabled, cutoff as f64, resonance as f64, env_amount as f64, drive as f64);
     }
 
     pub fn set_volume(&mut self, volume: f32) {
@@ -191,10 +258,11 @@ impl SynthEngine {
         let bpm = self.sequencer.get_bpm();
 
         for (l, r) in output_l.iter_mut().zip(output_r.iter_mut()) {
-            let (should_trigger, should_release, frequency) = self.sequencer.update(params);
+            let (should_trigger, should_release, frequency, decay_multiplier) = self.sequencer.update(params);
 
             if should_trigger {
                 self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
+                self.voice.set_decay_multiplier(decay_multiplier as f64);
                 self.voice.trigger();
             }
 

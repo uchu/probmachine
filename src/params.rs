@@ -19,6 +19,35 @@ impl BeatMode {
     }
 }
 
+/// Check if a note's strength matches the target slider value
+/// target: -100 to 100 where negative=weak, 0=off, positive=strong
+/// strength: 0.0 to 1.0 (normalized note strength from grid)
+pub fn strength_target_matches(target: f32, strength: f32) -> bool {
+    // Dead zone near center = modifier is off
+    if target.abs() < 5.0 {
+        return false;
+    }
+
+    // Must have some strength to match
+    if strength <= 0.0 {
+        return false;
+    }
+
+    if target < 0.0 {
+        // Targeting weak notes
+        // At -100: only very weak (strength < 0.15)
+        // At -5: up to medium-weak (strength < 0.48)
+        let threshold = 0.5 + (target + 5.0) / 285.0; // Maps -100 to 0.17, -5 to 0.5
+        strength < threshold
+    } else {
+        // Targeting strong notes
+        // At +5: above medium-strong (strength > 0.52)
+        // At +100: only very strong (strength > 0.85)
+        let threshold = 0.5 + (target - 5.0) / 285.0; // Maps +5 to 0.5, +100 to 0.83
+        strength > threshold
+    }
+}
+
 #[derive(Params)]
 pub struct DeviceParams {
     #[persist = "editor-state"]
@@ -361,13 +390,6 @@ pub struct DeviceParams {
     #[id = "synth_pll_fm_ratio"]
     pub synth_pll_fm_ratio: IntParam,
 
-    #[id = "synth_formant_mix"]
-    pub synth_formant_mix: FloatParam,
-    #[id = "synth_formant_vowel"]
-    pub synth_formant_vowel: FloatParam,
-    #[id = "synth_formant_shift"]
-    pub synth_formant_shift: FloatParam,
-
     #[id = "synth_pll_track_speed"]
     pub synth_pll_track_speed: FloatParam,
     #[id = "synth_pll_damping"]
@@ -380,10 +402,6 @@ pub struct DeviceParams {
     pub synth_pll_mode: BoolParam,
     #[id = "synth_pll_ref_octave"]
     pub synth_pll_ref_octave: IntParam,
-    #[id = "synth_pll_ref_tune"]
-    pub synth_pll_ref_tune: IntParam,
-    #[id = "synth_pll_ref_fine_tune"]
-    pub synth_pll_ref_fine_tune: FloatParam,
     #[id = "synth_pll_ref_pulse_width"]
     pub synth_pll_ref_pulse_width: FloatParam,
     #[id = "synth_pll_feedback"]
@@ -392,15 +410,64 @@ pub struct DeviceParams {
     pub synth_pll_influence: FloatParam,
     #[id = "synth_pll_volume"]
     pub synth_pll_volume: FloatParam,
-    #[id = "synth_pll_distortion_amount"]
-    pub synth_pll_distortion_amount: FloatParam,
     #[id = "synth_pll_stereo_damp_offset"]
     pub synth_pll_stereo_damp_offset: FloatParam,
     #[id = "synth_pll_glide"]
     pub synth_pll_glide: FloatParam,
 
-    #[id = "synth_distortion_amount"]
-    pub synth_distortion_amount: FloatParam,
+    // New PLL experimental parameters
+    #[id = "synth_pll_retrigger"]
+    pub synth_pll_retrigger: FloatParam,
+    #[id = "synth_pll_burst_threshold"]
+    pub synth_pll_burst_threshold: FloatParam,
+    #[id = "synth_pll_burst_amount"]
+    pub synth_pll_burst_amount: FloatParam,
+    #[id = "synth_pll_loop_saturation"]
+    pub synth_pll_loop_saturation: FloatParam,
+    #[id = "synth_pll_color_amount"]
+    pub synth_pll_color_amount: FloatParam,
+    #[id = "synth_pll_edge_sensitivity"]
+    pub synth_pll_edge_sensitivity: FloatParam,
+    #[id = "synth_pll_stereo_track_offset"]
+    pub synth_pll_stereo_track_offset: FloatParam,
+    #[id = "synth_pll_stereo_phase"]
+    pub synth_pll_stereo_phase: FloatParam,
+    #[id = "synth_pll_cross_feedback"]
+    pub synth_pll_cross_feedback: FloatParam,
+    #[id = "synth_pll_fm_env_amount"]
+    pub synth_pll_fm_env_amount: FloatParam,
+
+    #[id = "synth_ring_mod"]
+    pub synth_ring_mod: FloatParam,
+    #[id = "synth_wavefold"]
+    pub synth_wavefold: FloatParam,
+
+    #[id = "synth_drift_amount"]
+    pub synth_drift_amount: FloatParam,
+    #[id = "synth_drift_rate"]
+    pub synth_drift_rate: FloatParam,
+    #[id = "synth_noise_amount"]
+    pub synth_noise_amount: FloatParam,
+    #[id = "synth_tube_drive"]
+    pub synth_tube_drive: FloatParam,
+    #[id = "synth_color_distortion_amount"]
+    pub synth_color_distortion_amount: FloatParam,
+    #[id = "synth_color_distortion_threshold"]
+    pub synth_color_distortion_threshold: FloatParam,
+
+    // Bypass switches for CPU profiling
+    #[id = "synth_pll_enable"]
+    pub synth_pll_enable: BoolParam,
+    #[id = "synth_vps_enable"]
+    pub synth_vps_enable: BoolParam,
+    #[id = "synth_coloration_enable"]
+    pub synth_coloration_enable: BoolParam,
+    #[id = "synth_reverb_enable"]
+    pub synth_reverb_enable: BoolParam,
+    #[id = "synth_oversampling_factor"]
+    pub synth_oversampling_factor: IntParam,
+    #[id = "synth_base_rate"]
+    pub synth_base_rate: IntParam,  // 0=Auto, 1=44.1k, 2=88.2k, 3=96k, 4=192k
 
     #[id = "synth_filter_enable"]
     pub synth_filter_enable: BoolParam,
@@ -412,11 +479,12 @@ pub struct DeviceParams {
     pub synth_filter_env_amount: FloatParam,
     #[id = "synth_filter_drive"]
     pub synth_filter_drive: FloatParam,
-    #[id = "synth_filter_mode"]
-    pub synth_filter_mode: IntParam,
 
-    #[id = "synth_volume"]
-    pub synth_volume: FloatParam,
+    #[id = "global_volume"]
+    pub global_volume: FloatParam,
+
+    #[id = "limiter_enable"]
+    pub limiter_enable: BoolParam,
 
     #[id = "synth_vol_attack"]
     pub synth_vol_attack: FloatParam,
@@ -545,9 +613,251 @@ pub struct DeviceParams {
 
     #[id = "note_length_percent"]
     pub note_length_percent: FloatParam,
+
+    #[id = "len_mod_1_target"]
+    pub len_mod_1_target: FloatParam,
+    #[id = "len_mod_1_amount"]
+    pub len_mod_1_amount: FloatParam,
+    #[id = "len_mod_1_prob"]
+    pub len_mod_1_prob: FloatParam,
+
+    #[id = "len_mod_2_target"]
+    pub len_mod_2_target: FloatParam,
+    #[id = "len_mod_2_amount"]
+    pub len_mod_2_amount: FloatParam,
+    #[id = "len_mod_2_prob"]
+    pub len_mod_2_prob: FloatParam,
+
+    #[id = "decay_mod_1_target"]
+    pub decay_mod_1_target: FloatParam,
+    #[id = "decay_mod_1_amount"]
+    pub decay_mod_1_amount: FloatParam,
+    #[id = "decay_mod_1_prob"]
+    pub decay_mod_1_prob: FloatParam,
+
+    #[id = "decay_mod_2_target"]
+    pub decay_mod_2_target: FloatParam,
+    #[id = "decay_mod_2_amount"]
+    pub decay_mod_2_amount: FloatParam,
+    #[id = "decay_mod_2_prob"]
+    pub decay_mod_2_prob: FloatParam,
+
+    #[id = "pos_mod_1_target"]
+    pub pos_mod_1_target: FloatParam,
+    #[id = "pos_mod_1_shift"]
+    pub pos_mod_1_shift: FloatParam,
+    #[id = "pos_mod_1_prob"]
+    pub pos_mod_1_prob: FloatParam,
+
+    #[id = "pos_mod_2_target"]
+    pub pos_mod_2_target: FloatParam,
+    #[id = "pos_mod_2_shift"]
+    pub pos_mod_2_shift: FloatParam,
+    #[id = "pos_mod_2_prob"]
+    pub pos_mod_2_prob: FloatParam,
+
+    #[id = "swing_amount"]
+    pub swing_amount: FloatParam,
 }
 
 impl DeviceParams {
+    /// Apply swing to a normalized time position (0.0 to 1.0)
+    /// swing_amount: 50 = no swing, 66 = triplet feel, 75 = hard swing
+    /// Swing affects the "and" of each beat (8th notes within quarter notes)
+    pub fn apply_swing(time: f32, swing_amount: f32) -> f32 {
+        if (swing_amount - 50.0).abs() < 0.01 {
+            return time;
+        }
+
+        let swing_ratio = swing_amount / 100.0; // 0.5 to 0.75
+
+        // Work within each quarter note (0.25 of the bar)
+        let quarter_duration = 0.25_f32;
+        let quarter_index = (time / quarter_duration).floor();
+        let quarter_start = quarter_index * quarter_duration;
+        let pos_in_quarter = time - quarter_start;
+
+        // 8th note is half a quarter (0.125)
+        let eighth_duration = quarter_duration / 2.0;
+
+        // Check if we're in the second half of the quarter (the "and")
+        if pos_in_quarter >= eighth_duration - 0.001 {
+            // This is an "and" beat - apply swing
+            // Calculate how far into the second 8th we are
+            let pos_in_second_eighth = pos_in_quarter - eighth_duration;
+            let ratio_in_second_eighth = pos_in_second_eighth / eighth_duration;
+
+            // The second 8th starts at swing_ratio and ends at 1.0 of the quarter
+            let swung_eighth_start = quarter_duration * swing_ratio;
+            let swung_eighth_duration = quarter_duration - swung_eighth_start;
+
+            quarter_start + swung_eighth_start + ratio_in_second_eighth * swung_eighth_duration
+        } else {
+            // This is a downbeat - compress into the first part of the quarter
+            let ratio_in_first_eighth = pos_in_quarter / eighth_duration;
+            let swung_first_duration = quarter_duration * swing_ratio;
+
+            quarter_start + ratio_in_first_eighth * swung_first_duration
+        }
+    }
+
+    /// Get all length modifiers as (target, amount, probability) tuples
+    pub fn get_length_modifiers(&self) -> [(f32, f32, f32); 2] {
+        [
+            (
+                self.len_mod_1_target.value(),
+                self.len_mod_1_amount.value(),
+                self.len_mod_1_prob.value(),
+            ),
+            (
+                self.len_mod_2_target.value(),
+                self.len_mod_2_amount.value(),
+                self.len_mod_2_prob.value(),
+            ),
+        ]
+    }
+
+    /// Get all decay modifiers as (target, amount, probability) tuples
+    pub fn get_decay_modifiers(&self) -> [(f32, f32, f32); 2] {
+        [
+            (
+                self.decay_mod_1_target.value(),
+                self.decay_mod_1_amount.value(),
+                self.decay_mod_1_prob.value(),
+            ),
+            (
+                self.decay_mod_2_target.value(),
+                self.decay_mod_2_amount.value(),
+                self.decay_mod_2_prob.value(),
+            ),
+        ]
+    }
+
+    /// Calculate the length multiplier based on strength and modifiers
+    /// Returns the multiplier (1.0 = base length, 2.0 = double length)
+    pub fn calculate_length_multiplier(&self, strength: f32, rng: &mut impl rand::Rng) -> f32 {
+        let modifiers = self.get_length_modifiers();
+
+        // Collect matching modifiers
+        let mut candidates: Vec<(f32, f32)> = Vec::new(); // (amount, probability)
+        for (target, amount, prob) in modifiers.iter() {
+            if strength_target_matches(*target, strength) && *prob > 0.0 {
+                candidates.push((*amount, *prob));
+            }
+        }
+
+        if candidates.is_empty() {
+            return 1.0;
+        }
+
+        let total_prob: f32 = candidates.iter().map(|(_, p)| p).sum();
+        let roll = rng.gen_range(0.0..127.0);
+
+        if roll >= total_prob {
+            return 1.0; // No modifier applies
+        }
+
+        // Pick winner proportionally
+        let mut cumulative = 0.0;
+        for (amount, prob) in candidates {
+            cumulative += prob;
+            if roll < cumulative {
+                return amount / 100.0; // Convert percent to multiplier
+            }
+        }
+
+        1.0
+    }
+
+    /// Calculate the decay multiplier based on strength and modifiers
+    /// Returns the multiplier (1.0 = base decay, 2.0 = double decay time)
+    pub fn calculate_decay_multiplier(&self, strength: f32, rng: &mut impl rand::Rng) -> f32 {
+        let modifiers = self.get_decay_modifiers();
+
+        // Collect matching modifiers
+        let mut candidates: Vec<(f32, f32)> = Vec::new(); // (amount, probability)
+        for (target, amount, prob) in modifiers.iter() {
+            if strength_target_matches(*target, strength) && *prob > 0.0 {
+                candidates.push((*amount, *prob));
+            }
+        }
+
+        if candidates.is_empty() {
+            return 1.0;
+        }
+
+        let total_prob: f32 = candidates.iter().map(|(_, p)| p).sum();
+        let roll = rng.gen_range(0.0..127.0);
+
+        if roll >= total_prob {
+            return 1.0; // No modifier applies
+        }
+
+        // Pick winner proportionally
+        let mut cumulative = 0.0;
+        for (amount, prob) in candidates {
+            cumulative += prob;
+            if roll < cumulative {
+                return amount / 100.0; // Convert percent to multiplier
+            }
+        }
+
+        1.0
+    }
+
+    /// Get position modifiers as (target, shift, probability) tuples
+    pub fn get_position_modifiers(&self) -> [(f32, f32, f32); 2] {
+        [
+            (
+                self.pos_mod_1_target.value(),
+                self.pos_mod_1_shift.value(),
+                self.pos_mod_1_prob.value(),
+            ),
+            (
+                self.pos_mod_2_target.value(),
+                self.pos_mod_2_shift.value(),
+                self.pos_mod_2_prob.value(),
+            ),
+        ]
+    }
+
+    /// Calculate the position shift based on strength and modifiers
+    /// Returns the shift as a fraction of beat duration (-0.5 to +0.5)
+    pub fn calculate_position_shift(&self, strength: f32, beat_duration: f32, rng: &mut impl rand::Rng) -> f32 {
+        let modifiers = self.get_position_modifiers();
+
+        // Collect matching modifiers
+        let mut candidates: Vec<(f32, f32)> = Vec::new(); // (shift, probability)
+        for (target, shift, prob) in modifiers.iter() {
+            if strength_target_matches(*target, strength) && *prob > 0.0 {
+                candidates.push((*shift, *prob));
+            }
+        }
+
+        if candidates.is_empty() {
+            return 0.0;
+        }
+
+        let total_prob: f32 = candidates.iter().map(|(_, p)| p).sum();
+        let roll = rng.gen_range(0.0..127.0);
+
+        if roll >= total_prob {
+            return 0.0; // No modifier applies
+        }
+
+        // Pick winner proportionally
+        let mut cumulative = 0.0;
+        for (shift, prob) in candidates {
+            cumulative += prob;
+            if roll < cumulative {
+                // Convert shift percentage to actual time offset
+                return (shift / 100.0) * beat_duration;
+            }
+        }
+
+        0.0
+    }
+
     pub fn get_beat_time_span(mode: BeatMode, beat_count: usize, beat_index: usize) -> (f32, f32) {
         match mode {
             BeatMode::Straight => {
@@ -1120,7 +1430,7 @@ impl Default for DeviceParams {
             synth_osc_octave: IntParam::new(
                 "VPS Octave".to_string(),
                 0,
-                IntRange::Linear { min: -2, max: 2 }
+                IntRange::Linear { min: -5, max: 5 }
             ),
             synth_sub_volume: FloatParam::new(
                 "Sub Volume".to_string(),
@@ -1131,29 +1441,13 @@ impl Default for DeviceParams {
             synth_pll_fm_amount: FloatParam::new(
                 "PLL FM Amount".to_string(),
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
+                FloatRange::Linear { min: 0.0, max: 0.2 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_fm_ratio: IntParam::new(
                 "PLL FM Ratio".to_string(),
                 1,
                 IntRange::Linear { min: 1, max: 8 }
             ),
-
-            synth_formant_mix: FloatParam::new(
-                "Formant Mix".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_formant_vowel: FloatParam::new(
-                "Formant Vowel".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_formant_shift: FloatParam::new(
-                "Formant Shift".to_string(),
-                0.0,
-                FloatRange::Linear { min: -1.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             synth_pll_track_speed: FloatParam::new(
                 "PLL Track Speed".to_string(),
@@ -1168,7 +1462,7 @@ impl Default for DeviceParams {
             synth_pll_mult: IntParam::new(
                 "PLL Multiplier".to_string(),
                 0,
-                IntRange::Linear { min: 0, max: 4 }
+                IntRange::Linear { min: 0, max: 6 }
             ),
             synth_pll_colored: BoolParam::new(
                 "PLL Colored".to_string(),
@@ -1181,18 +1475,8 @@ impl Default for DeviceParams {
             synth_pll_ref_octave: IntParam::new(
                 "PLL Ref Octave".to_string(),
                 0,
-                IntRange::Linear { min: -2, max: 2 }
+                IntRange::Linear { min: -5, max: 5 }
             ),
-            synth_pll_ref_tune: IntParam::new(
-                "PLL Ref Tune".to_string(),
-                0,
-                IntRange::Linear { min: -12, max: 12 }
-            ),
-            synth_pll_ref_fine_tune: FloatParam::new(
-                "PLL Ref Fine Tune".to_string(),
-                0.0,
-                FloatRange::Linear { min: -1.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_ref_pulse_width: FloatParam::new(
                 "PLL Ref Pulse Width".to_string(),
                 0.5,
@@ -1201,7 +1485,7 @@ impl Default for DeviceParams {
             synth_pll_feedback: FloatParam::new(
                 "PLL Feedback".to_string(),
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 0.1 }
+                FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_influence: FloatParam::new(
                 "PLL Influence".to_string(),
@@ -1213,15 +1497,10 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_pll_distortion_amount: FloatParam::new(
-                "PLL Distortion Amount".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 0.1 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_stereo_damp_offset: FloatParam::new(
                 "PLL Stereo Damp Δ".to_string(),
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 0.3 }
+                FloatRange::Linear { min: 0.0, max: 0.5 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_glide: FloatParam::new(
                 "PLL Glide".to_string(),
@@ -1229,11 +1508,115 @@ impl Default for DeviceParams {
                 FloatRange::Skewed { min: 0.0, max: 2000.0, factor: 0.3 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
-            synth_distortion_amount: FloatParam::new(
-                "Distortion Amount".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 0.1 }
+            // New PLL experimental parameters
+            synth_pll_retrigger: FloatParam::new(
+                "PLL Retrigger".to_string(),
+                0.05,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            synth_pll_burst_threshold: FloatParam::new(
+                "PLL Burst Threshold".to_string(),
+                0.7,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_burst_amount: FloatParam::new(
+                "PLL Burst Amount".to_string(),
+                3.3,
+                FloatRange::Linear { min: 0.0, max: 10.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_loop_saturation: FloatParam::new(
+                "PLL Loop Limit".to_string(),
+                100.0,
+                FloatRange::Skewed { min: 1.0, max: 500.0, factor: 0.5 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_color_amount: FloatParam::new(
+                "PLL Color Amount".to_string(),
+                0.25,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_edge_sensitivity: FloatParam::new(
+                "PLL Edge Sensitivity".to_string(),
+                0.02,
+                FloatRange::Skewed { min: 0.001, max: 0.2, factor: 0.5 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_stereo_track_offset: FloatParam::new(
+                "PLL Stereo Track Δ".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.5 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_stereo_phase: FloatParam::new(
+                "PLL Stereo Phase".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.5 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_cross_feedback: FloatParam::new(
+                "PLL Cross Feedback".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_fm_env_amount: FloatParam::new(
+                "PLL FM Env Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_ring_mod: FloatParam::new(
+                "Ring Mod".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_wavefold: FloatParam::new(
+                "Wavefold".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_drift_amount: FloatParam::new(
+                "Drift Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_drift_rate: FloatParam::new(
+                "Drift Rate".to_string(),
+                0.3,
+                FloatRange::Skewed { min: 0.01, max: 5.0, factor: 0.5 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_noise_amount: FloatParam::new(
+                "Noise Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_tube_drive: FloatParam::new(
+                "Tube Drive".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_color_distortion_amount: FloatParam::new(
+                "Color Distortion Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_color_distortion_threshold: FloatParam::new(
+                "Color Distortion Threshold".to_string(),
+                0.7,
+                FloatRange::Linear { min: 0.1, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            // Bypass switches (all enabled by default)
+            synth_pll_enable: BoolParam::new("PLL Enable".to_string(), true),
+            synth_vps_enable: BoolParam::new("VPS Enable".to_string(), true),
+            synth_coloration_enable: BoolParam::new("Coloration Enable".to_string(), true),
+            synth_reverb_enable: BoolParam::new("Reverb Enable".to_string(), true),
+            synth_oversampling_factor: IntParam::new(
+                "Oversampling Factor",
+                0,  // Default to 1x (index 0: 1x=0, 2x=1, 4x=2, 8x=3, 16x=4)
+                IntRange::Linear { min: 0, max: 4 },
+            ),
+            synth_base_rate: IntParam::new(
+                "Base Sample Rate",
+                0,  // 0=Auto, 1=44.1k, 2=88.2k, 3=96k, 4=192k
+                IntRange::Linear { min: 0, max: 4 },
+            ),
 
             synth_filter_enable: BoolParam::new(
                 "Filter Enable".to_string(),
@@ -1259,17 +1642,14 @@ impl Default for DeviceParams {
                 1.0,
                 FloatRange::Linear { min: 1.0, max: 15.849 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filter_mode: IntParam::new(
-                "Filter Mode".to_string(),
-                3,
-                IntRange::Linear { min: 0, max: 10 }
-            ),
 
-            synth_volume: FloatParam::new(
-                "Volume".to_string(),
-                0.8,
+            global_volume: FloatParam::new(
+                "Global Volume".to_string(),
+                0.5,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            limiter_enable: BoolParam::new("Limiter".to_string(), true),
 
             synth_vol_attack: FloatParam::new(
                 "Vol Attack".to_string(),
@@ -1429,13 +1809,13 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo1_dest1: IntParam::new("LFO 1 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo1_dest1: IntParam::new("LFO 1 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
             lfo1_amount1: FloatParam::new(
                 "LFO 1 Amount 1".to_string(),
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo1_dest2: IntParam::new("LFO 1 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo1_dest2: IntParam::new("LFO 1 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
             lfo1_amount2: FloatParam::new(
                 "LFO 1 Amount 2".to_string(),
                 0.0,
@@ -1457,13 +1837,13 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo2_dest1: IntParam::new("LFO 2 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo2_dest1: IntParam::new("LFO 2 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
             lfo2_amount1: FloatParam::new(
                 "LFO 2 Amount 1".to_string(),
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo2_dest2: IntParam::new("LFO 2 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo2_dest2: IntParam::new("LFO 2 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
             lfo2_amount2: FloatParam::new(
                 "LFO 2 Amount 2".to_string(),
                 0.0,
@@ -1485,13 +1865,13 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo3_dest1: IntParam::new("LFO 3 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo3_dest1: IntParam::new("LFO 3 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
             lfo3_amount1: FloatParam::new(
                 "LFO 3 Amount 1".to_string(),
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo3_dest2: IntParam::new("LFO 3 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 18 }),
+            lfo3_dest2: IntParam::new("LFO 3 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
             lfo3_amount2: FloatParam::new(
                 "LFO 3 Amount 2".to_string(),
                 0.0,
@@ -1500,9 +1880,111 @@ impl Default for DeviceParams {
 
             note_length_percent: FloatParam::new(
                 "Note Length %".to_string(),
+                95.0,
+                FloatRange::Linear { min: 1.0, max: 200.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            len_mod_1_target: FloatParam::new(
+                "Len Mod 1 Target",
+                0.0,
+                FloatRange::Linear { min: -100.0, max: 100.0 }
+            ),
+            len_mod_1_amount: FloatParam::new(
+                "Len Mod 1 Amount",
                 100.0,
                 FloatRange::Linear { min: 0.0, max: 200.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            ),
+            len_mod_1_prob: FloatParam::new(
+                "Len Mod 1 Prob",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 }
+            ),
+
+            len_mod_2_target: FloatParam::new(
+                "Len Mod 2 Target",
+                0.0,
+                FloatRange::Linear { min: -100.0, max: 100.0 }
+            ),
+            len_mod_2_amount: FloatParam::new(
+                "Len Mod 2 Amount",
+                100.0,
+                FloatRange::Linear { min: 0.0, max: 200.0 }
+            ),
+            len_mod_2_prob: FloatParam::new(
+                "Len Mod 2 Prob",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 }
+            ),
+
+            decay_mod_1_target: FloatParam::new(
+                "Decay Mod 1 Target",
+                0.0,
+                FloatRange::Linear { min: -100.0, max: 100.0 }
+            ),
+            decay_mod_1_amount: FloatParam::new(
+                "Decay Mod 1 Amount",
+                100.0,
+                FloatRange::Linear { min: 0.0, max: 200.0 }
+            ),
+            decay_mod_1_prob: FloatParam::new(
+                "Decay Mod 1 Prob",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 }
+            ),
+
+            decay_mod_2_target: FloatParam::new(
+                "Decay Mod 2 Target",
+                0.0,
+                FloatRange::Linear { min: -100.0, max: 100.0 }
+            ),
+            decay_mod_2_amount: FloatParam::new(
+                "Decay Mod 2 Amount",
+                100.0,
+                FloatRange::Linear { min: 0.0, max: 200.0 }
+            ),
+            decay_mod_2_prob: FloatParam::new(
+                "Decay Mod 2 Prob",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 }
+            ),
+
+            pos_mod_1_target: FloatParam::new(
+                "Pos Mod 1 Target",
+                0.0,
+                FloatRange::Linear { min: -100.0, max: 100.0 }
+            ),
+            pos_mod_1_shift: FloatParam::new(
+                "Pos Mod 1 Shift",
+                0.0,
+                FloatRange::Linear { min: -50.0, max: 50.0 }
+            ),
+            pos_mod_1_prob: FloatParam::new(
+                "Pos Mod 1 Prob",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 }
+            ),
+
+            pos_mod_2_target: FloatParam::new(
+                "Pos Mod 2 Target",
+                0.0,
+                FloatRange::Linear { min: -100.0, max: 100.0 }
+            ),
+            pos_mod_2_shift: FloatParam::new(
+                "Pos Mod 2 Shift",
+                0.0,
+                FloatRange::Linear { min: -50.0, max: 50.0 }
+            ),
+            pos_mod_2_prob: FloatParam::new(
+                "Pos Mod 2 Prob",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 127.0 }
+            ),
+
+            swing_amount: FloatParam::new(
+                "Swing".to_string(),
+                50.0,
+                FloatRange::Linear { min: 50.0, max: 75.0 }
+            ),
         }
     }
 }

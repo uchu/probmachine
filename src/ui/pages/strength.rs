@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use nih_plug::prelude::Param;
 use nih_plug_egui::egui::{self, Color32};
 use nih_plug_egui::egui::style::HandleShape;
 use egui_taffy::TuiBuilderLogic;
@@ -12,32 +13,255 @@ enum BeatStrengthMode {
     Triplet,
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum StrengthStyle {
+    FourFourStandard,
+    Backbeat,
+    Offbeat,
+    TripletFeel,
+    Shuffle,
+    Sparse,
+    Dense,
+    Polyrhythm34,
+    African,
+    Reggae,
+    Latin,
+    Funk,
+    Jazz,
+    Ambient,
+    Driving,
+}
+
+impl StrengthStyle {
+    pub fn all() -> &'static [StrengthStyle] {
+        &[
+            StrengthStyle::FourFourStandard,
+            StrengthStyle::Backbeat,
+            StrengthStyle::Offbeat,
+            StrengthStyle::TripletFeel,
+            StrengthStyle::Shuffle,
+            StrengthStyle::Sparse,
+            StrengthStyle::Dense,
+            StrengthStyle::Polyrhythm34,
+            StrengthStyle::African,
+            StrengthStyle::Reggae,
+            StrengthStyle::Latin,
+            StrengthStyle::Funk,
+            StrengthStyle::Jazz,
+            StrengthStyle::Ambient,
+            StrengthStyle::Driving,
+        ]
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            StrengthStyle::FourFourStandard => "4/4 Standard",
+            StrengthStyle::Backbeat => "Backbeat",
+            StrengthStyle::Offbeat => "Offbeat",
+            StrengthStyle::TripletFeel => "Triplet Feel",
+            StrengthStyle::Shuffle => "Shuffle",
+            StrengthStyle::Sparse => "Sparse",
+            StrengthStyle::Dense => "Dense",
+            StrengthStyle::Polyrhythm34 => "Polyrhythm 3:4",
+            StrengthStyle::African => "African",
+            StrengthStyle::Reggae => "Reggae",
+            StrengthStyle::Latin => "Latin",
+            StrengthStyle::Funk => "Funk",
+            StrengthStyle::Jazz => "Jazz",
+            StrengthStyle::Ambient => "Ambient",
+            StrengthStyle::Driving => "Driving",
+        }
+    }
+
+    pub fn generate_pattern(&self) -> [u8; 96] {
+        let mut s = [40u8; 96];
+
+        match self {
+            StrengthStyle::FourFourStandard => {
+                for i in 0..96 {
+                    let pos_in_beat = i % 24;
+                    if i == 0 { s[i] = 100; }
+                    else if i == 48 { s[i] = 90; }
+                    else if i == 24 || i == 72 { s[i] = 80; }
+                    else if pos_in_beat == 12 { s[i] = 65; }
+                    else if pos_in_beat == 6 || pos_in_beat == 18 { s[i] = 55; }
+                    else if pos_in_beat % 3 == 0 { s[i] = 50; }
+                    else { s[i] = 40; }
+                }
+            }
+            StrengthStyle::Backbeat => {
+                for i in 0..96 {
+                    let pos_in_beat = i % 24;
+                    if i == 24 || i == 72 { s[i] = 100; }
+                    else if i == 0 || i == 48 { s[i] = 65; }
+                    else if pos_in_beat == 12 { s[i] = 55; }
+                    else { s[i] = 35; }
+                }
+            }
+            StrengthStyle::Offbeat => {
+                for i in 0..96 {
+                    if i == 12 || i == 36 || i == 60 || i == 84 { s[i] = 100; }
+                    else if i == 0 || i == 24 || i == 48 || i == 72 { s[i] = 50; }
+                    else if i % 24 == 6 || i % 24 == 18 { s[i] = 70; }
+                    else { s[i] = 35; }
+                }
+            }
+            StrengthStyle::TripletFeel => {
+                for i in 0..96 {
+                    if i == 0 { s[i] = 100; }
+                    else if i == 48 { s[i] = 90; }
+                    else if i == 24 || i == 72 { s[i] = 80; }
+                    else if i % 32 == 0 { s[i] = 85; }
+                    else if i % 32 == 16 { s[i] = 70; }
+                    else if i % 8 == 0 { s[i] = 60; }
+                    else { s[i] = 40; }
+                }
+            }
+            StrengthStyle::Shuffle => {
+                for i in 0..96 {
+                    let pos_in_beat = i % 24;
+                    if i == 0 { s[i] = 100; }
+                    else if i == 48 { s[i] = 90; }
+                    else if i == 24 || i == 72 { s[i] = 80; }
+                    else if pos_in_beat == 16 { s[i] = 75; }
+                    else if pos_in_beat == 8 { s[i] = 55; }
+                    else { s[i] = 40; }
+                }
+            }
+            StrengthStyle::Sparse => {
+                for i in 0..96 {
+                    if i == 0 { s[i] = 100; }
+                    else if i == 48 { s[i] = 80; }
+                    else if i == 24 || i == 72 { s[i] = 60; }
+                    else { s[i] = 25; }
+                }
+            }
+            StrengthStyle::Dense => {
+                for i in 0..96 {
+                    if i == 0 { s[i] = 100; }
+                    else if i == 48 { s[i] = 95; }
+                    else if i == 24 || i == 72 { s[i] = 90; }
+                    else if i % 24 == 12 { s[i] = 85; }
+                    else if i % 24 == 6 || i % 24 == 18 { s[i] = 80; }
+                    else if i % 3 == 0 { s[i] = 75; }
+                    else { s[i] = 65; }
+                }
+            }
+            StrengthStyle::Polyrhythm34 => {
+                for i in 0..96 {
+                    let beat4 = i == 0 || i == 24 || i == 48 || i == 72;
+                    let beat3 = i == 0 || i == 32 || i == 64;
+                    if i == 0 { s[i] = 100; }
+                    else if beat3 && beat4 { s[i] = 95; }
+                    else if beat4 { s[i] = 80; }
+                    else if beat3 { s[i] = 85; }
+                    else { s[i] = 40; }
+                }
+            }
+            StrengthStyle::African => {
+                for i in 0..96 {
+                    if i == 0 { s[i] = 100; }
+                    else if i == 18 { s[i] = 90; }
+                    else if i == 36 { s[i] = 85; }
+                    else if i == 54 { s[i] = 80; }
+                    else if i == 72 { s[i] = 75; }
+                    else if i == 9 || i == 27 || i == 45 || i == 63 || i == 81 { s[i] = 65; }
+                    else { s[i] = 35; }
+                }
+            }
+            StrengthStyle::Reggae => {
+                for i in 0..96 {
+                    let pos_in_beat = i % 24;
+                    if i == 24 || i == 72 { s[i] = 100; }
+                    else if pos_in_beat == 12 { s[i] = 85; }
+                    else if i == 0 || i == 48 { s[i] = 45; }
+                    else { s[i] = 30; }
+                }
+            }
+            StrengthStyle::Latin => {
+                let son_clave = [0, 18, 48, 60, 78];
+                for i in 0..96 {
+                    if i == 0 { s[i] = 100; }
+                    else if son_clave.contains(&i) { s[i] = 90; }
+                    else if i == 24 || i == 72 { s[i] = 70; }
+                    else if i % 24 == 12 { s[i] = 55; }
+                    else { s[i] = 35; }
+                }
+            }
+            StrengthStyle::Funk => {
+                for i in 0..96 {
+                    let pos_in_beat = i % 24;
+                    if i == 0 { s[i] = 100; }
+                    else if i == 24 || i == 72 { s[i] = 85; }
+                    else if i == 48 { s[i] = 75; }
+                    else if i == 66 { s[i] = 90; }
+                    else if pos_in_beat == 6 || pos_in_beat == 18 { s[i] = 70; }
+                    else if pos_in_beat == 12 { s[i] = 60; }
+                    else { s[i] = 40; }
+                }
+            }
+            StrengthStyle::Jazz => {
+                for i in 0..96 {
+                    if i == 0 { s[i] = 90; }
+                    else if i == 48 { s[i] = 85; }
+                    else if i == 24 || i == 72 { s[i] = 80; }
+                    else if i % 32 == 0 { s[i] = 75; }
+                    else if i % 32 == 16 { s[i] = 70; }
+                    else if i % 8 == 0 { s[i] = 60; }
+                    else { s[i] = 45; }
+                }
+            }
+            StrengthStyle::Ambient => {
+                for i in 0..96 {
+                    let wave = (i as f32 * std::f32::consts::PI * 2.0 / 96.0).sin();
+                    s[i] = (55.0 + 25.0 * wave) as u8;
+                    if i == 0 { s[i] = 80; }
+                    else if i == 48 { s[i] = 70; }
+                }
+            }
+            StrengthStyle::Driving => {
+                for i in 0..96 {
+                    if i == 0 { s[i] = 100; }
+                    else if i == 24 || i == 48 || i == 72 { s[i] = 95; }
+                    else if i % 24 == 12 { s[i] = 90; }
+                    else if i % 24 == 6 || i % 24 == 18 { s[i] = 85; }
+                    else if i % 3 == 0 { s[i] = 75; }
+                    else { s[i] = 60; }
+                }
+            }
+        }
+        s
+    }
+}
+
 #[derive(Clone, PartialEq)]
 struct StrengthState {
     beat_strength_mode: BeatStrengthMode,
-    beat_strength_values: [u8; 96], // LCM of 32 and 24 = 96
+    beat_strength_values: [u8; 96], // LCM of 32 and 24 = 96, values 0-100
     last_preset_version: u64,
+    selected_style: Option<StrengthStyle>,
 }
 
 impl Default for StrengthState {
     fn default() -> Self {
         let mut values = [0u8; 96];
-        // Downbeat
-        values[0] = 64;
+        // Downbeat - strongest
+        values[0] = 100;
         // Quarter notes (every 24/96)
-        values[24] = 48;
-        values[48] = 48;
-        values[72] = 48;
+        values[24] = 75;
+        values[48] = 75;
+        values[72] = 75;
         // Eighth notes (every 12/96)
-        values[12] = 32;
-        values[36] = 32;
-        values[60] = 32;
-        values[84] = 32;
+        values[12] = 50;
+        values[36] = 50;
+        values[60] = 50;
+        values[84] = 50;
 
         Self {
             beat_strength_mode: BeatStrengthMode::Straight,
             beat_strength_values: values,
             last_preset_version: 0,
+            selected_style: None,
         }
     }
 }
@@ -45,9 +269,10 @@ impl Default for StrengthState {
 fn sync_state_from_shared(state: &mut StrengthState, ui_state: &Arc<SharedUiState>) {
     if let Ok(strength_values) = ui_state.strength_values.lock() {
         for i in 0..96 {
-            state.beat_strength_values[i] = (strength_values[i] * 127.0) as u8;
+            state.beat_strength_values[i] = (strength_values[i] * 100.0).round() as u8;
         }
     }
+    state.selected_style = None;
 }
 
 // Helper function to map S position to 96-grid
@@ -62,12 +287,13 @@ fn triplet_to_grid(pos: usize) -> usize {
 
 pub fn render(
     tui: &mut egui_taffy::Tui,
-    _params: &Arc<DeviceParams>,
+    params: &Arc<DeviceParams>,
     _setter: &nih_plug::prelude::ParamSetter,
     ui_state: &Arc<SharedUiState>,
 ) {
     let state_id = egui::Id::new("strength_state");
     let current_version = ui_state.get_preset_version();
+    let swing = params.swing_amount.modulated_plain_value();
 
     tui.ui(|ui| {
         ui.add_space(12.0);
@@ -91,13 +317,12 @@ pub fn render(
 
         let state_before = state.clone();
 
-        render_beat_strength(ui, &mut state);
+        render_beat_strength(ui, &mut state, swing);
 
         if state != state_before {
-            // Update shared state with normalized strength values (0.0 to 1.0)
             if let Ok(mut strength_values) = ui_state.strength_values.lock() {
                 for i in 0..96 {
-                    strength_values[i] = state.beat_strength_values[i] as f32 / 127.0;
+                    strength_values[i] = state.beat_strength_values[i] as f32 / 100.0;
                 }
             }
             ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
@@ -118,8 +343,8 @@ pub fn render(
     });
 }
 
-fn render_beat_strength(ui: &mut egui::Ui, state: &mut StrengthState) {
-    render_beat_strength_grid(ui, state);
+fn render_beat_strength(ui: &mut egui::Ui, state: &mut StrengthState, swing: f32) {
+    render_beat_strength_grid(ui, state, swing);
 }
 
 fn render_mode_buttons(ui: &mut egui::Ui, state: &mut StrengthState) {
@@ -131,7 +356,26 @@ fn render_mode_buttons(ui: &mut egui::Ui, state: &mut StrengthState) {
         .show(ui, |ui| {
             ui.vertical_centered(|ui| {
                 ui.horizontal(|ui| {
-                    ui.add_space(102.0);
+                    ui.add_space(12.0);
+
+                    ui.label(egui::RichText::new("Style:").size(12.0));
+                    ui.add_space(4.0);
+
+                    let current_name = state.selected_style.map(|s| s.name()).unwrap_or("Custom");
+                    egui::ComboBox::from_id_salt("strength_style")
+                        .selected_text(egui::RichText::new(current_name).size(12.0))
+                        .width(120.0)
+                        .show_ui(ui, |ui| {
+                            for style in StrengthStyle::all() {
+                                let is_selected = state.selected_style == Some(*style);
+                                if ui.selectable_label(is_selected, style.name()).clicked() {
+                                    state.selected_style = Some(*style);
+                                    state.beat_strength_values = style.generate_pattern();
+                                }
+                            }
+                        });
+
+                    ui.add_space(24.0);
 
                     let button_s = egui::Button::new(egui::RichText::new("S").size(14.0))
                         .min_size(egui::vec2(60.0, 32.0))
@@ -153,7 +397,7 @@ fn render_mode_buttons(ui: &mut egui::Ui, state: &mut StrengthState) {
         });
 }
 
-fn render_beat_strength_grid(ui: &mut egui::Ui, state: &mut StrengthState) {
+fn render_beat_strength_grid(ui: &mut egui::Ui, state: &mut StrengthState, swing: f32) {
     let container_height = 276.0;
     ui.set_min_size(egui::vec2(742.0, container_height));
     ui.set_max_width(742.0);
@@ -172,13 +416,13 @@ fn render_beat_strength_grid(ui: &mut egui::Ui, state: &mut StrengthState) {
                 BeatStrengthMode::Triplet => 24,
             };
 
-            render_beat_strength_grid_lines(ui, state.beat_strength_mode, num_sliders, container_height);
-            render_opposite_mode_lines(ui, state, container_height);
-            render_beat_strength_sliders(ui, state, num_sliders, container_height);
+            render_beat_strength_grid_lines(ui, state.beat_strength_mode, num_sliders, container_height, swing);
+            render_opposite_mode_lines(ui, state, container_height, swing);
+            render_beat_strength_sliders(ui, state, num_sliders, container_height, swing);
         });
 }
 
-fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _container_height: f32) {
+fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _container_height: f32, swing: f32) {
     let container_rect = ui.available_rect_before_wrap();
     let painter = ui.painter();
     let container_width = 738.0;
@@ -189,22 +433,17 @@ fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _contain
 
     match state.beat_strength_mode {
         BeatStrengthMode::Straight => {
-            // Show Triplet positions in Straight mode
-            let straight_grid_spaces = 32.0;
-
             for triplet_pos in 0..24 {
                 let grid_pos = triplet_to_grid(triplet_pos);
-
-                // Check if this grid position is also used by a straight position
                 let coincides = grid_pos.is_multiple_of(3) && (grid_pos / 3) < 32;
 
                 if !coincides {
                     let value = state.beat_strength_values[grid_pos];
                     if value > 0 {
-                        let height = max_height * (value as f32 / 64.0);
+                        let height = max_height * (value as f32 / 100.0);
                         let time_pos = triplet_pos as f32 / 24.0;
-                        let straight_grid_pos = time_pos * straight_grid_spaces;
-                        let x = container_rect.min.x + grid_padding + straight_grid_pos * (grid_width / straight_grid_spaces);
+                        let swung_time = DeviceParams::apply_swing(time_pos, swing);
+                        let x = container_rect.min.x + grid_padding + swung_time * grid_width;
 
                         painter.line_segment(
                             [
@@ -218,22 +457,17 @@ fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _contain
             }
         }
         BeatStrengthMode::Triplet => {
-            // Show Straight positions in Triplet mode
-            let triplet_grid_spaces = 24.0;
-
             for straight_pos in 0..32 {
                 let grid_pos = straight_to_grid(straight_pos);
-
-                // Check if this grid position is also used by a triplet position
                 let coincides = grid_pos.is_multiple_of(4) && (grid_pos / 4) < 24;
 
                 if !coincides {
                     let value = state.beat_strength_values[grid_pos];
                     if value > 0 {
-                        let height = max_height * (value as f32 / 64.0);
+                        let height = max_height * (value as f32 / 100.0);
                         let time_pos = straight_pos as f32 / 32.0;
-                        let triplet_grid_pos = time_pos * triplet_grid_spaces;
-                        let x = container_rect.min.x + grid_padding + triplet_grid_pos * (grid_width / triplet_grid_spaces);
+                        let swung_time = DeviceParams::apply_swing(time_pos, swing);
+                        let x = container_rect.min.x + grid_padding + swung_time * grid_width;
 
                         painter.line_segment(
                             [
@@ -249,7 +483,7 @@ fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _contain
     }
 }
 
-fn render_beat_strength_grid_lines(ui: &mut egui::Ui, mode: BeatStrengthMode, num_sliders: usize, container_height: f32) {
+fn render_beat_strength_grid_lines(ui: &mut egui::Ui, mode: BeatStrengthMode, num_sliders: usize, container_height: f32, swing: f32) {
     let container_rect = ui.available_rect_before_wrap();
     let painter = ui.painter();
     let container_width = 738.0;
@@ -260,10 +494,11 @@ fn render_beat_strength_grid_lines(ui: &mut egui::Ui, mode: BeatStrengthMode, nu
         BeatStrengthMode::Straight => (33, 32.0),
         BeatStrengthMode::Triplet => (25, 24.0),
     };
-    let slider_width = grid_width / grid_spaces;
 
     for i in 0..num_v_grid_positions {
-        let x = container_rect.min.x + grid_padding + i as f32 * slider_width;
+        let normalized_pos = i as f32 / grid_spaces;
+        let swung_pos = DeviceParams::apply_swing(normalized_pos, swing);
+        let x = container_rect.min.x + grid_padding + swung_pos * grid_width;
         let line_num = i + 1;
 
         let color = match mode {
@@ -312,7 +547,7 @@ fn render_beat_strength_grid_lines(ui: &mut egui::Ui, mode: BeatStrengthMode, nu
     }
 }
 
-fn render_beat_strength_sliders(ui: &mut egui::Ui, state: &mut StrengthState, num_sliders: usize, container_height: f32) {
+fn render_beat_strength_sliders(ui: &mut egui::Ui, state: &mut StrengthState, num_sliders: usize, container_height: f32, swing: f32) {
     let container_width = 738.0;
     let grid_padding = 10.0;
     let grid_width = container_width - (grid_padding * 2.0);
@@ -329,9 +564,9 @@ fn render_beat_strength_sliders(ui: &mut egui::Ui, state: &mut StrengthState, nu
             };
 
             for i in 0..num_sliders {
-                let grid_pos = i as f32;
-                let slider_width_for_pos = grid_width / grid_base;
-                let target_x = grid_padding + grid_pos * slider_width_for_pos;
+                let normalized_pos = i as f32 / grid_base;
+                let swung_pos = DeviceParams::apply_swing(normalized_pos, swing);
+                let target_x = grid_padding + swung_pos * grid_width;
                 let current_x = ui.cursor().min.x - 24.0;
                 let space_needed = target_x - current_x;
 
@@ -351,7 +586,7 @@ fn render_beat_strength_sliders(ui: &mut egui::Ui, state: &mut StrengthState, nu
                     ui.style_mut().visuals.selection.bg_fill = Color32::from_rgb(100, 150, 200);
 
                     ui.add(
-                        egui::Slider::new(value, 0..=64)
+                        egui::Slider::new(value, 0..=100)
                             .vertical()
                             .trailing_fill(true)
                             .handle_shape(HandleShape::Rect {
