@@ -117,8 +117,6 @@ impl Sequencer {
 
         let total_samples = self.bar_length_samples;
 
-        use nih_plug::nih_log;
-
         use std::collections::HashSet;
         let mut unique_start_times: HashSet<(u32, u32)> = HashSet::new();
 
@@ -227,18 +225,6 @@ impl Sequencer {
                     }
                 }
             }
-        }
-
-        if !events.is_empty() {
-            let event_descriptions: Vec<String> = events
-                .iter()
-                .map(|e| {
-                    let time_in_bar = e.sample_position as f32 / total_samples as f32;
-                    let duration_in_bar = e.duration_samples as f32 / total_samples as f32;
-                    format!("t={:.3} dur={:.3}", time_in_bar, duration_in_bar)
-                })
-                .collect();
-            nih_log!("Generated {} events: {}", events.len(), event_descriptions.join(", "));
         }
 
         events

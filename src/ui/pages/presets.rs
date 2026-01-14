@@ -202,16 +202,18 @@ pub fn render(
 
                     ui.horizontal_wrapped(|ui| {
                         for i in 0..32 {
-                            let (_preset_name, is_empty) = match state.section {
+                            let (_preset_name, is_empty, is_favorite) = match state.section {
                                 PresetSection::Factory => {
                                     let p = &manager.get_factory_bank(state.factory_bank).presets[i];
                                     let empty = p.name.starts_with("Init ");
-                                    (p.name.clone(), empty)
+                                    let fav = manager.is_favorite_by_indices(true, state.factory_bank as usize, i);
+                                    (p.name.clone(), empty, fav)
                                 }
                                 PresetSection::User => {
                                     let p = &manager.get_user_bank(state.user_bank).presets[i];
                                     let empty = p.name.starts_with("User ") || p.name.starts_with("Init");
-                                    (p.name.clone(), empty)
+                                    let fav = manager.is_favorite_by_indices(false, state.user_bank as usize, i);
+                                    (p.name.clone(), empty, fav)
                                 }
                             };
 
@@ -239,10 +241,14 @@ pub fn render(
                                 Color32::from_rgb(45, 45, 45)
                             };
 
-                            let label = format!("{:02}", i + 1);
+                            let label = if is_favorite {
+                                format!("★{}", i + 1)
+                            } else {
+                                format!("{:02}", i + 1)
+                            };
 
                             let button = egui::Button::new(
-                                egui::RichText::new(label).size(11.0)
+                                egui::RichText::new(label).size(if is_favorite { 10.0 } else { 11.0 })
                             )
                             .min_size(egui::vec2(32.0, 32.0))
                             .fill(fill_color);
@@ -352,6 +358,38 @@ pub fn render(
                                 let _ = mgr.save_user_presets();
                                 state.status_message = Some(("Preset initialized".to_string(), std::time::Instant::now()));
                             }
+                        }
+                    }
+
+                    ui.add_space(10.0);
+                    let is_fav = if let Ok(mgr) = ui_state.preset_manager.lock() {
+                        let location = match state.section {
+                            PresetSection::Factory => PresetLocation::Factory(state.factory_bank, state.selected_preset),
+                            PresetSection::User => PresetLocation::User(state.user_bank, state.selected_preset),
+                        };
+                        mgr.is_favorite(location)
+                    } else {
+                        false
+                    };
+
+                    let star_label = if is_fav { "★" } else { "☆" };
+                    let star_btn = egui::Button::new(
+                        egui::RichText::new(star_label).size(16.0)
+                    ).min_size(egui::vec2(32.0, 28.0))
+                    .fill(if is_fav { Color32::from_rgb(180, 140, 40) } else { Color32::from_rgb(60, 60, 60) });
+
+                    if ui.add(star_btn).clicked() {
+                        if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                            let location = match state.section {
+                                PresetSection::Factory => PresetLocation::Factory(state.factory_bank, state.selected_preset),
+                                PresetSection::User => PresetLocation::User(state.user_bank, state.selected_preset),
+                            };
+                            let is_now_fav = mgr.toggle_favorite(location);
+                            let _ = mgr.save_favorites();
+                            state.status_message = Some((
+                                if is_now_fav { "Added to favorites".to_string() } else { "Removed from favorites".to_string() },
+                                std::time::Instant::now()
+                            ));
                         }
                     }
 

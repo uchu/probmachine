@@ -3,6 +3,7 @@
 use super::data::{Preset, PresetBank};
 use super::defaults::create_default_presets;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -103,6 +104,40 @@ pub enum PresetLocation {
     User(UserBank, usize),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct FavoriteLocation {
+    pub is_factory: bool,
+    pub bank_index: usize,
+    pub preset_index: usize,
+}
+
+impl FavoriteLocation {
+    pub fn from_preset_location(loc: PresetLocation) -> Self {
+        match loc {
+            PresetLocation::Factory(bank, idx) => FavoriteLocation {
+                is_factory: true,
+                bank_index: bank as usize,
+                preset_index: idx,
+            },
+            PresetLocation::User(bank, idx) => FavoriteLocation {
+                is_factory: false,
+                bank_index: bank as usize,
+                preset_index: idx,
+            },
+        }
+    }
+
+    pub fn to_preset_location(&self) -> Option<PresetLocation> {
+        if self.is_factory {
+            FactoryBank::from_index(self.bank_index)
+                .map(|bank| PresetLocation::Factory(bank, self.preset_index))
+        } else {
+            UserBank::from_index(self.bank_index)
+                .map(|bank| PresetLocation::User(bank, self.preset_index))
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Bank {
     A = 0,
@@ -166,11 +201,18 @@ struct UserPresetsFile {
     banks: [PresetBank; 8],
 }
 
+#[derive(Serialize, Deserialize, Default)]
+struct FavoritesFile {
+    favorites: Vec<FavoriteLocation>,
+}
+
 pub struct PresetManager {
     factory_banks: [PresetBank; 8],
     user_banks: [PresetBank; 8],
     current_location: PresetLocation,
     modified: bool,
+    favorites: HashSet<FavoriteLocation>,
+    favorites_modified: bool,
 }
 
 impl PresetManager {
@@ -182,6 +224,8 @@ impl PresetManager {
             user_banks,
             current_location: PresetLocation::Factory(FactoryBank::A, 0),
             modified: false,
+            favorites: HashSet::new(),
+            favorites_modified: false,
         }
     }
 
@@ -452,6 +496,87 @@ impl PresetManager {
 
     pub fn load_from_file(&mut self) -> Result<(), String> {
         self.load_user_presets()
+    }
+
+    pub fn get_favorites_file_path() -> Option<PathBuf> {
+        dirs::data_local_dir().map(|mut path| {
+            path.push("Device");
+            path.push("favorites.json");
+            path
+        })
+    }
+
+    pub fn is_favorite(&self, location: PresetLocation) -> bool {
+        let fav_loc = FavoriteLocation::from_preset_location(location);
+        self.favorites.contains(&fav_loc)
+    }
+
+    pub fn is_favorite_by_indices(&self, is_factory: bool, bank_index: usize, preset_index: usize) -> bool {
+        let fav_loc = FavoriteLocation {
+            is_factory,
+            bank_index,
+            preset_index,
+        };
+        self.favorites.contains(&fav_loc)
+    }
+
+    pub fn toggle_favorite(&mut self, location: PresetLocation) -> bool {
+        let fav_loc = FavoriteLocation::from_preset_location(location);
+        let is_now_favorite = if self.favorites.contains(&fav_loc) {
+            self.favorites.remove(&fav_loc);
+            false
+        } else {
+            self.favorites.insert(fav_loc);
+            true
+        };
+        self.favorites_modified = true;
+        is_now_favorite
+    }
+
+    pub fn favorites_count(&self) -> usize {
+        self.favorites.len()
+    }
+
+    pub fn save_favorites(&mut self) -> Result<(), String> {
+        let path = Self::get_favorites_file_path()
+            .ok_or_else(|| "Could not determine favorites file path".to_string())?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory: {}", e))?;
+        }
+
+        let file_data = FavoritesFile {
+            favorites: self.favorites.iter().copied().collect(),
+        };
+
+        let json = serde_json::to_string_pretty(&file_data)
+            .map_err(|e| format!("Failed to serialize favorites: {}", e))?;
+
+        std::fs::write(&path, json)
+            .map_err(|e| format!("Failed to write favorites file: {}", e))?;
+
+        self.favorites_modified = false;
+        Ok(())
+    }
+
+    pub fn load_favorites(&mut self) -> Result<(), String> {
+        let path = Self::get_favorites_file_path()
+            .ok_or_else(|| "Could not determine favorites file path".to_string())?;
+
+        if !path.exists() {
+            return Ok(());
+        }
+
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read favorites file: {}", e))?;
+
+        let file_data: FavoritesFile = serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to parse favorites file: {}", e))?;
+
+        self.favorites = file_data.favorites.into_iter().collect();
+        self.favorites_modified = false;
+        Ok(())
     }
 }
 

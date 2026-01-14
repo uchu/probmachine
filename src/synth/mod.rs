@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
+pub mod simd;
 mod oscillator;
 mod filter;
 mod envelope;

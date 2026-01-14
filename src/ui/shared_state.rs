@@ -22,6 +22,7 @@ impl SharedUiState {
     pub fn new() -> Self {
         let mut manager = PresetManager::new();
         let _ = manager.load_from_file();
+        let _ = manager.load_favorites();
 
         Self {
             note_pool: Arc::new(Mutex::new(NotePool::new())),

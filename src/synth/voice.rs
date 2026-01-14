@@ -2,7 +2,7 @@
 
 use synfx_dsp::{Oversampling, f_distort, SlewValue, rand_01};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator};
-use super::filter::MoogFilter;
+use super::filter::StereoMoogFilter;
 use super::envelope::Envelope;
 use super::reverb::StereoReverb;
 use super::lfo::ModulationValues;
@@ -42,8 +42,7 @@ pub struct Voice {
     fm_oscillator: SineOscillator,
 
     // ===== Processing =====
-    filter_left: MoogFilter,
-    filter_right: MoogFilter,
+    stereo_filter: StereoMoogFilter,
     volume_envelope: Envelope,
     filter_envelope: Envelope,
     oversampling_2x_left: Oversampling<2>,
@@ -330,8 +329,7 @@ impl Voice {
             pll_reference_oscillator: PolyBlepWrapper::new(processing_rate),
             fm_oscillator: SineOscillator::new(processing_rate),
 
-            filter_left: MoogFilter::new(processing_rate),
-            filter_right: MoogFilter::new(processing_rate),
+            stereo_filter: StereoMoogFilter::new(processing_rate),
             volume_envelope: Envelope::new(sample_rate_f64),
             filter_envelope: Envelope::new(sample_rate_f64),
             oversampling_2x_left,
@@ -703,9 +701,8 @@ impl Voice {
         self.pll_reference_oscillator.set_sample_rate(self.processing_sample_rate);
         self.fm_oscillator.set_sample_rate(self.processing_sample_rate);
 
-        // Update filters
-        self.filter_left.set_sample_rate(self.processing_sample_rate);
-        self.filter_right.set_sample_rate(self.processing_sample_rate);
+        // Update stereo filter
+        self.stereo_filter.set_sample_rate(self.processing_sample_rate);
 
         // Update reverb
         self.reverb.set_sample_rate(self.processing_sample_rate);
@@ -1250,19 +1247,14 @@ impl Voice {
             buf_r[i] = mixed_oscillators_r as f32;
         }
 
-        // Apply Moog ladder filter at oversampled rate
+        // Apply SIMD stereo Moog ladder filter at oversampled rate
         if self.filter_enabled {
-            self.filter_left.process_buffer(
+            self.stereo_filter.process_buffers(
                 &mut buf_l[..iterations],
-                cutoff as f32,
-                self.filter_resonance as f32,
-                self.filter_drive as f32,
-            );
-            self.filter_right.process_buffer(
                 &mut buf_r[..iterations],
-                cutoff as f32,
-                self.filter_resonance as f32,
-                self.filter_drive as f32,
+                cutoff,
+                self.filter_resonance,
+                self.filter_drive,
             );
         }
 
