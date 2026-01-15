@@ -1,11 +1,12 @@
 #![allow(clippy::too_many_arguments)]
 
-use synfx_dsp::{Oversampling, f_distort, SlewValue, rand_01};
+use synfx_dsp::{Oversampling, SlewValue, rand_01};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator};
 use super::filter::StereoMoogFilter;
 use super::envelope::Envelope;
 use super::reverb::StereoReverb;
 use super::lfo::ModulationValues;
+use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_tube_saturate, stereo_distort_bram};
 
 struct SineOscillator {
     phase: f64,
@@ -1197,15 +1198,12 @@ impl Voice {
                 mixed_oscillators_r += ring_r * self.ring_mod_amount;
             }
 
-            // Wavefolder
+            // Wavefolder (SIMD stereo)
             if self.coloration_enabled && self.wavefold_amount > 0.001 {
-                let fold_gain = 1.0 + self.wavefold_amount * 4.0;
-                let fold = |x: f64| -> f64 {
-                    let folded = (x * fold_gain).sin();
-                    x * (1.0 - self.wavefold_amount) + folded * self.wavefold_amount
-                };
-                mixed_oscillators_l = fold(mixed_oscillators_l);
-                mixed_oscillators_r = fold(mixed_oscillators_r);
+                let mixed = stereo(mixed_oscillators_l, mixed_oscillators_r);
+                let folded = stereo_wavefold(mixed, self.wavefold_amount);
+                mixed_oscillators_l = stereo_left(folded);
+                mixed_oscillators_r = stereo_right(folded);
             }
 
             // Noise injection for organic texture
@@ -1216,31 +1214,22 @@ impl Voice {
                 mixed_oscillators_r += noise_r;
             }
 
-            // Tube saturation (asymmetric soft clipping)
+            // Tube saturation (SIMD stereo asymmetric soft clipping)
             if self.coloration_enabled && self.tube_drive > 0.001 {
-                let tube = |x: f64| -> f64 {
-                    let drive = 1.0 + self.tube_drive * 3.0;
-                    let driven = x * drive;
-                    // Asymmetric clipping - harder on positive, softer on negative
-                    let pos = driven.min(1.0);
-                    let neg = (-driven).min(0.8);
-                    if driven > 0.0 {
-                        (pos - pos.powi(3) / 3.0) / (1.0 - 1.0 / 3.0)
-                    } else {
-                        -(neg - neg.powi(3) / 3.0) / (1.0 - 1.0 / 3.0) * 0.9
-                    }
-                };
-                let comp = 1.0 - self.tube_drive * 0.3;
-                mixed_oscillators_l = tube(mixed_oscillators_l) * comp;
-                mixed_oscillators_r = tube(mixed_oscillators_r) * comp;
+                let mixed = stereo(mixed_oscillators_l, mixed_oscillators_r);
+                let saturated = stereo_tube_saturate(mixed, self.tube_drive);
+                mixed_oscillators_l = stereo_left(saturated);
+                mixed_oscillators_r = stereo_right(saturated);
             }
 
-            // Color Distortion with threshold control and very aggressive compensation
+            // Color Distortion (SIMD stereo) - Bram de Jong waveshaper
             if self.coloration_enabled && self.color_distortion_amount > 0.001 {
                 let dist_gain = 1.0 + self.color_distortion_amount * 49.0;
                 let comp = 1.0 / dist_gain.sqrt() * 0.5;
-                mixed_oscillators_l = f_distort(dist_gain as f32, self.color_distortion_threshold as f32, mixed_oscillators_l as f32) as f64 * comp;
-                mixed_oscillators_r = f_distort(dist_gain as f32, self.color_distortion_threshold as f32, mixed_oscillators_r as f32) as f64 * comp;
+                let mixed = stereo(mixed_oscillators_l, mixed_oscillators_r);
+                let distorted = stereo_distort_bram(mixed, dist_gain, self.color_distortion_threshold);
+                mixed_oscillators_l = stereo_left(distorted) * comp;
+                mixed_oscillators_r = stereo_right(distorted) * comp;
             }
 
             buf_l[i] = mixed_oscillators_l as f32;
