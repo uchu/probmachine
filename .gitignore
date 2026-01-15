@@ -15,5 +15,4 @@ Cargo.lock
 !README.md
 
 .vscode/
-/.claude/
-/docs/
+
