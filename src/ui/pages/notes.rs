@@ -94,12 +94,6 @@ pub fn render(
     let current_version = ui_state.get_preset_version();
 
     tui.ui(|ui| {
-        ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Note Stability").size(14.0));
-        ui.add_space(8.0);
-    });
-
-    tui.ui(|ui| {
         let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
 
         if state.last_preset_version != current_version {
@@ -110,7 +104,55 @@ pub fn render(
 
         let state_before = state.clone();
 
-        render_scale_pattern_dropdowns(ui, &mut state);
+        ui.add_space(16.0);
+        ui.horizontal(|ui| {
+            ui.heading(egui::RichText::new("    Note Stability").size(22.0));
+
+            ui.add_space(120.0);
+
+            ui.label(egui::RichText::new("Scale:").size(18.0));
+            ui.add_space(8.0);
+
+            egui::ComboBox::from_id_salt("scale_select")
+                .selected_text(egui::RichText::new(state.scale.name()).size(18.0))
+                .width(220.0)
+                .height(400.0)
+                .show_ui(ui, |ui| {
+                    ui.style_mut().spacing.item_spacing.y = 8.0;
+                    for scale in Scale::all() {
+                        let btn = egui::Button::new(egui::RichText::new(scale.name()).size(18.0))
+                            .min_size(egui::vec2(200.0, 32.0))
+                            .selected(state.scale == *scale);
+                        if ui.add(btn).clicked() {
+                            state.scale = *scale;
+                            ui.close_menu();
+                        }
+                    }
+                });
+
+            ui.add_space(32.0);
+
+            ui.label(egui::RichText::new("Pattern:").size(18.0));
+            ui.add_space(8.0);
+
+            egui::ComboBox::from_id_salt("pattern_select")
+                .selected_text(egui::RichText::new(state.stability_pattern.name()).size(18.0))
+                .width(200.0)
+                .height(300.0)
+                .show_ui(ui, |ui| {
+                    ui.style_mut().spacing.item_spacing.y = 8.0;
+                    for pattern in StabilityPattern::all() {
+                        let btn = egui::Button::new(egui::RichText::new(pattern.name()).size(18.0))
+                            .min_size(egui::vec2(180.0, 32.0))
+                            .selected(state.stability_pattern == *pattern);
+                        if ui.add(btn).clicked() {
+                            state.stability_pattern = *pattern;
+                            ui.close_menu();
+                        }
+                    }
+                });
+        });
+        ui.add_space(12.0);
 
         if state != state_before {
             if state.scale != state_before.scale || state.stability_pattern != state_before.stability_pattern {
@@ -139,82 +181,32 @@ pub fn render(
         let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
         let state_before = state.clone();
 
-        render_selected_note_info(ui, &mut state);
+        ui.add_space(16.0);
+        ui.horizontal(|ui| {
+            render_selected_note_info(ui, &mut state);
+            ui.add_space(16.0);
+            render_octave_randomization(ui, &mut state);
+        });
 
         if state != state_before {
             let chances_changed = state.note_chances != state_before.note_chances;
             let beats_changed = state.note_beats != state_before.note_beats;
             let beat_lengths_changed = state.note_beat_lengths != state_before.note_beat_lengths;
             let root_changed = state.root_note != state_before.root_note;
+            let octave_changed = state.octave_randomization != state_before.octave_randomization;
 
             if chances_changed || beats_changed || beat_lengths_changed || root_changed {
                 update_shared_state(&state, ui_state);
             }
 
-            ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
-        }
-    });
-
-    tui.ui(|ui| {
-        let mut state = ui.ctx().data_mut(|d| d.get_temp::<NoteState>(state_id).unwrap_or_default());
-        let state_before = state.clone();
-
-        render_octave_randomization(ui, &mut state);
-
-        if state != state_before {
-            if state.octave_randomization != state_before.octave_randomization {
+            if octave_changed {
                 update_octave_randomization_shared(&state.octave_randomization, ui_state);
             }
+
             ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
         }
     });
-}
-
-fn render_scale_pattern_dropdowns(ui: &mut egui::Ui, state: &mut NoteState) {
-    egui::Frame::default()
-        .fill(Color32::from_rgb(30, 30, 30))
-        .inner_margin(8.0)
-        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
-        .corner_radius(15.0)
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.add_space(12.0);
-
-                ui.label(egui::RichText::new("Scale:").size(12.0));
-                ui.add_space(4.0);
-
-                egui::ComboBox::from_id_salt("scale_select")
-                    .selected_text(egui::RichText::new(state.scale.name()).size(12.0))
-                    .width(140.0)
-                    .show_ui(ui, |ui| {
-                        for scale in Scale::all() {
-                            let is_selected = state.scale == *scale;
-                            if ui.selectable_label(is_selected, scale.name()).clicked() {
-                                state.scale = *scale;
-                            }
-                        }
-                    });
-
-                ui.add_space(24.0);
-
-                ui.label(egui::RichText::new("Pattern:").size(12.0));
-                ui.add_space(4.0);
-
-                egui::ComboBox::from_id_salt("pattern_select")
-                    .selected_text(egui::RichText::new(state.stability_pattern.name()).size(12.0))
-                    .width(120.0)
-                    .show_ui(ui, |ui| {
-                        for pattern in StabilityPattern::all() {
-                            let is_selected = state.stability_pattern == *pattern;
-                            if ui.selectable_label(is_selected, pattern.name()).clicked() {
-                                state.stability_pattern = *pattern;
-                            }
-                        }
-                    });
-            });
-        });
 }
 
 fn apply_scale_and_pattern(state: &mut NoteState) {
@@ -245,93 +237,110 @@ fn apply_scale_and_pattern(state: &mut NoteState) {
 }
 
 fn render_octave_randomization(ui: &mut egui::Ui, state: &mut NoteState) {
+    let label_width = 80.0;
+    let slider_width = 280.0;
+
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
-        .inner_margin(10.0)
+        .inner_margin(16.0)
         .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
         .corner_radius(15.0)
         .show(ui, |ui| {
-            ui.label(egui::RichText::new("Octave Randomization").size(12.0).color(Color32::from_gray(180)));
-            ui.add_space(8.0);
+            ui.set_min_width(450.0);
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("Octave Randomization").size(18.0).color(Color32::from_gray(180)));
+                ui.add_space(12.0);
 
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Chance:").size(11.0));
-                ui.add_space(4.0);
-                let mut chance = state.octave_randomization.chance;
-                if ui.add(egui::Slider::new(&mut chance, 0..=127).show_value(true)).changed() {
-                    state.octave_randomization.chance = chance;
-                }
-            });
-
-            ui.add_space(4.0);
-
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Strength:").size(11.0));
-                ui.add_space(4.0);
-                let mut strength = state.octave_randomization.strength_pref;
-                if ui.add(egui::Slider::new(&mut strength, 0..=127).show_value(true)).changed() {
-                    state.octave_randomization.strength_pref = strength;
-                }
-                ui.add_space(8.0);
-                ui.label(egui::RichText::new("Weak").size(9.0).color(Color32::from_gray(120)));
-                ui.add_space(40.0);
-                ui.label(egui::RichText::new("Any").size(9.0).color(Color32::from_gray(120)));
-                ui.add_space(40.0);
-                ui.label(egui::RichText::new("Strong").size(9.0).color(Color32::from_gray(120)));
-            });
-
-            ui.add_space(4.0);
-
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Length:").size(11.0));
-                ui.add_space(4.0);
-                let mut length = state.octave_randomization.length_pref;
-                if ui.add(egui::Slider::new(&mut length, 0..=127).show_value(true)).changed() {
-                    state.octave_randomization.length_pref = length;
-                }
-                ui.add_space(8.0);
-                ui.label(egui::RichText::new("Short").size(9.0).color(Color32::from_gray(120)));
-                ui.add_space(40.0);
-                ui.label(egui::RichText::new("Any").size(9.0).color(Color32::from_gray(120)));
-                ui.add_space(40.0);
-                ui.label(egui::RichText::new("Long").size(9.0).color(Color32::from_gray(120)));
-            });
-
-            ui.add_space(4.0);
-
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Direction:").size(11.0));
-                ui.add_space(4.0);
-                for dir in OctaveDirection::all() {
-                    let is_selected = state.octave_randomization.direction == *dir;
-                    if ui.selectable_label(is_selected, dir.name()).clicked() {
-                        state.octave_randomization.direction = *dir;
+                ui.horizontal(|ui| {
+                    ui.add_sized(egui::vec2(label_width, 20.0), egui::Label::new(egui::RichText::new("Chance:").size(16.0)));
+                    let mut chance = state.octave_randomization.chance;
+                    ui.style_mut().spacing.slider_width = slider_width;
+                    ui.style_mut().spacing.slider_rail_height = 10.0;
+                    if ui.add(egui::Slider::new(&mut chance, 0..=127).show_value(true)).changed() {
+                        state.octave_randomization.chance = chance;
                     }
-                    ui.add_space(8.0);
-                }
+                });
+
+                ui.add_space(12.0);
+
+                ui.horizontal(|ui| {
+                    ui.add_sized(egui::vec2(label_width, 20.0), egui::Label::new(egui::RichText::new("Strength:").size(16.0)));
+                    let mut strength = state.octave_randomization.strength_pref;
+                    ui.style_mut().spacing.slider_width = slider_width;
+                    ui.style_mut().spacing.slider_rail_height = 10.0;
+                    if ui.add(egui::Slider::new(&mut strength, 0..=127).show_value(true)).changed() {
+                        state.octave_randomization.strength_pref = strength;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.add_space(label_width);
+                    ui.label(egui::RichText::new("Weak").size(12.0).color(Color32::from_gray(120)));
+                    ui.add_space(slider_width / 2.0 - 40.0);
+                    ui.label(egui::RichText::new("Any").size(12.0).color(Color32::from_gray(120)));
+                    ui.add_space(slider_width / 2.0 - 40.0);
+                    ui.label(egui::RichText::new("Strong").size(12.0).color(Color32::from_gray(120)));
+                });
+
+                ui.add_space(12.0);
+
+                ui.horizontal(|ui| {
+                    ui.add_sized(egui::vec2(label_width, 20.0), egui::Label::new(egui::RichText::new("Length:").size(16.0)));
+                    let mut length = state.octave_randomization.length_pref;
+                    ui.style_mut().spacing.slider_width = slider_width;
+                    ui.style_mut().spacing.slider_rail_height = 10.0;
+                    if ui.add(egui::Slider::new(&mut length, 0..=127).show_value(true)).changed() {
+                        state.octave_randomization.length_pref = length;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.add_space(label_width);
+                    ui.label(egui::RichText::new("Short").size(12.0).color(Color32::from_gray(120)));
+                    ui.add_space(slider_width / 2.0 - 40.0);
+                    ui.label(egui::RichText::new("Any").size(12.0).color(Color32::from_gray(120)));
+                    ui.add_space(slider_width / 2.0 - 40.0);
+                    ui.label(egui::RichText::new("Long").size(12.0).color(Color32::from_gray(120)));
+                });
+
+                ui.add_space(12.0);
+
+                ui.horizontal(|ui| {
+                    ui.add_sized(egui::vec2(label_width, 20.0), egui::Label::new(egui::RichText::new("Direction:").size(16.0)));
+                    for dir in OctaveDirection::all() {
+                        let is_selected = state.octave_randomization.direction == *dir;
+                        let btn = egui::Button::new(egui::RichText::new(dir.name()).size(14.0))
+                            .min_size(egui::vec2(60.0, 28.0))
+                            .selected(is_selected);
+                        if ui.add(btn).clicked() {
+                            state.octave_randomization.direction = *dir;
+                        }
+                        ui.add_space(8.0);
+                    }
+                });
             });
         });
 }
 
 fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
-    ui.set_max_width(742.0);
+    ui.set_max_width(1220.0);
 
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
-        .inner_margin(10.0)
+        .inner_margin(16.0)
         .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
         .corner_radius(15.0)
         .show(ui, |ui| {
             render_piano_keys(ui, state);
 
-            ui.add_space(10.0);
+            ui.add_space(12.0);
 
             let total_white_keys = 43.0;
             let visible_white_keys = 15.0;
             let max_scroll = total_white_keys - visible_white_keys;
 
-            let scrollbar_width = 720.0;
-            let scrollbar_height = 16.0;
+            let scrollbar_width = 1180.0;
+            let scrollbar_height = 24.0;
 
             let (rect, response) = ui.allocate_exact_size(
                 egui::vec2(scrollbar_width, scrollbar_height),
@@ -354,7 +363,7 @@ fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
             let painter = ui.painter();
 
             let bg_color = ui.visuals().extreme_bg_color;
-            painter.rect_filled(rect, 2.0, bg_color);
+            painter.rect_filled(rect, 3.0, bg_color);
 
             let handle_ratio = visible_white_keys / total_white_keys;
             let handle_width = rect.width() * handle_ratio;
@@ -374,10 +383,10 @@ fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
                 Color32::from_rgb(140, 140, 140)
             };
 
-            painter.rect_filled(handle_rect, 2.0, handle_color);
+            painter.rect_filled(handle_rect, 3.0, handle_color);
             painter.rect_stroke(
                 handle_rect,
-                2.0,
+                3.0,
                 egui::Stroke::new(1.0, Color32::from_rgb(80, 80, 80)),
                 egui::epaint::StrokeKind::Outside,
             );
@@ -385,8 +394,8 @@ fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
 }
 
 fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
-    let keyboard_width = 720.0;
-    let white_key_height = 70.0;
+    let keyboard_width = 1180.0;
+    let white_key_height = 170.0;
 
     let num_white_keys = 15;
     let white_key_width = keyboard_width / num_white_keys as f32;
@@ -615,13 +624,13 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
             if let Some(ref label) = key.label {
                 let text_pos = egui::pos2(
                     key.rect.center().x,
-                    key.rect.bottom() - 15.0,
+                    key.rect.bottom() - 20.0,
                 );
                 painter.text(
                     text_pos,
                     egui::Align2::CENTER_CENTER,
                     label,
-                    egui::FontId::proportional(10.0),
+                    egui::FontId::proportional(14.0),
                     Color32::from_rgb(80, 80, 80),
                 );
             }
@@ -685,12 +694,16 @@ fn update_octave_randomization_shared(oct_rand: &OctaveRandomization, ui_state: 
 }
 
 fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
+    let label_width = 80.0;
+    let slider_width = 280.0;
+
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
-        .inner_margin(10.0)
+        .inner_margin(16.0)
         .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
         .corner_radius(15.0)
         .show(ui, |ui| {
+            ui.set_min_width(450.0);
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     let selected_note_name = if let Some(note) = state.selected_note {
@@ -701,25 +714,26 @@ fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
 
                     let root_note_name = midi_note_to_name(state.root_note);
 
-                    ui.label(egui::RichText::new(format!("Selected: {}", selected_note_name)).size(12.0));
-                    ui.add_space(16.0);
-                    ui.label(egui::RichText::new(format!("Root: {}", root_note_name)).size(12.0));
+                    ui.label(egui::RichText::new(format!("Selected: {}", selected_note_name)).size(18.0));
+                    ui.add_space(24.0);
+                    ui.label(egui::RichText::new(format!("Root: {}", root_note_name)).size(18.0));
 
-                    ui.add_space(16.0);
+                    ui.add_space(24.0);
 
                     if let Some(selected) = state.selected_note {
-                        if ui.button("Set as Root").clicked() {
+                        let btn = egui::Button::new(egui::RichText::new("Set as Root").size(14.0))
+                            .min_size(egui::vec2(100.0, 32.0));
+                        if ui.add(btn).clicked() {
                             state.root_note = selected;
                         }
                     }
                 });
 
-                ui.add_space(8.0);
+                ui.add_space(12.0);
 
                 if let Some(selected) = state.selected_note {
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Chance:").size(12.0));
-                        ui.add_space(8.0);
+                        ui.add_sized(egui::vec2(label_width, 20.0), egui::Label::new(egui::RichText::new("Chance:").size(16.0)));
 
                         let is_root = selected == state.root_note;
                         let mut chance_value = if is_root {
@@ -728,6 +742,8 @@ fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
                             *state.note_chances.get(&selected).unwrap_or(&0)
                         };
 
+                        ui.style_mut().spacing.slider_width = slider_width;
+                        ui.style_mut().spacing.slider_rail_height = 10.0;
                         let slider = egui::Slider::new(&mut chance_value, 0..=127).show_value(true);
 
                         let slider_response = if is_root {
@@ -741,58 +757,56 @@ fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
                         }
                     });
 
-                    ui.add_space(8.0);
+                    ui.add_space(20.0);
 
-                    ui.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("Strength:").size(12.0));
-                            ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        ui.add_sized(egui::vec2(label_width, 20.0), egui::Label::new(egui::RichText::new("Strength:").size(16.0)));
 
-                            let mut beat_value = *state.note_beats.get(&selected).unwrap_or(&64);
+                        let mut beat_value = *state.note_beats.get(&selected).unwrap_or(&64);
 
-                            let slider = egui::Slider::new(&mut beat_value, 0..=127).show_value(true);
-                            let slider_response = ui.add(slider);
+                        ui.style_mut().spacing.slider_width = slider_width;
+                        ui.style_mut().spacing.slider_rail_height = 10.0;
+                        let slider = egui::Slider::new(&mut beat_value, 0..=127).show_value(true);
+                        let slider_response = ui.add(slider);
 
-                            if slider_response.changed() {
-                                state.note_beats.insert(selected, beat_value);
-                            }
-                        });
-
-                        ui.horizontal(|ui| {
-                            ui.add_space(64.0);
-                            ui.label(egui::RichText::new("Weak (0)").size(10.0).color(Color32::from_gray(150)));
-                            ui.add_space(60.0);
-                            ui.label(egui::RichText::new("Any (64)").size(10.0).color(Color32::from_gray(150)));
-                            ui.add_space(55.0);
-                            ui.label(egui::RichText::new("Strong (127)").size(10.0).color(Color32::from_gray(150)));
-                        });
+                        if slider_response.changed() {
+                            state.note_beats.insert(selected, beat_value);
+                        }
                     });
 
-                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(label_width);
+                        ui.label(egui::RichText::new("Weak").size(12.0).color(Color32::from_gray(120)));
+                        ui.add_space(slider_width / 2.0 - 40.0);
+                        ui.label(egui::RichText::new("Any").size(12.0).color(Color32::from_gray(120)));
+                        ui.add_space(slider_width / 2.0 - 40.0);
+                        ui.label(egui::RichText::new("Strong").size(12.0).color(Color32::from_gray(120)));
+                    });
 
-                    ui.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("Length:").size(12.0));
-                            ui.add_space(8.0);
+                    ui.add_space(12.0);
 
-                            let mut beat_length_value = *state.note_beat_lengths.get(&selected).unwrap_or(&64);
+                    ui.horizontal(|ui| {
+                        ui.add_sized(egui::vec2(label_width, 20.0), egui::Label::new(egui::RichText::new("Length:").size(16.0)));
 
-                            let slider = egui::Slider::new(&mut beat_length_value, 0..=127).show_value(true);
-                            let slider_response = ui.add(slider);
+                        let mut beat_length_value = *state.note_beat_lengths.get(&selected).unwrap_or(&64);
 
-                            if slider_response.changed() {
-                                state.note_beat_lengths.insert(selected, beat_length_value);
-                            }
-                        });
+                        ui.style_mut().spacing.slider_width = slider_width;
+                        ui.style_mut().spacing.slider_rail_height = 10.0;
+                        let slider = egui::Slider::new(&mut beat_length_value, 0..=127).show_value(true);
+                        let slider_response = ui.add(slider);
 
-                        ui.horizontal(|ui| {
-                            ui.add_space(52.0);
-                            ui.label(egui::RichText::new("Short (0)").size(10.0).color(Color32::from_gray(150)));
-                            ui.add_space(60.0);
-                            ui.label(egui::RichText::new("Any (64)").size(10.0).color(Color32::from_gray(150)));
-                            ui.add_space(60.0);
-                            ui.label(egui::RichText::new("Long (127)").size(10.0).color(Color32::from_gray(150)));
-                        });
+                        if slider_response.changed() {
+                            state.note_beat_lengths.insert(selected, beat_length_value);
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.add_space(label_width);
+                        ui.label(egui::RichText::new("Short").size(12.0).color(Color32::from_gray(120)));
+                        ui.add_space(slider_width / 2.0 - 40.0);
+                        ui.label(egui::RichText::new("Any").size(12.0).color(Color32::from_gray(120)));
+                        ui.add_space(slider_width / 2.0 - 40.0);
+                        ui.label(egui::RichText::new("Long").size(12.0).color(Color32::from_gray(120)));
                     });
                 }
             });

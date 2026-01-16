@@ -8,25 +8,25 @@ use std::sync::Arc;
 pub fn render(ui: &mut egui::Ui, current_page: &mut Page, params: &Arc<DeviceParams>, setter: &ParamSetter, ui_state: &Arc<SharedUiState>) {
     egui::Frame::default()
         .outer_margin(Margin {
-            left: -30,
+            left: -48,
             right: 0,
-            top: -10,
+            top: -16,
             bottom: 0,
         })
         .inner_margin(Margin {
-            left: 30,
-            right: 30,
-            top: 10,
-            bottom: 6,
+            left: 48,
+            right: 48,
+            top: 16,
+            bottom: 10,
         })
         .fill(Color32::BLACK)
         .show(ui, |ui| {
-            ui.set_min_width(800.0);
-            ui.set_max_width(800.0);
+            ui.set_min_width(1280.0);
+            ui.set_max_width(1280.0);
             ui.horizontal(|ui| {
                 for page in Page::all() {
-                    let button = egui::Button::new(egui::RichText::new(page.label()).size(14.0))
-                        .min_size(egui::vec2(60.0, 32.0))
+                    let button = egui::Button::new(egui::RichText::new(page.label()).size(20.0))
+                        .min_size(egui::vec2(96.0, 48.0))
                         .selected(*current_page == page);
 
                     if ui.add(button).clicked() {
@@ -41,17 +41,17 @@ pub fn render(ui: &mut egui::Ui, current_page: &mut Page, params: &Arc<DevicePar
                     } else {
                         Color32::from_rgb(80, 80, 80)
                     };
-                    let btn = egui::Button::new(egui::RichText::new("L").size(12.0).color(btn_color))
-                        .min_size(egui::vec2(20.0, 20.0));
+                    let btn = egui::Button::new(egui::RichText::new("L").size(18.0).color(btn_color))
+                        .min_size(egui::vec2(32.0, 32.0));
                     if ui.add(btn).clicked() {
                         setter.set_parameter(&params.limiter_enable, !limiter_on);
                     }
 
-                    ui.add_space(6.0);
+                    ui.add_space(10.0);
 
                     let output_level = ui_state.get_output_level();
-                    let box_size = egui::vec2(6.0, 12.0);
-                    let spacing = 2.0;
+                    let box_size = egui::vec2(10.0, 20.0);
+                    let spacing = 3.0;
                     let total_width = 5.0 * box_size.x + 4.0 * spacing;
                     let (rect, _) = ui.allocate_exact_size(egui::vec2(total_width, box_size.y), egui::Sense::hover());
 
@@ -69,20 +69,21 @@ pub fn render(ui: &mut egui::Ui, current_page: &mut Page, params: &Arc<DevicePar
                         let x = rect.left() + (4 - i) as f32 * (box_size.x + spacing);
                         let box_rect = egui::Rect::from_min_size(egui::pos2(x, rect.top()), box_size);
                         let color = if (4 - i) < level { colors_on[4 - i] } else { color_off };
-                        ui.painter().rect_filled(box_rect, 1.0, color);
+                        ui.painter().rect_filled(box_rect, 2.0, color);
                     }
 
-                    ui.add_space(8.0);
+                    ui.add_space(12.0);
                     let mut volume = params.global_volume.modulated_plain_value();
+                    ui.style_mut().spacing.slider_width = 140.0;
+                    ui.style_mut().spacing.slider_rail_height = 12.0;
                     let slider = egui::Slider::new(&mut volume, 0.0..=1.0)
                         .show_value(false)
                         .trailing_fill(true);
-                    ui.style_mut().spacing.slider_width = 80.0;
                     if ui.add(slider).changed() {
                         setter.set_parameter(&params.global_volume, volume);
                     }
-                    ui.add_space(5.0);
-                    ui.label(egui::RichText::new("Vol").size(10.0).color(Color32::GRAY));
+                    ui.add_space(8.0);
+                    ui.label(egui::RichText::new("Vol").size(16.0).color(Color32::GRAY));
                 });
             });
         });

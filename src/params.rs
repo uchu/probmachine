@@ -1886,7 +1886,7 @@ impl Default for DeviceParams {
 
             len_mod_1_target: FloatParam::new(
                 "Len Mod 1 Target",
-                0.0,
+                -75.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
             len_mod_1_amount: FloatParam::new(
@@ -1902,7 +1902,7 @@ impl Default for DeviceParams {
 
             len_mod_2_target: FloatParam::new(
                 "Len Mod 2 Target",
-                0.0,
+                75.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
             len_mod_2_amount: FloatParam::new(
@@ -1918,7 +1918,7 @@ impl Default for DeviceParams {
 
             decay_mod_1_target: FloatParam::new(
                 "Decay Mod 1 Target",
-                0.0,
+                -75.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
             decay_mod_1_amount: FloatParam::new(
@@ -1934,7 +1934,7 @@ impl Default for DeviceParams {
 
             decay_mod_2_target: FloatParam::new(
                 "Decay Mod 2 Target",
-                0.0,
+                75.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
             decay_mod_2_amount: FloatParam::new(
@@ -1950,7 +1950,7 @@ impl Default for DeviceParams {
 
             pos_mod_1_target: FloatParam::new(
                 "Pos Mod 1 Target",
-                0.0,
+                -75.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
             pos_mod_1_shift: FloatParam::new(
@@ -1966,7 +1966,7 @@ impl Default for DeviceParams {
 
             pos_mod_2_target: FloatParam::new(
                 "Pos Mod 2 Target",
-                0.0,
+                75.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
             pos_mod_2_shift: FloatParam::new(

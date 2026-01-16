@@ -297,7 +297,43 @@ pub fn render(
 
     tui.ui(|ui| {
         ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Strength").size(14.0));
+        ui.horizontal(|ui| {
+            ui.heading(egui::RichText::new("    Strength").size(22.0));
+            ui.add_space(40.0);
+
+            let mut state = ui.ctx().data_mut(|d| d.get_temp::<StrengthState>(state_id).unwrap_or_default());
+            let state_before = state.clone();
+
+            ui.label(egui::RichText::new("Style:").size(18.0));
+            ui.add_space(8.0);
+
+            let current_name = state.selected_style.map(|s| s.name()).unwrap_or("Custom");
+            egui::ComboBox::from_id_salt("strength_style_header")
+                .selected_text(egui::RichText::new(current_name).size(18.0))
+                .width(180.0)
+                .height(500.0)
+                .show_ui(ui, |ui| {
+                    for style in StrengthStyle::all() {
+                        let btn = egui::Button::new(egui::RichText::new(style.name()).size(18.0))
+                            .min_size(egui::vec2(160.0, 40.0))
+                            .selected(state.selected_style == Some(*style));
+                        if ui.add(btn).clicked() {
+                            state.selected_style = Some(*style);
+                            state.beat_strength_values = style.generate_pattern();
+                            ui.close_menu();
+                        }
+                    }
+                });
+
+            if state != state_before {
+                if let Ok(mut strength_values) = ui_state.strength_values.lock() {
+                    for i in 0..96 {
+                        strength_values[i] = state.beat_strength_values[i] as f32 / 100.0;
+                    }
+                }
+                ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
+            }
+        });
         ui.add_space(8.0);
     });
 
@@ -335,7 +371,25 @@ pub fn render(
         let mut state = ui.ctx().data_mut(|d| d.get_temp::<StrengthState>(state_id).unwrap_or_default());
         let state_before = state.clone();
 
-        render_mode_buttons(ui, &mut state);
+        ui.horizontal(|ui| {
+            ui.add_space(48.0);
+
+            let button_s = egui::Button::new(egui::RichText::new("S").size(20.0))
+                .min_size(egui::vec2(96.0, 48.0))
+                .selected(matches!(state.beat_strength_mode, BeatStrengthMode::Straight));
+
+            if ui.add(button_s).clicked() {
+                state.beat_strength_mode = BeatStrengthMode::Straight;
+            }
+
+            let button_t = egui::Button::new(egui::RichText::new("T").size(20.0))
+                .min_size(egui::vec2(96.0, 48.0))
+                .selected(matches!(state.beat_strength_mode, BeatStrengthMode::Triplet));
+
+            if ui.add(button_t).clicked() {
+                state.beat_strength_mode = BeatStrengthMode::Triplet;
+            }
+        });
 
         if state != state_before {
             ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
@@ -347,60 +401,11 @@ fn render_beat_strength(ui: &mut egui::Ui, state: &mut StrengthState, swing: f32
     render_beat_strength_grid(ui, state, swing);
 }
 
-fn render_mode_buttons(ui: &mut egui::Ui, state: &mut StrengthState) {
-    egui::Frame::default()
-        .fill(Color32::from_rgb(30, 30, 30))
-        .inner_margin(8.0)
-        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
-        .corner_radius(15.0)
-        .show(ui, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.horizontal(|ui| {
-                    ui.add_space(12.0);
-
-                    ui.label(egui::RichText::new("Style:").size(12.0));
-                    ui.add_space(4.0);
-
-                    let current_name = state.selected_style.map(|s| s.name()).unwrap_or("Custom");
-                    egui::ComboBox::from_id_salt("strength_style")
-                        .selected_text(egui::RichText::new(current_name).size(12.0))
-                        .width(120.0)
-                        .show_ui(ui, |ui| {
-                            for style in StrengthStyle::all() {
-                                let is_selected = state.selected_style == Some(*style);
-                                if ui.selectable_label(is_selected, style.name()).clicked() {
-                                    state.selected_style = Some(*style);
-                                    state.beat_strength_values = style.generate_pattern();
-                                }
-                            }
-                        });
-
-                    ui.add_space(24.0);
-
-                    let button_s = egui::Button::new(egui::RichText::new("S").size(14.0))
-                        .min_size(egui::vec2(60.0, 32.0))
-                        .selected(matches!(state.beat_strength_mode, BeatStrengthMode::Straight));
-
-                    if ui.add(button_s).clicked() {
-                        state.beat_strength_mode = BeatStrengthMode::Straight;
-                    }
-
-                    let button_t = egui::Button::new(egui::RichText::new("T").size(14.0))
-                        .min_size(egui::vec2(60.0, 32.0))
-                        .selected(matches!(state.beat_strength_mode, BeatStrengthMode::Triplet));
-
-                    if ui.add(button_t).clicked() {
-                        state.beat_strength_mode = BeatStrengthMode::Triplet;
-                    }
-                });
-            });
-        });
-}
 
 fn render_beat_strength_grid(ui: &mut egui::Ui, state: &mut StrengthState, swing: f32) {
-    let container_height = 276.0;
-    ui.set_min_size(egui::vec2(742.0, container_height));
-    ui.set_max_width(742.0);
+    let container_height = 420.0;
+    ui.set_min_size(egui::vec2(1220.0, container_height));
+    ui.set_max_width(1220.0);
 
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
@@ -425,11 +430,11 @@ fn render_beat_strength_grid(ui: &mut egui::Ui, state: &mut StrengthState, swing
 fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _container_height: f32, swing: f32) {
     let container_rect = ui.available_rect_before_wrap();
     let painter = ui.painter();
-    let container_width = 738.0;
-    let grid_padding = 10.0;
+    let container_width = 1216.0;
+    let grid_padding = 16.0;
     let grid_width = container_width - (grid_padding * 2.0);
-    let max_height = 256.0;
-    let top_y = container_rect.min.y + 10.0;
+    let max_height = 388.0;
+    let top_y = container_rect.min.y + 16.0;
 
     match state.beat_strength_mode {
         BeatStrengthMode::Straight => {
@@ -486,8 +491,8 @@ fn render_opposite_mode_lines(ui: &mut egui::Ui, state: &StrengthState, _contain
 fn render_beat_strength_grid_lines(ui: &mut egui::Ui, mode: BeatStrengthMode, num_sliders: usize, container_height: f32, swing: f32) {
     let container_rect = ui.available_rect_before_wrap();
     let painter = ui.painter();
-    let container_width = 738.0;
-    let grid_padding = 10.0;
+    let container_width = 1216.0;
+    let grid_padding = 16.0;
     let grid_width = container_width - (grid_padding * 2.0);
 
     let (num_v_grid_positions, grid_spaces) = match mode {
@@ -536,11 +541,11 @@ fn render_beat_strength_grid_lines(ui: &mut egui::Ui, mode: BeatStrengthMode, nu
     }
 
     for i in 0..5 {
-        let y = container_rect.min.y + 10.0 + i as f32 * (container_height - 20.0) / 4.0;
+        let y = container_rect.min.y + 16.0 + i as f32 * (container_height - 32.0) / 4.0;
         painter.line_segment(
             [
-                egui::pos2(container_rect.min.x + 10.0, y),
-                egui::pos2(container_rect.max.x - 12.5, y),
+                egui::pos2(container_rect.min.x + 16.0, y),
+                egui::pos2(container_rect.max.x - 18.0, y),
             ],
             egui::Stroke::new(1.0, Color32::from_rgb(20, 20, 20)),
         );
@@ -548,14 +553,14 @@ fn render_beat_strength_grid_lines(ui: &mut egui::Ui, mode: BeatStrengthMode, nu
 }
 
 fn render_beat_strength_sliders(ui: &mut egui::Ui, state: &mut StrengthState, num_sliders: usize, container_height: f32, swing: f32) {
-    let container_width = 738.0;
-    let grid_padding = 10.0;
+    let container_width = 1216.0;
+    let grid_padding = 16.0;
     let grid_width = container_width - (grid_padding * 2.0);
 
     ui.vertical(|ui| {
-        ui.set_min_size(egui::vec2(738.0, container_height));
-        ui.set_max_width(738.0);
-        ui.add_space(10.0);
+        ui.set_min_size(egui::vec2(1216.0, container_height));
+        ui.set_max_width(1216.0);
+        ui.add_space(16.0);
 
         ui.horizontal_top(|ui| {
             let grid_base = match state.beat_strength_mode {
@@ -567,7 +572,7 @@ fn render_beat_strength_sliders(ui: &mut egui::Ui, state: &mut StrengthState, nu
                 let normalized_pos = i as f32 / grid_base;
                 let swung_pos = DeviceParams::apply_swing(normalized_pos, swing);
                 let target_x = grid_padding + swung_pos * grid_width;
-                let current_x = ui.cursor().min.x - 24.0;
+                let current_x = ui.cursor().min.x - 31.0;
                 let space_needed = target_x - current_x;
 
                 ui.add_space(space_needed);
@@ -579,10 +584,10 @@ fn render_beat_strength_sliders(ui: &mut egui::Ui, state: &mut StrengthState, nu
                     };
                     let value = &mut state.beat_strength_values[grid_pos];
 
-                    let slider_height = 256.0;
+                    let slider_height = 388.0;
 
                     ui.style_mut().spacing.slider_width = slider_height;
-                    ui.style_mut().spacing.slider_rail_height = 9.0;
+                    ui.style_mut().spacing.slider_rail_height = 16.0;
                     ui.style_mut().visuals.selection.bg_fill = Color32::from_rgb(100, 150, 200);
 
                     ui.add(

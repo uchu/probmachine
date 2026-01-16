@@ -16,9 +16,28 @@ pub fn render(
     let (beat_mode, num_sliders) = tui.ui(get_beat_state);
 
     tui.ui(|ui| {
+        ui.add_space(16.0);
+        ui.horizontal(|ui| {
+            ui.heading(egui::RichText::new("    Beat Probability").size(22.0));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(166.0);
+                let clear_button = egui::Button::new(egui::RichText::new("Clear All").size(14.0))
+                    .min_size(egui::vec2(80.0, 28.0));
+                if ui.add(clear_button).clicked() {
+                    for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+                        for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
+                            for index in 0..*count {
+                                let param = params.get_division_param(mode, *count, index);
+                                setter.begin_set_parameter(param);
+                                setter.set_parameter(param, 0.0);
+                                setter.end_set_parameter(param);
+                            }
+                        }
+                    }
+                }
+            });
+        });
         ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Beat Probability").size(14.0));
-        ui.add_space(8.0);
     });
 
     tui.style(Style {
@@ -31,7 +50,7 @@ pub fn render(
     });
 
     tui.ui(|ui| {
-        ui.add_space(12.0);
+        ui.add_space(16.0);
         render_controls(ui, params, setter, beat_mode, num_sliders);
     });
 }
@@ -62,9 +81,9 @@ fn render_grid_container(
     beat_mode: BeatMode,
     num_sliders: usize,
 ) {
-    let container_height = 276.0;
-    ui.set_min_size(egui::vec2(742.0, container_height));
-    ui.set_max_width(742.0);
+    let container_height = 420.0;
+    ui.set_min_size(egui::vec2(1220.0, container_height));
+    ui.set_max_width(1220.0);
 
     let swing = params.swing_amount.modulated_plain_value();
 
@@ -92,8 +111,8 @@ fn render_grid_lines(
 ) {
     let container_rect = ui.available_rect_before_wrap();
     let painter = ui.painter();
-    let container_width = 738.0;
-    let grid_padding = 10.0;
+    let container_width = 1216.0;
+    let grid_padding = 16.0;
     let grid_width = container_width - (grid_padding * 2.0);
 
     let (num_v_grid_positions, grid_spaces) = match beat_mode {
@@ -142,11 +161,11 @@ fn render_grid_lines(
     }
 
     for i in 0..5 {
-        let y = container_rect.min.y + 10.0 + i as f32 * (container_height - 20.0) / 4.0;
+        let y = container_rect.min.y + 16.0 + i as f32 * (container_height - 32.0) / 4.0;
         painter.line_segment(
             [
-                egui::pos2(container_rect.min.x + 10.0, y),
-                egui::pos2(container_rect.max.x - 12.5, y),
+                egui::pos2(container_rect.min.x + 16.0, y),
+                egui::pos2(container_rect.max.x - 20.0, y),
             ],
             egui::Stroke::new(1.0, Color32::from_rgb(20, 20, 20)),
         );
@@ -184,12 +203,12 @@ fn render_occupied_space(
 ) {
     let container_rect = ui.available_rect_before_wrap();
     let painter = ui.painter();
-    let container_width = 738.0;
-    let grid_padding = 10.0;
+    let container_width = 1216.0;
+    let grid_padding = 16.0;
     let grid_width = container_width - (grid_padding * 2.0);
 
-    let max_height = 256.0;
-    let top_y = container_rect.min.y + 10.0;
+    let max_height = 388.0;
+    let top_y = container_rect.min.y + 16.0;
 
     #[derive(Clone, Debug)]
     struct Beat {
@@ -292,14 +311,14 @@ fn render_sliders(
     container_height: f32,
     swing: f32,
 ) {
-    let container_width = 738.0;
-    let grid_padding = 10.0;
+    let container_width = 1216.0;
+    let grid_padding = 16.0;
     let grid_width = container_width - (grid_padding * 2.0);
 
     ui.vertical(|ui| {
-        ui.set_min_size(egui::vec2(738.0, container_height));
-        ui.set_max_width(738.0);
-        ui.add_space(10.0);
+        ui.set_min_size(egui::vec2(1216.0, container_height));
+        ui.set_max_width(1216.0);
+        ui.add_space(16.0);
 
         ui.horizontal_top(|ui| {
             let grid_base = match beat_mode {
@@ -334,7 +353,7 @@ fn render_sliders(
                 };
                 let slider_width_for_pos = grid_width / grid_spaces;
                 let target_x = grid_padding + grid_pos * slider_width_for_pos;
-                let current_x = ui.cursor().min.x - 24.0;
+                let current_x = ui.cursor().min.x - 31.0;
                 let space_needed = target_x - current_x;
 
                 ui.add_space(space_needed);
@@ -347,13 +366,13 @@ fn render_sliders(
                     let max_value = available_range;
                     value = value.min(max_value);
 
-                    let slider_height = 256.0 * (max_value / 127.0);
-                    let padding_top = 256.0 - slider_height;
+                    let slider_height = 388.0 * (max_value / 127.0);
+                    let padding_top = 388.0 - slider_height;
 
                     ui.add_space(padding_top);
 
                     ui.style_mut().spacing.slider_width = slider_height;
-                    ui.style_mut().spacing.slider_rail_height = 9.0;
+                    ui.style_mut().spacing.slider_rail_height = 16.0;
 
                     let division_color = get_division_color(beat_mode, num_sliders, 127);
                     ui.style_mut().visuals.selection.bg_fill = division_color;
@@ -435,71 +454,117 @@ fn render_sliders(
 }
 
 fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter, beat_mode: BeatMode, num_sliders: usize) {
-    egui::Frame::default()
-        .fill(Color32::from_rgb(30, 30, 30))
-        .inner_margin(8.0)
-        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
-        .corner_radius(15.0)
-        .show(ui, |ui| {
-            ui.vertical_centered(|ui| {
-                render_division_buttons(ui, params, beat_mode, num_sliders);
-                ui.add_space(5.0);
-                render_mode_buttons(ui, params, beat_mode);
-                ui.add_space(5.0);
-                render_swing_control(ui, params, setter);
-                ui.add_space(5.0);
-                render_clear_button(ui, params, setter);
+    ui.horizontal(|ui| {
+        egui::Frame::default()
+            .fill(Color32::from_rgb(30, 30, 30))
+            .inner_margin(12.0)
+            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
+            .corner_radius(15.0)
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    render_division_buttons(ui, params, beat_mode, num_sliders);
+                    ui.add_space(8.0);
+                    render_mode_buttons(ui, params, beat_mode);
+                });
             });
-        });
+
+        ui.add_space(16.0);
+
+        egui::Frame::default()
+            .fill(Color32::from_rgb(30, 30, 30))
+            .inner_margin(12.0)
+            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
+            .corner_radius(15.0)
+            .show(ui, |ui| {
+                render_timing_controls(ui, params, setter);
+            });
+    });
 }
 
-fn render_swing_control(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter) {
-    ui.horizontal(|ui| {
-        ui.add_space(200.0);
-        ui.label(egui::RichText::new("Swing:").size(12.0));
-        ui.add_space(5.0);
+fn render_timing_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter) {
+    ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Length:").size(18.0));
+            ui.add_space(8.0);
 
-        let mut swing = params.swing_amount.modulated_plain_value();
-        let response = ui.add(
-            egui::Slider::new(&mut swing, 50.0..=75.0)
-                .suffix("%")
-                .fixed_decimals(0)
-                .clamping(egui::SliderClamping::Always)
-        );
-        if response.changed() {
-            setter.set_parameter(&params.swing_amount, swing);
-        }
+            let mut length = params.note_length_percent.modulated_plain_value();
+            ui.style_mut().spacing.slider_width = 140.0;
+            ui.style_mut().spacing.slider_rail_height = 10.0;
+            let response = ui.add(
+                egui::Slider::new(&mut length, 1.0..=200.0)
+                    .fixed_decimals(0)
+                    .clamping(egui::SliderClamping::Always)
+                    .show_value(false)
+            );
+            if response.changed() {
+                setter.set_parameter(&params.note_length_percent, length);
+            }
 
-        ui.add_space(10.0);
+            ui.add_space(12.0);
+            let mut length_edit = length;
+            ui.style_mut().spacing.interact_size.y = 32.0;
+            let edit_response = ui.add_sized(
+                egui::vec2(70.0, 32.0),
+                egui::DragValue::new(&mut length_edit)
+                    .range(1.0..=200.0)
+                    .speed(1.0)
+                    .suffix("%")
+                    .min_decimals(0)
+                    .max_decimals(0)
+            );
+            if edit_response.changed() {
+                setter.set_parameter(&params.note_length_percent, length_edit);
+            }
+        });
 
-        // Quick preset buttons
-        let btn_50 = egui::Button::new("50").min_size(egui::vec2(32.0, 20.0)).selected((swing - 50.0).abs() < 0.5);
-        if ui.add(btn_50).clicked() {
-            setter.set_parameter(&params.swing_amount, 50.0);
-        }
+        ui.add_space(16.0);
 
-        let btn_66 = egui::Button::new("66").min_size(egui::vec2(32.0, 20.0)).selected((swing - 66.0).abs() < 0.5);
-        if ui.add(btn_66).clicked() {
-            setter.set_parameter(&params.swing_amount, 66.0);
-        }
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Swing:").size(18.0));
+            ui.add_space(8.0);
 
-        let btn_75 = egui::Button::new("75").min_size(egui::vec2(32.0, 20.0)).selected((swing - 75.0).abs() < 0.5);
-        if ui.add(btn_75).clicked() {
-            setter.set_parameter(&params.swing_amount, 75.0);
-        }
+            let mut swing = params.swing_amount.modulated_plain_value();
+            ui.style_mut().spacing.slider_width = 140.0;
+            ui.style_mut().spacing.slider_rail_height = 10.0;
+            let response = ui.add(
+                egui::Slider::new(&mut swing, 50.0..=75.0)
+                    .fixed_decimals(0)
+                    .clamping(egui::SliderClamping::Always)
+                    .show_value(false)
+            );
+            if response.changed() {
+                setter.set_parameter(&params.swing_amount, swing);
+            }
+
+            ui.add_space(12.0);
+            let mut swing_edit = swing;
+            ui.style_mut().spacing.interact_size.y = 32.0;
+            let edit_response = ui.add_sized(
+                egui::vec2(70.0, 32.0),
+                egui::DragValue::new(&mut swing_edit)
+                    .range(50.0..=75.0)
+                    .speed(0.5)
+                    .suffix("%")
+                    .min_decimals(0)
+                    .max_decimals(0)
+            );
+            if edit_response.changed() {
+                setter.set_parameter(&params.swing_amount, swing_edit);
+            }
+        });
     });
 }
 
 fn render_division_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode: BeatMode, num_sliders: usize) {
     ui.horizontal(|ui| {
-        ui.add_space(5.0);
+        ui.add_space(8.0);
         let divisions = DeviceParams::get_divisions_for_mode(beat_mode);
         let mode_suffix = beat_mode.as_str();
 
         match beat_mode {
             BeatMode::Straight => {}
             BeatMode::Triplet | BeatMode::Dotted => {
-                ui.add_enabled(false, egui::Button::new("").min_size(egui::vec2(60.0, 32.0)));
+                ui.add_enabled(false, egui::Button::new("").min_size(egui::vec2(96.0, 48.0)));
             }
         }
 
@@ -510,8 +575,8 @@ fn render_division_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_m
                 format!("{}{}", label, mode_suffix)
             };
 
-            let button = egui::Button::new(egui::RichText::new(button_label).size(14.0))
-                .min_size(egui::vec2(60.0, 32.0))
+            let button = egui::Button::new(egui::RichText::new(button_label).size(20.0))
+                .min_size(egui::vec2(96.0, 48.0))
                 .selected(num_sliders == *count);
 
             let response = ui.add(button);
@@ -526,10 +591,10 @@ fn render_division_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_m
                 let opaque_color = Color32::from_rgb(color.r(), color.g(), color.b());
                 let button_rect = response.rect;
                 let circle_center = egui::pos2(
-                    button_rect.right() - 6.0,
-                    button_rect.bottom() - 6.0
+                    button_rect.right() - 10.0,
+                    button_rect.bottom() - 10.0
                 );
-                ui.painter().circle_filled(circle_center, 3.5, opaque_color);
+                ui.painter().circle_filled(circle_center, 5.0, opaque_color);
             }
 
             if response.clicked() {
@@ -540,9 +605,9 @@ fn render_division_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_m
         }
 
         if beat_mode == BeatMode::Triplet {
-            ui.add_enabled(false, egui::Button::new("").min_size(egui::vec2(60.0, 32.0)));
+            ui.add_enabled(false, egui::Button::new("").min_size(egui::vec2(96.0, 48.0)));
         }
-        ui.add_space(5.0);
+        ui.add_space(8.0);
     });
 }
 
@@ -559,10 +624,10 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
     };
 
     ui.horizontal(|ui| {
-        ui.add_space(102.0);
+        ui.add_space(8.0);
 
-        let button_s = egui::Button::new(egui::RichText::new("S").size(14.0))
-            .min_size(egui::vec2(60.0, 32.0))
+        let button_s = egui::Button::new(egui::RichText::new("S").size(20.0))
+            .min_size(egui::vec2(96.0, 48.0))
             .selected(beat_mode == BeatMode::Straight);
 
         let response_s = ui.add(button_s);
@@ -571,10 +636,10 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
             let circle_color = Color32::from_rgba_unmultiplied(255, 255, 255, 127);
             let button_rect = response_s.rect;
             let circle_center = egui::pos2(
-                button_rect.right() - 6.0,
-                button_rect.bottom() - 6.0
+                button_rect.right() - 10.0,
+                button_rect.bottom() - 10.0
             );
-            ui.painter().circle_filled(circle_center, 3.5, circle_color);
+            ui.painter().circle_filled(circle_center, 5.0, circle_color);
         }
 
         if response_s.clicked() && beat_mode != BeatMode::Straight {
@@ -584,8 +649,8 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
             });
         }
 
-        let button_t = egui::Button::new(egui::RichText::new("T").size(14.0))
-            .min_size(egui::vec2(60.0, 32.0))
+        let button_t = egui::Button::new(egui::RichText::new("T").size(20.0))
+            .min_size(egui::vec2(96.0, 48.0))
             .selected(beat_mode == BeatMode::Triplet);
 
         let response_t = ui.add(button_t);
@@ -594,10 +659,10 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
             let circle_color = Color32::from_rgba_unmultiplied(255, 255, 255, 127);
             let button_rect = response_t.rect;
             let circle_center = egui::pos2(
-                button_rect.right() - 6.0,
-                button_rect.bottom() - 6.0
+                button_rect.right() - 10.0,
+                button_rect.bottom() - 10.0
             );
-            ui.painter().circle_filled(circle_center, 3.5, circle_color);
+            ui.painter().circle_filled(circle_center, 5.0, circle_color);
         }
 
         if response_t.clicked() && beat_mode != BeatMode::Triplet {
@@ -607,8 +672,8 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
             });
         }
 
-        let button_d = egui::Button::new(egui::RichText::new("D").size(14.0))
-            .min_size(egui::vec2(60.0, 32.0))
+        let button_d = egui::Button::new(egui::RichText::new("D").size(20.0))
+            .min_size(egui::vec2(96.0, 48.0))
             .selected(beat_mode == BeatMode::Dotted);
 
         let response_d = ui.add(button_d);
@@ -617,10 +682,10 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
             let circle_color = Color32::from_rgba_unmultiplied(255, 255, 255, 127);
             let button_rect = response_d.rect;
             let circle_center = egui::pos2(
-                button_rect.right() - 6.0,
-                button_rect.bottom() - 6.0
+                button_rect.right() - 10.0,
+                button_rect.bottom() - 10.0
             );
-            ui.painter().circle_filled(circle_center, 3.5, circle_color);
+            ui.painter().circle_filled(circle_center, 5.0, circle_color);
         }
 
         if response_d.clicked() && beat_mode != BeatMode::Dotted {
@@ -632,24 +697,3 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
     });
 }
 
-fn render_clear_button(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter) {
-    ui.horizontal(|ui| {
-        ui.add_space(275.0);
-
-        let clear_button = egui::Button::new(egui::RichText::new("Clear").size(14.0))
-            .min_size(egui::vec2(80.0, 32.0));
-
-        if ui.add(clear_button).clicked() {
-            for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
-                for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
-                    for index in 0..*count {
-                        let param = params.get_division_param(mode, *count, index);
-                        setter.begin_set_parameter(param);
-                        setter.set_parameter(param, 0.0);
-                        setter.end_set_parameter(param);
-                    }
-                }
-            }
-        }
-    });
-}

@@ -27,7 +27,7 @@ pub fn render(
 ) {
     tui.ui(|ui| {
         ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Modulation").size(14.0));
+        ui.heading(egui::RichText::new("    Modulation").size(22.0));
         ui.add_space(8.0);
     });
 
@@ -70,21 +70,21 @@ fn render_lfo_panel(
     tui.ui(|ui| {
         egui::Frame::default()
             .fill(ui.visuals().extreme_bg_color)
-            .inner_margin(10.0)
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(60, 80, 120)))
-            .corner_radius(10.0)
+            .inner_margin(16.0)
+            .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+            .corner_radius(15.0)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(format!("LFO {}", lfo_num)).size(12.0).strong());
+                    ui.label(egui::RichText::new(format!("LFO {}", lfo_num)).size(18.0).strong());
 
-                    ui.add_space(15.0);
+                    ui.add_space(24.0);
 
                     // Waveform selector
-                    ui.label(egui::RichText::new("Wave:").size(10.0));
+                    ui.label(egui::RichText::new("Wave:").size(14.0));
                     let wf_idx = waveform.value() as usize;
                     egui::ComboBox::from_id_salt(format!("lfo{}_wf", lfo_num))
-                        .width(50.0)
-                        .selected_text(WAVEFORM_NAMES.get(wf_idx).copied().unwrap_or("?"))
+                        .width(70.0)
+                        .selected_text(egui::RichText::new(WAVEFORM_NAMES.get(wf_idx).copied().unwrap_or("?")).size(14.0))
                         .show_ui(ui, |ui| {
                             for (i, name) in WAVEFORM_NAMES.iter().enumerate() {
                                 if ui.selectable_label(wf_idx == i, *name).clicked() {
@@ -93,23 +93,23 @@ fn render_lfo_panel(
                             }
                         });
 
-                    ui.add_space(10.0);
+                    ui.add_space(16.0);
 
                     // Tempo sync toggle
                     let mut sync = tempo_sync.value();
-                    if ui.checkbox(&mut sync, "Sync").changed() {
+                    if ui.add(egui::Checkbox::new(&mut sync, egui::RichText::new("Sync").size(14.0))).changed() {
                         setter.set_parameter(tempo_sync, sync);
                     }
 
-                    ui.add_space(10.0);
+                    ui.add_space(16.0);
 
                     // Rate or division based on sync
                     if tempo_sync.value() {
-                        ui.label(egui::RichText::new("Div:").size(10.0));
+                        ui.label(egui::RichText::new("Div:").size(14.0));
                         let div_idx = sync_division.value() as usize;
                         egui::ComboBox::from_id_salt(format!("lfo{}_div", lfo_num))
-                            .width(50.0)
-                            .selected_text(DIVISION_NAMES.get(div_idx).copied().unwrap_or("?"))
+                            .width(70.0)
+                            .selected_text(egui::RichText::new(DIVISION_NAMES.get(div_idx).copied().unwrap_or("?")).size(14.0))
                             .show_ui(ui, |ui| {
                                 for (i, name) in DIVISION_NAMES.iter().enumerate() {
                                     if ui.selectable_label(div_idx == i, *name).clicked() {
@@ -118,8 +118,9 @@ fn render_lfo_panel(
                                 }
                             });
                     } else {
-                        ui.label(egui::RichText::new("Rate:").size(10.0));
+                        ui.label(egui::RichText::new("Rate:").size(14.0));
                         let mut rate_val = rate.modulated_plain_value();
+                        ui.style_mut().spacing.slider_width = 120.0;
                         let slider = egui::Slider::new(&mut rate_val, 0.01..=50.0)
                             .logarithmic(true)
                             .suffix(" Hz")
@@ -129,10 +130,10 @@ fn render_lfo_panel(
                         }
                     }
 
-                    ui.add_space(10.0);
+                    ui.add_space(16.0);
 
                     // Sync source
-                    ui.label(egui::RichText::new("From:").size(10.0));
+                    ui.label(egui::RichText::new("From:").size(14.0));
                     let src = sync_source.value();
                     let src_name = match src {
                         -1 => "None",
@@ -142,8 +143,8 @@ fn render_lfo_panel(
                         _ => "?",
                     };
                     egui::ComboBox::from_id_salt(format!("lfo{}_src", lfo_num))
-                        .width(55.0)
-                        .selected_text(src_name)
+                        .width(75.0)
+                        .selected_text(egui::RichText::new(src_name).size(14.0))
                         .show_ui(ui, |ui| {
                             if ui.selectable_label(src == -1, "None").clicked() {
                                 setter.set_parameter(sync_source, -1);
@@ -160,25 +161,27 @@ fn render_lfo_panel(
 
                     // Phase mod amount (only show if sync source is set)
                     if sync_source.value() >= 0 {
-                        ui.label(egui::RichText::new("Amt:").size(10.0));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Amt:").size(14.0));
                         let mut pm_val = phase_mod.modulated_plain_value();
+                        ui.style_mut().spacing.slider_width = 80.0;
                         let slider = egui::Slider::new(&mut pm_val, 0.0..=1.0)
                             .clamping(egui::SliderClamping::Always)
                             .show_value(false);
-                        if ui.add_sized([60.0, 18.0], slider).changed() {
+                        if ui.add(slider).changed() {
                             setter.set_parameter(phase_mod, pm_val);
                         }
                     }
                 });
 
-                ui.add_space(5.0);
+                ui.add_space(12.0);
 
                 // Modulation slots
                 ui.horizontal(|ui| {
                     // Slot 1
                     render_mod_slot(ui, setter, lfo_num, 1, dest1, amount1);
 
-                    ui.add_space(20.0);
+                    ui.add_space(40.0);
 
                     // Slot 2
                     render_mod_slot(ui, setter, lfo_num, 2, dest2, amount2);
@@ -186,7 +189,7 @@ fn render_lfo_panel(
             });
     });
 
-    tui.ui(|ui| { ui.add_space(8.0); });
+    tui.ui(|ui| { ui.add_space(12.0); });
 }
 
 fn render_mod_slot(
@@ -197,12 +200,14 @@ fn render_mod_slot(
     dest: &IntParam,
     amount: &FloatParam,
 ) {
-    ui.label(egui::RichText::new("→").size(12.0).color(Color32::from_rgb(100, 150, 200)));
+    ui.label(egui::RichText::new("→").size(18.0).color(Color32::from_rgb(100, 150, 200)));
+
+    ui.add_space(4.0);
 
     let dest_idx = dest.value() as usize;
     egui::ComboBox::from_id_salt(format!("lfo{}_{}_dest", lfo_num, slot))
-        .width(75.0)
-        .selected_text(DEST_NAMES.get(dest_idx).copied().unwrap_or("?"))
+        .width(110.0)
+        .selected_text(egui::RichText::new(DEST_NAMES.get(dest_idx).copied().unwrap_or("?")).size(14.0))
         .show_ui(ui, |ui| {
             for (i, name) in DEST_NAMES.iter().enumerate() {
                 if ui.selectable_label(dest_idx == i, *name).clicked() {
@@ -211,11 +216,14 @@ fn render_mod_slot(
             }
         });
 
+    ui.add_space(8.0);
+
     let mut amt_val = amount.modulated_plain_value();
+    ui.style_mut().spacing.slider_width = 140.0;
     let slider = egui::Slider::new(&mut amt_val, -1.0..=1.0)
         .clamping(egui::SliderClamping::Always)
         .show_value(true);
-    if ui.add_sized([100.0, 18.0], slider).changed() {
+    if ui.add(slider).changed() {
         setter.set_parameter(amount, amt_val);
     }
 }

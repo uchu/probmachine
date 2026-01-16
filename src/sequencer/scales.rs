@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, Default)]
 pub enum Scale {
     #[default]
+    Custom,
     Major,
     Minor,
     Dorian,
@@ -25,6 +26,7 @@ pub enum Scale {
 impl Scale {
     pub fn all() -> &'static [Scale] {
         &[
+            Scale::Custom,
             Scale::Major,
             Scale::Minor,
             Scale::Dorian,
@@ -47,6 +49,7 @@ impl Scale {
 
     pub fn name(&self) -> &'static str {
         match self {
+            Scale::Custom => "Custom",
             Scale::Major => "Major",
             Scale::Minor => "Minor",
             Scale::Dorian => "Dorian",
@@ -69,6 +72,7 @@ impl Scale {
 
     pub fn intervals(&self) -> &'static [u8] {
         match self {
+            Scale::Custom => &[],
             Scale::Major => &[0, 2, 4, 5, 7, 9, 11],
             Scale::Minor => &[0, 2, 3, 5, 7, 8, 10],
             Scale::Dorian => &[0, 2, 3, 5, 7, 9, 10],
@@ -132,6 +136,7 @@ impl Scale {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, Default)]
 pub enum StabilityPattern {
     #[default]
+    Custom,
     Traditional,
     JazzMelodic,
     Ambient,
@@ -145,6 +150,7 @@ pub enum StabilityPattern {
 impl StabilityPattern {
     pub fn all() -> &'static [StabilityPattern] {
         &[
+            StabilityPattern::Custom,
             StabilityPattern::Traditional,
             StabilityPattern::JazzMelodic,
             StabilityPattern::Ambient,
@@ -158,6 +164,7 @@ impl StabilityPattern {
 
     pub fn name(&self) -> &'static str {
         match self {
+            StabilityPattern::Custom => "Custom",
             StabilityPattern::Traditional => "Traditional",
             StabilityPattern::JazzMelodic => "Jazz Melodic",
             StabilityPattern::Ambient => "Ambient",
@@ -171,6 +178,7 @@ impl StabilityPattern {
 
     pub fn get_stability_settings(&self, degree: u8) -> NoteStabilitySettings {
         match self {
+            StabilityPattern::Custom => NoteStabilitySettings::new(64, 64, vec![0]),
             StabilityPattern::Traditional => match degree {
                 1 => NoteStabilitySettings::new(64, 64, vec![-1, 0, 1]),
                 5 => NoteStabilitySettings::new(110, 100, vec![-1, 0]),

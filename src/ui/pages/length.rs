@@ -12,7 +12,7 @@ pub fn render(
 ) {
     tui.ui(|ui| {
         ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Length & Position").size(14.0));
+        ui.heading(egui::RichText::new("    Length & Position").size(22.0));
         ui.add_space(8.0);
     });
 
@@ -22,43 +22,32 @@ pub fn render(
         ..Default::default()
     })
     .ui(|ui| {
-        ui.spacing_mut().item_spacing.y = 6.0;
+        ui.spacing_mut().item_spacing.y = 10.0;
 
-        ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("Base Length:").size(12.0));
-            ui.add_space(5.0);
-            let mut value = params.note_length_percent.modulated_plain_value();
-            if ui.add(egui::Slider::new(&mut value, 1.0..=200.0)
-                .custom_formatter(|v, _| format!("{:.0}%", v)))
-                .changed() {
-                setter.set_parameter(&params.note_length_percent, value);
-            }
-        });
-
-        ui.add_space(8.0);
-        ui.separator();
-        ui.label(egui::RichText::new("Length Modifiers").size(12.0).strong());
-        ui.label(egui::RichText::new("Target: Weak ← Center (off) → Strong").weak().size(10.0));
+        ui.label(egui::RichText::new("Length Modifiers").size(18.0).strong());
+        ui.label(egui::RichText::new("Target: Weak ← Center (off) → Strong").weak().size(14.0));
 
         render_length_modifier(ui, setter, 1,
             &params.len_mod_1_target, &params.len_mod_1_amount, &params.len_mod_1_prob);
         render_length_modifier(ui, setter, 2,
             &params.len_mod_2_target, &params.len_mod_2_amount, &params.len_mod_2_prob);
 
-        ui.add_space(8.0);
+        ui.add_space(12.0);
         ui.separator();
-        ui.label(egui::RichText::new("Decay Modifiers").size(12.0).strong());
-        ui.label(egui::RichText::new("Modifies vol env decay time").weak().size(10.0));
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new("Decay Modifiers").size(18.0).strong());
+        ui.label(egui::RichText::new("Modifies vol env decay time").weak().size(14.0));
 
         render_decay_modifier(ui, setter, 1,
             &params.decay_mod_1_target, &params.decay_mod_1_amount, &params.decay_mod_1_prob);
         render_decay_modifier(ui, setter, 2,
             &params.decay_mod_2_target, &params.decay_mod_2_amount, &params.decay_mod_2_prob);
 
-        ui.add_space(8.0);
+        ui.add_space(12.0);
         ui.separator();
-        ui.label(egui::RichText::new("Position Modifiers").size(12.0).strong());
-        ui.label(egui::RichText::new("Shift: - = early, + = late").weak().size(10.0));
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new("Position Modifiers").size(18.0).strong());
+        ui.label(egui::RichText::new("Shift: - = early, + = late").weak().size(14.0));
 
         render_position_modifier(ui, setter, 1,
             &params.pos_mod_1_target, &params.pos_mod_1_shift, &params.pos_mod_1_prob);
@@ -100,12 +89,14 @@ fn render_length_modifier(
 
     egui::Frame::default()
         .fill(frame_color)
-        .inner_margin(6.0)
-        .corner_radius(6.0)
+        .inner_margin(12.0)
+        .corner_radius(10.0)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(format!("{}:", slot)).size(11.0));
+                ui.label(egui::RichText::new(format!("{}:", slot)).size(16.0));
+                ui.add_space(8.0);
                 let mut target = target_value;
+                ui.style_mut().spacing.slider_width = 200.0;
                 if ui.add(egui::Slider::new(&mut target, -100.0..=100.0)
                     .custom_formatter(|v, _| format_target(v as f32))
                     .step_by(1.0))
@@ -113,9 +104,13 @@ fn render_length_modifier(
                     setter.set_parameter(target_param, target);
                 }
 
+                ui.add_space(16.0);
                 ui.separator();
+                ui.add_space(16.0);
+
                 let mut amount = amount_param.modulated_plain_value();
-                ui.label(egui::RichText::new("Amt:").size(10.0));
+                ui.label(egui::RichText::new("Amt:").size(14.0));
+                ui.style_mut().spacing.slider_width = 140.0;
                 if ui.add(egui::Slider::new(&mut amount, 0.0..=200.0)
                     .custom_formatter(|v, _| format!("{:.0}%", v))
                     .step_by(1.0))
@@ -123,8 +118,11 @@ fn render_length_modifier(
                     setter.set_parameter(amount_param, amount);
                 }
 
+                ui.add_space(16.0);
+
                 let mut prob = prob_param.modulated_plain_value();
-                ui.label(egui::RichText::new("P:").size(10.0));
+                ui.label(egui::RichText::new("P:").size(14.0));
+                ui.style_mut().spacing.slider_width = 100.0;
                 if ui.add(egui::Slider::new(&mut prob, 0.0..=127.0)
                     .custom_formatter(|v, _| format!("{:.0}", v))
                     .step_by(1.0))
@@ -158,12 +156,14 @@ fn render_decay_modifier(
 
     egui::Frame::default()
         .fill(frame_color)
-        .inner_margin(6.0)
-        .corner_radius(6.0)
+        .inner_margin(12.0)
+        .corner_radius(10.0)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(format!("{}:", slot)).size(11.0));
+                ui.label(egui::RichText::new(format!("{}:", slot)).size(16.0));
+                ui.add_space(8.0);
                 let mut target = target_value;
+                ui.style_mut().spacing.slider_width = 200.0;
                 if ui.add(egui::Slider::new(&mut target, -100.0..=100.0)
                     .custom_formatter(|v, _| format_target(v as f32))
                     .step_by(1.0))
@@ -171,9 +171,13 @@ fn render_decay_modifier(
                     setter.set_parameter(target_param, target);
                 }
 
+                ui.add_space(16.0);
                 ui.separator();
+                ui.add_space(16.0);
+
                 let mut amount = amount_param.modulated_plain_value();
-                ui.label(egui::RichText::new("Amt:").size(10.0));
+                ui.label(egui::RichText::new("Amt:").size(14.0));
+                ui.style_mut().spacing.slider_width = 140.0;
                 if ui.add(egui::Slider::new(&mut amount, 0.0..=200.0)
                     .custom_formatter(|v, _| format!("{:.0}%", v))
                     .step_by(1.0))
@@ -181,8 +185,11 @@ fn render_decay_modifier(
                     setter.set_parameter(amount_param, amount);
                 }
 
+                ui.add_space(16.0);
+
                 let mut prob = prob_param.modulated_plain_value();
-                ui.label(egui::RichText::new("P:").size(10.0));
+                ui.label(egui::RichText::new("P:").size(14.0));
+                ui.style_mut().spacing.slider_width = 100.0;
                 if ui.add(egui::Slider::new(&mut prob, 0.0..=127.0)
                     .custom_formatter(|v, _| format!("{:.0}", v))
                     .step_by(1.0))
@@ -216,12 +223,14 @@ fn render_position_modifier(
 
     egui::Frame::default()
         .fill(frame_color)
-        .inner_margin(6.0)
-        .corner_radius(6.0)
+        .inner_margin(12.0)
+        .corner_radius(10.0)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(format!("{}:", slot)).size(11.0));
+                ui.label(egui::RichText::new(format!("{}:", slot)).size(16.0));
+                ui.add_space(8.0);
                 let mut target = target_value;
+                ui.style_mut().spacing.slider_width = 200.0;
                 if ui.add(egui::Slider::new(&mut target, -100.0..=100.0)
                     .custom_formatter(|v, _| format_target(v as f32))
                     .step_by(1.0))
@@ -229,9 +238,13 @@ fn render_position_modifier(
                     setter.set_parameter(target_param, target);
                 }
 
+                ui.add_space(16.0);
                 ui.separator();
+                ui.add_space(16.0);
+
                 let mut shift = shift_param.modulated_plain_value();
-                ui.label(egui::RichText::new("Shift:").size(10.0));
+                ui.label(egui::RichText::new("Shift:").size(14.0));
+                ui.style_mut().spacing.slider_width = 140.0;
                 if ui.add(egui::Slider::new(&mut shift, -50.0..=50.0)
                     .custom_formatter(|v, _| {
                         if v < -0.5 { format!("{:.0}%", v) }
@@ -243,8 +256,11 @@ fn render_position_modifier(
                     setter.set_parameter(shift_param, shift);
                 }
 
+                ui.add_space(16.0);
+
                 let mut prob = prob_param.modulated_plain_value();
-                ui.label(egui::RichText::new("P:").size(10.0));
+                ui.label(egui::RichText::new("P:").size(14.0));
+                ui.style_mut().spacing.slider_width = 100.0;
                 if ui.add(egui::Slider::new(&mut prob, 0.0..=127.0)
                     .custom_formatter(|v, _| format!("{:.0}", v))
                     .step_by(1.0))

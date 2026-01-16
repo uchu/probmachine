@@ -217,8 +217,19 @@ pub struct PresetManager {
 
 impl PresetManager {
     pub fn new() -> Self {
-        let factory_banks = create_default_presets();
+        let mut factory_banks = create_default_presets();
         let user_banks = create_empty_user_banks();
+
+        if let Some(path) = Self::get_factory_presets_file_path() {
+            if path.exists() {
+                if let Ok(json) = std::fs::read_to_string(&path) {
+                    if let Ok(banks) = serde_json::from_str::<[PresetBank; 8]>(&json) {
+                        factory_banks = banks;
+                    }
+                }
+            }
+        }
+
         Self {
             factory_banks,
             user_banks,
@@ -288,6 +299,13 @@ impl PresetManager {
         }
     }
 
+    pub fn save_to_factory_slot(&mut self, bank: FactoryBank, index: usize, preset: Preset) {
+        if index < 32 {
+            self.factory_banks[bank as usize].presets[index] = preset;
+            self.modified = true;
+        }
+    }
+
     pub fn init_user_preset(&mut self, bank: UserBank, index: usize) {
         if index < 32 {
             self.user_banks[bank as usize].presets[index] = Preset::new(&format!("User {}", index + 1));
@@ -341,6 +359,50 @@ impl PresetManager {
             path.push("user_presets.json");
             path
         })
+    }
+
+    pub fn get_factory_presets_file_path() -> Option<PathBuf> {
+        dirs::data_local_dir().map(|mut path| {
+            path.push("Device");
+            path.push("factory_presets.json");
+            path
+        })
+    }
+
+    pub fn save_factory_presets(&mut self) -> Result<(), String> {
+        let path = Self::get_factory_presets_file_path()
+            .ok_or_else(|| "Could not determine preset file path".to_string())?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory: {}", e))?;
+        }
+
+        let json = serde_json::to_string_pretty(&self.factory_banks)
+            .map_err(|e| format!("Failed to serialize presets: {}", e))?;
+
+        std::fs::write(&path, json)
+            .map_err(|e| format!("Failed to write presets file: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn load_factory_presets(&mut self) -> Result<(), String> {
+        let path = Self::get_factory_presets_file_path()
+            .ok_or_else(|| "Could not determine preset file path".to_string())?;
+
+        if !path.exists() {
+            return Ok(());
+        }
+
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read presets file: {}", e))?;
+
+        let banks: [PresetBank; 8] = serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to parse presets file: {}", e))?;
+
+        self.factory_banks = banks;
+        Ok(())
     }
 
     pub fn save_user_presets(&mut self) -> Result<(), String> {

@@ -16,9 +16,9 @@ enum PresetSection {
 }
 
 #[derive(Clone, PartialEq)]
-enum SaveDialogState {
-    Hidden,
-    Selecting { bank: UserBank, slot: usize },
+enum PageMode {
+    Browse,
+    Save,
 }
 
 #[derive(Clone, PartialEq)]
@@ -27,12 +27,10 @@ struct PresetPageState {
     factory_bank: FactoryBank,
     user_bank: UserBank,
     selected_preset: usize,
-    editing_name: bool,
+    mode: PageMode,
     name_buffer: String,
     author_buffer: String,
-    description_buffer: String,
     status_message: Option<(String, std::time::Instant)>,
-    save_dialog: SaveDialogState,
 }
 
 impl Default for PresetPageState {
@@ -42,12 +40,10 @@ impl Default for PresetPageState {
             factory_bank: FactoryBank::A,
             user_bank: UserBank::U1,
             selected_preset: 0,
-            editing_name: false,
+            mode: PageMode::Browse,
             name_buffer: String::new(),
             author_buffer: String::new(),
-            description_buffer: String::new(),
             status_message: None,
-            save_dialog: SaveDialogState::Hidden,
         }
     }
 }
@@ -62,7 +58,7 @@ pub fn render(
 
     tui.ui(|ui| {
         ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Presets").size(14.0));
+        ui.heading(egui::RichText::new("    Presets").size(22.0));
         ui.add_space(8.0);
     });
 
@@ -77,15 +73,18 @@ pub fn render(
 
         egui::Frame::default()
             .fill(ui.visuals().extreme_bg_color)
-            .inner_margin(15.0)
+            .inner_margin(24.0)
             .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
             .corner_radius(15.0)
             .show(ui, |ui| {
+                ui.set_max_width(1120.0);
+
+                // Top row: Section toggle, Bank selection, Status
                 ui.horizontal(|ui| {
                     let factory_btn = egui::Button::new(
-                        egui::RichText::new("Factory").size(12.0).strong()
+                        egui::RichText::new("Factory").size(16.0).strong()
                     )
-                    .min_size(egui::vec2(70.0, 28.0))
+                    .min_size(egui::vec2(100.0, 40.0))
                     .fill(if state.section == PresetSection::Factory {
                         Color32::from_rgb(60, 100, 160)
                     } else {
@@ -93,11 +92,11 @@ pub fn render(
                     });
 
                     let user_btn = egui::Button::new(
-                        egui::RichText::new("User").size(12.0).strong()
+                        egui::RichText::new("User").size(16.0).strong()
                     )
-                    .min_size(egui::vec2(70.0, 28.0))
+                    .min_size(egui::vec2(100.0, 40.0))
                     .fill(if state.section == PresetSection::User {
-                        Color32::from_rgb(60, 100, 160)
+                        Color32::from_rgb(100, 80, 60)
                     } else {
                         Color32::from_rgb(50, 50, 50)
                     });
@@ -105,36 +104,26 @@ pub fn render(
                     if ui.add(factory_btn).clicked() {
                         state.section = PresetSection::Factory;
                         state.selected_preset = 0;
-                        state.editing_name = false;
                     }
-                    ui.add_space(5.0);
+                    ui.add_space(8.0);
                     if ui.add(user_btn).clicked() {
                         state.section = PresetSection::User;
                         state.selected_preset = 0;
-                        state.editing_name = false;
                     }
 
-                    ui.add_space(20.0);
+                    ui.add_space(40.0);
 
-                    if let Some((msg, _)) = &state.status_message {
-                        ui.label(egui::RichText::new(msg).size(11.0).color(Color32::from_rgb(100, 200, 100)));
-                    }
-                });
-
-                ui.add_space(10.0);
-
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("Bank:").size(12.0));
-                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new("Bank:").size(16.0));
+                    ui.add_space(12.0);
 
                     match state.section {
                         PresetSection::Factory => {
                             for bank in FactoryBank::all() {
                                 let is_selected = state.factory_bank == bank;
                                 let button = egui::Button::new(
-                                    egui::RichText::new(bank.label()).size(14.0).strong()
+                                    egui::RichText::new(bank.label()).size(16.0).strong()
                                 )
-                                .min_size(egui::vec2(40.0, 28.0))
+                                .min_size(egui::vec2(50.0, 40.0))
                                 .fill(if is_selected {
                                     Color32::from_rgb(60, 100, 160)
                                 } else {
@@ -144,18 +133,17 @@ pub fn render(
                                 if ui.add(button).clicked() {
                                     state.factory_bank = bank;
                                     state.selected_preset = 0;
-                                    state.editing_name = false;
                                 }
-                                ui.add_space(5.0);
+                                ui.add_space(4.0);
                             }
                         }
                         PresetSection::User => {
                             for bank in UserBank::all() {
                                 let is_selected = state.user_bank == bank;
                                 let button = egui::Button::new(
-                                    egui::RichText::new(bank.label()).size(14.0).strong()
+                                    egui::RichText::new(bank.label()).size(16.0).strong()
                                 )
-                                .min_size(egui::vec2(40.0, 28.0))
+                                .min_size(egui::vec2(50.0, 40.0))
                                 .fill(if is_selected {
                                     Color32::from_rgb(100, 80, 60)
                                 } else {
@@ -165,20 +153,25 @@ pub fn render(
                                 if ui.add(button).clicked() {
                                     state.user_bank = bank;
                                     state.selected_preset = 0;
-                                    state.editing_name = false;
                                 }
-                                ui.add_space(5.0);
+                                ui.add_space(4.0);
                             }
                         }
                     }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(105.0);
+                        if let Some((msg, _)) = &state.status_message {
+                            ui.label(egui::RichText::new(msg).size(14.0).color(Color32::from_rgb(100, 200, 100)));
+                        }
+                    });
                 });
 
-                ui.add_space(15.0);
+                ui.add_space(20.0);
 
+                // Preset grid: 2 rows of 16
                 let mut clicked_preset: Option<usize> = None;
                 let mut selected_preset_name = String::new();
-                let mut selected_preset_author = String::new();
-                let mut selected_preset_description = String::new();
 
                 if let Ok(manager) = ui_state.preset_manager.lock() {
                     let current_location = Some(manager.current_location());
@@ -186,34 +179,29 @@ pub fn render(
                     match state.section {
                         PresetSection::Factory => {
                             let bank = manager.get_factory_bank(state.factory_bank);
-                            let preset = &bank.presets[state.selected_preset];
-                            selected_preset_name = preset.name.clone();
-                            selected_preset_author = preset.author.clone();
-                            selected_preset_description = preset.description.clone();
+                            selected_preset_name = bank.presets[state.selected_preset].name.clone();
                         }
                         PresetSection::User => {
                             let bank = manager.get_user_bank(state.user_bank);
-                            let preset = &bank.presets[state.selected_preset];
-                            selected_preset_name = preset.name.clone();
-                            selected_preset_author = preset.author.clone();
-                            selected_preset_description = preset.description.clone();
+                            selected_preset_name = bank.presets[state.selected_preset].name.clone();
                         }
                     }
 
-                    ui.horizontal_wrapped(|ui| {
-                        for i in 0..32 {
-                            let (_preset_name, is_empty, is_favorite) = match state.section {
+                    // Row 1: presets 1-16
+                    ui.horizontal(|ui| {
+                        for i in 0..16 {
+                            let (is_empty, is_favorite) = match state.section {
                                 PresetSection::Factory => {
                                     let p = &manager.get_factory_bank(state.factory_bank).presets[i];
                                     let empty = p.name.starts_with("Init ");
                                     let fav = manager.is_favorite_by_indices(true, state.factory_bank as usize, i);
-                                    (p.name.clone(), empty, fav)
+                                    (empty, fav)
                                 }
                                 PresetSection::User => {
                                     let p = &manager.get_user_bank(state.user_bank).presets[i];
                                     let empty = p.name.starts_with("User ") || p.name.starts_with("Init");
                                     let fav = manager.is_favorite_by_indices(false, state.user_bank as usize, i);
-                                    (p.name.clone(), empty, fav)
+                                    (empty, fav)
                                 }
                             };
 
@@ -228,6 +216,7 @@ pub fn render(
                                 _ => false,
                             };
 
+                            let is_group_start = i % 4 == 0;
                             let fill_color = if is_current {
                                 Color32::from_rgb(80, 140, 80)
                             } else if is_selected {
@@ -236,9 +225,9 @@ pub fn render(
                                     PresetSection::User => Color32::from_rgb(100, 80, 60),
                                 }
                             } else if is_empty {
-                                Color32::from_rgb(35, 35, 35)
+                                if is_group_start { Color32::from_rgb(28, 28, 28) } else { Color32::from_rgb(35, 35, 35) }
                             } else {
-                                Color32::from_rgb(45, 45, 45)
+                                if is_group_start { Color32::from_rgb(42, 42, 42) } else { Color32::from_rgb(50, 50, 50) }
                             };
 
                             let label = if is_favorite {
@@ -248,25 +237,90 @@ pub fn render(
                             };
 
                             let button = egui::Button::new(
-                                egui::RichText::new(label).size(if is_favorite { 10.0 } else { 11.0 })
+                                egui::RichText::new(label).size(14.0)
                             )
-                            .min_size(egui::vec2(32.0, 32.0))
+                            .min_size(egui::vec2(64.0, 44.0))
                             .fill(fill_color);
 
                             if ui.add(button).clicked() {
                                 state.selected_preset = i;
-                                state.editing_name = false;
-                                clicked_preset = Some(i);
+                                if state.mode == PageMode::Browse {
+                                    clicked_preset = Some(i);
+                                }
                             }
+                            ui.add_space(2.0);
+                        }
+                    });
 
-                            if (i + 1) % 8 == 0 && i < 31 {
-                                ui.end_row();
-                                ui.add_space(3.0);
+                    ui.add_space(6.0);
+
+                    // Row 2: presets 17-32
+                    ui.horizontal(|ui| {
+                        for i in 16..32 {
+                            let (is_empty, is_favorite) = match state.section {
+                                PresetSection::Factory => {
+                                    let p = &manager.get_factory_bank(state.factory_bank).presets[i];
+                                    let empty = p.name.starts_with("Init ");
+                                    let fav = manager.is_favorite_by_indices(true, state.factory_bank as usize, i);
+                                    (empty, fav)
+                                }
+                                PresetSection::User => {
+                                    let p = &manager.get_user_bank(state.user_bank).presets[i];
+                                    let empty = p.name.starts_with("User ") || p.name.starts_with("Init");
+                                    let fav = manager.is_favorite_by_indices(false, state.user_bank as usize, i);
+                                    (empty, fav)
+                                }
+                            };
+
+                            let is_selected = state.selected_preset == i;
+                            let is_current = match (&state.section, current_location) {
+                                (PresetSection::Factory, Some(PresetLocation::Factory(b, idx))) => {
+                                    b == state.factory_bank && idx == i
+                                }
+                                (PresetSection::User, Some(PresetLocation::User(b, idx))) => {
+                                    b == state.user_bank && idx == i
+                                }
+                                _ => false,
+                            };
+
+                            let is_group_start = i % 4 == 0;
+                            let fill_color = if is_current {
+                                Color32::from_rgb(80, 140, 80)
+                            } else if is_selected {
+                                match state.section {
+                                    PresetSection::Factory => Color32::from_rgb(70, 100, 140),
+                                    PresetSection::User => Color32::from_rgb(100, 80, 60),
+                                }
+                            } else if is_empty {
+                                if is_group_start { Color32::from_rgb(28, 28, 28) } else { Color32::from_rgb(35, 35, 35) }
+                            } else {
+                                if is_group_start { Color32::from_rgb(42, 42, 42) } else { Color32::from_rgb(50, 50, 50) }
+                            };
+
+                            let label = if is_favorite {
+                                format!("★{}", i + 1)
+                            } else {
+                                format!("{:02}", i + 1)
+                            };
+
+                            let button = egui::Button::new(
+                                egui::RichText::new(label).size(14.0)
+                            )
+                            .min_size(egui::vec2(64.0, 44.0))
+                            .fill(fill_color);
+
+                            if ui.add(button).clicked() {
+                                state.selected_preset = i;
+                                if state.mode == PageMode::Browse {
+                                    clicked_preset = Some(i);
+                                }
                             }
+                            ui.add_space(2.0);
                         }
                     });
                 }
 
+                // Load preset on click (only in Browse mode)
                 if let Some(preset_idx) = clicked_preset {
                     if let Ok(mut mgr) = ui_state.preset_manager.lock() {
                         let location = match state.section {
@@ -276,292 +330,184 @@ pub fn render(
                         mgr.set_current_location(location);
                         let preset = mgr.get_current_preset().clone();
                         selected_preset_name = preset.name.clone();
-                        selected_preset_author = preset.author.clone();
-                        selected_preset_description = preset.description.clone();
                         drop(mgr);
                         load_preset_to_params(&preset.data, params, setter, ui_state);
                         state.status_message = Some((format!("Loaded: {}", preset.name), std::time::Instant::now()));
                     }
                 }
 
-                ui.add_space(15.0);
-                ui.separator();
-                ui.add_space(10.0);
+                ui.add_space(16.0);
+                ui.add(egui::Separator::default().shrink(5.0));
+                ui.add_space(12.0);
 
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("Name:").size(12.0));
-                    ui.add_space(5.0);
-                    ui.label(egui::RichText::new(&selected_preset_name).size(14.0).strong());
-                });
+                // Action area - changes based on mode
+                match state.mode {
+                    PageMode::Browse => {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new(&selected_preset_name).size(18.0).strong());
 
-                ui.add_space(5.0);
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                ui.add_space(105.0);
 
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("Author:").size(11.0).color(Color32::GRAY));
-                    ui.add_space(5.0);
-                    ui.label(egui::RichText::new(&selected_preset_author).size(11.0).color(Color32::GRAY));
-                });
-
-                if !selected_preset_description.is_empty() {
-                    ui.add_space(3.0);
-                    ui.label(egui::RichText::new(&selected_preset_description).size(10.0).color(Color32::DARK_GRAY));
-                }
-
-                ui.add_space(15.0);
-
-                ui.horizontal(|ui| {
-                    let load_btn = egui::Button::new(
-                        egui::RichText::new("Load").size(12.0)
-                    ).min_size(egui::vec2(70.0, 28.0));
-
-                    let save_btn = egui::Button::new(
-                        egui::RichText::new("Save As...").size(12.0)
-                    ).min_size(egui::vec2(90.0, 28.0))
-                    .fill(Color32::from_rgb(80, 100, 60));
-
-                    if ui.add(load_btn).clicked() {
-                        if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                            let location = match state.section {
-                                PresetSection::Factory => PresetLocation::Factory(state.factory_bank, state.selected_preset),
-                                PresetSection::User => PresetLocation::User(state.user_bank, state.selected_preset),
-                            };
-                            mgr.set_current_location(location);
-                            let preset = mgr.get_current_preset().clone();
-                            drop(mgr);
-                            load_preset_to_params(&preset.data, params, setter, ui_state);
-                            state.status_message = Some((format!("Loaded: {}", preset.name), std::time::Instant::now()));
-                        }
-                    }
-
-                    ui.add_space(10.0);
-
-                    if ui.add(save_btn).clicked() {
-                        state.save_dialog = SaveDialogState::Selecting {
-                            bank: UserBank::U1,
-                            slot: 0
-                        };
-                        state.name_buffer = "My Preset".to_string();
-                        state.author_buffer = "User".to_string();
-                        state.description_buffer = String::new();
-                    }
-
-                    if matches!(state.section, PresetSection::User) {
-                        ui.add_space(10.0);
-                        let init_btn = egui::Button::new(
-                            egui::RichText::new("Init").size(12.0)
-                        ).min_size(egui::vec2(50.0, 28.0))
-                        .fill(Color32::from_rgb(100, 70, 70));
-
-                        if ui.add(init_btn).clicked() {
-                            if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                                mgr.init_user_preset(state.user_bank, state.selected_preset);
-                                let _ = mgr.save_user_presets();
-                                state.status_message = Some(("Preset initialized".to_string(), std::time::Instant::now()));
-                            }
-                        }
-                    }
-
-                    ui.add_space(10.0);
-                    let is_fav = if let Ok(mgr) = ui_state.preset_manager.lock() {
-                        let location = match state.section {
-                            PresetSection::Factory => PresetLocation::Factory(state.factory_bank, state.selected_preset),
-                            PresetSection::User => PresetLocation::User(state.user_bank, state.selected_preset),
-                        };
-                        mgr.is_favorite(location)
-                    } else {
-                        false
-                    };
-
-                    let star_label = if is_fav { "★" } else { "☆" };
-                    let star_btn = egui::Button::new(
-                        egui::RichText::new(star_label).size(16.0)
-                    ).min_size(egui::vec2(32.0, 28.0))
-                    .fill(if is_fav { Color32::from_rgb(180, 140, 40) } else { Color32::from_rgb(60, 60, 60) });
-
-                    if ui.add(star_btn).clicked() {
-                        if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                            let location = match state.section {
-                                PresetSection::Factory => PresetLocation::Factory(state.factory_bank, state.selected_preset),
-                                PresetSection::User => PresetLocation::User(state.user_bank, state.selected_preset),
-                            };
-                            let is_now_fav = mgr.toggle_favorite(location);
-                            let _ = mgr.save_favorites();
-                            state.status_message = Some((
-                                if is_now_fav { "Added to favorites".to_string() } else { "Removed from favorites".to_string() },
-                                std::time::Instant::now()
-                            ));
-                        }
-                    }
-
-                });
-
-                if let SaveDialogState::Selecting { bank, slot } = &mut state.save_dialog {
-                    ui.add_space(15.0);
-                    ui.separator();
-                    ui.add_space(10.0);
-
-                    ui.label(egui::RichText::new("Save to User Bank:").size(12.0).strong());
-                    ui.add_space(8.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Bank:").size(11.0));
-                        ui.add_space(5.0);
-                        for b in UserBank::all() {
-                            let is_selected = *bank == b;
-                            let btn = egui::Button::new(
-                                egui::RichText::new(b.label()).size(12.0)
-                            )
-                            .min_size(egui::vec2(30.0, 24.0))
-                            .fill(if is_selected {
-                                Color32::from_rgb(100, 80, 60)
-                            } else {
-                                Color32::from_rgb(50, 50, 50)
-                            });
-                            if ui.add(btn).clicked() {
-                                *bank = b;
-                            }
-                            ui.add_space(3.0);
-                        }
-                    });
-
-                    ui.add_space(8.0);
-
-                    ui.vertical(|ui| {
-                        ui.label(egui::RichText::new("Slot:").size(11.0));
-                        ui.add_space(3.0);
-                        ui.horizontal_wrapped(|ui| {
-                            for i in 0..32 {
-                                let is_selected = *slot == i;
-                                let btn = egui::Button::new(
-                                    egui::RichText::new(format!("{:02}", i + 1)).size(10.0)
-                                )
-                                .min_size(egui::vec2(26.0, 22.0))
-                                .fill(if is_selected {
-                                    Color32::from_rgb(100, 80, 60)
+                                // Favorite button
+                                let is_fav = if let Ok(mgr) = ui_state.preset_manager.lock() {
+                                    let location = match state.section {
+                                        PresetSection::Factory => PresetLocation::Factory(state.factory_bank, state.selected_preset),
+                                        PresetSection::User => PresetLocation::User(state.user_bank, state.selected_preset),
+                                    };
+                                    mgr.is_favorite(location)
                                 } else {
-                                    Color32::from_rgb(50, 50, 50)
-                                });
-                                if ui.add(btn).clicked() {
-                                    *slot = i;
+                                    false
+                                };
+
+                                let star_label = if is_fav { "★" } else { "☆" };
+                                let star_btn = egui::Button::new(
+                                    egui::RichText::new(star_label).size(20.0)
+                                ).min_size(egui::vec2(48.0, 40.0))
+                                .fill(if is_fav { Color32::from_rgb(180, 140, 40) } else { Color32::from_rgb(60, 60, 60) });
+
+                                if ui.add(star_btn).clicked() {
+                                    if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                                        let location = match state.section {
+                                            PresetSection::Factory => PresetLocation::Factory(state.factory_bank, state.selected_preset),
+                                            PresetSection::User => PresetLocation::User(state.user_bank, state.selected_preset),
+                                        };
+                                        let is_now_fav = mgr.toggle_favorite(location);
+                                        let _ = mgr.save_favorites();
+                                        state.status_message = Some((
+                                            if is_now_fav { "Added to favorites".to_string() } else { "Removed from favorites".to_string() },
+                                            std::time::Instant::now()
+                                        ));
+                                    }
                                 }
-                                if (i + 1) % 8 == 0 && i < 31 {
-                                    ui.end_row();
-                                    ui.add_space(2.0);
+
+                                ui.add_space(8.0);
+
+                                // Init button (only for User presets)
+                                if matches!(state.section, PresetSection::User) {
+                                    let init_btn = egui::Button::new(
+                                        egui::RichText::new("Init").size(16.0)
+                                    ).min_size(egui::vec2(70.0, 40.0))
+                                    .fill(Color32::from_rgb(100, 70, 70));
+
+                                    if ui.add(init_btn).clicked() {
+                                        if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                                            mgr.init_user_preset(state.user_bank, state.selected_preset);
+                                            let _ = mgr.save_user_presets();
+                                            state.status_message = Some(("Preset initialized".to_string(), std::time::Instant::now()));
+                                        }
+                                    }
+                                    ui.add_space(8.0);
                                 }
-                            }
+
+                                // Save button
+                                let save_btn = egui::Button::new(
+                                    egui::RichText::new("Save").size(16.0)
+                                ).min_size(egui::vec2(80.0, 40.0))
+                                .fill(Color32::from_rgb(80, 100, 60));
+
+                                if ui.add(save_btn).clicked() {
+                                    state.mode = PageMode::Save;
+                                    state.name_buffer = selected_preset_name.clone();
+                                    state.author_buffer = "User".to_string();
+                                }
+                            });
                         });
-                    });
-
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Name:").size(11.0));
-                        ui.add_space(5.0);
-                        ui.add(
-                            egui::TextEdit::singleline(&mut state.name_buffer)
-                                .desired_width(150.0)
-                                .font(egui::TextStyle::Body)
-                        );
-                    });
-
-                    ui.add_space(5.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Author:").size(11.0));
-                        ui.add_space(5.0);
-                        ui.add(
-                            egui::TextEdit::singleline(&mut state.author_buffer)
-                                .desired_width(100.0)
-                                .font(egui::TextStyle::Body)
-                        );
-                    });
-
-                    ui.add_space(5.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Description:").size(11.0));
-                    });
-                    ui.add(
-                        egui::TextEdit::multiline(&mut state.description_buffer)
-                            .desired_width(300.0)
-                            .desired_rows(2)
-                            .font(egui::TextStyle::Body)
-                    );
-                    if state.description_buffer.len() > 256 {
-                        state.description_buffer = state.description_buffer.chars().take(256).collect();
                     }
-                    ui.label(egui::RichText::new(format!("{}/256", state.description_buffer.len())).size(9.0).color(Color32::GRAY));
+                    PageMode::Save => {
+                        let location_label = match state.section {
+                            PresetSection::Factory => format!("Factory {} - {:02}", state.factory_bank.label(), state.selected_preset + 1),
+                            PresetSection::User => format!("User {} - {:02}", state.user_bank.label(), state.selected_preset + 1),
+                        };
 
-                    ui.add_space(10.0);
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Save to:").size(16.0).strong());
+                            ui.add_space(12.0);
+                            ui.label(egui::RichText::new(&location_label).size(16.0));
 
-                    let target_bank = *bank;
-                    let target_slot = *slot;
+                            ui.add_space(32.0);
 
-                    ui.horizontal(|ui| {
-                        let confirm_btn = egui::Button::new(
-                            egui::RichText::new("Save").size(12.0)
-                        ).min_size(egui::vec2(60.0, 28.0))
-                        .fill(Color32::from_rgb(80, 120, 80));
-
-                        let cancel_btn = egui::Button::new(
-                            egui::RichText::new("Cancel").size(12.0)
-                        ).min_size(egui::vec2(60.0, 28.0));
-
-                        if ui.add(confirm_btn).clicked() && !state.name_buffer.is_empty() {
-                            let data = save_params_to_preset_data(params, ui_state);
-                            let preset = Preset::with_author_and_description(
-                                &state.name_buffer,
-                                &state.author_buffer,
-                                &state.description_buffer,
-                                data,
+                            ui.label(egui::RichText::new("Name:").size(14.0));
+                            ui.add_space(8.0);
+                            ui.add(
+                                egui::TextEdit::singleline(&mut state.name_buffer)
+                                    .desired_width(200.0)
+                                    .font(egui::TextStyle::Body)
                             );
-                            if let Ok(mut mgr) = ui_state.preset_manager.lock() {
-                                mgr.save_to_user_slot(target_bank, target_slot, preset);
-                                mgr.set_current_location(PresetLocation::User(target_bank, target_slot));
-                                match mgr.save_user_presets() {
-                                    Ok(_) => {
-                                        state.status_message = Some(("Preset saved!".to_string(), std::time::Instant::now()));
-                                    }
-                                    Err(e) => {
-                                        state.status_message = Some((format!("Saved but disk error: {}", e), std::time::Instant::now()));
-                                    }
+
+                            ui.add_space(24.0);
+
+                            ui.label(egui::RichText::new("Author:").size(14.0));
+                            ui.add_space(8.0);
+                            ui.add(
+                                egui::TextEdit::singleline(&mut state.author_buffer)
+                                    .desired_width(120.0)
+                                    .font(egui::TextStyle::Body)
+                            );
+
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                ui.add_space(105.0);
+
+                                let cancel_btn = egui::Button::new(
+                                    egui::RichText::new("Cancel").size(16.0)
+                                ).min_size(egui::vec2(90.0, 40.0));
+
+                                if ui.add(cancel_btn).clicked() {
+                                    state.mode = PageMode::Browse;
                                 }
-                            }
-                            state.save_dialog = SaveDialogState::Hidden;
-                            state.section = PresetSection::User;
-                            state.user_bank = target_bank;
-                            state.selected_preset = target_slot;
-                        }
 
-                        ui.add_space(10.0);
+                                ui.add_space(8.0);
 
-                        if ui.add(cancel_btn).clicked() {
-                            state.save_dialog = SaveDialogState::Hidden;
-                        }
-                    });
+                                let confirm_btn = egui::Button::new(
+                                    egui::RichText::new("Confirm").size(16.0)
+                                ).min_size(egui::vec2(100.0, 40.0))
+                                .fill(Color32::from_rgb(80, 120, 80));
+
+                                if ui.add(confirm_btn).clicked() && !state.name_buffer.is_empty() {
+                                    let data = save_params_to_preset_data(params, ui_state);
+                                    let preset = Preset::with_author_and_description(
+                                        &state.name_buffer,
+                                        &state.author_buffer,
+                                        "",
+                                        data,
+                                    );
+                                    if let Ok(mut mgr) = ui_state.preset_manager.lock() {
+                                        match state.section {
+                                            PresetSection::Factory => {
+                                                mgr.save_to_factory_slot(state.factory_bank, state.selected_preset, preset);
+                                                mgr.set_current_location(PresetLocation::Factory(state.factory_bank, state.selected_preset));
+                                                match mgr.save_factory_presets() {
+                                                    Ok(_) => {
+                                                        state.status_message = Some(("Preset saved!".to_string(), std::time::Instant::now()));
+                                                    }
+                                                    Err(e) => {
+                                                        state.status_message = Some((format!("Save error: {}", e), std::time::Instant::now()));
+                                                    }
+                                                }
+                                            }
+                                            PresetSection::User => {
+                                                mgr.save_to_user_slot(state.user_bank, state.selected_preset, preset);
+                                                mgr.set_current_location(PresetLocation::User(state.user_bank, state.selected_preset));
+                                                match mgr.save_user_presets() {
+                                                    Ok(_) => {
+                                                        state.status_message = Some(("Preset saved!".to_string(), std::time::Instant::now()));
+                                                    }
+                                                    Err(e) => {
+                                                        state.status_message = Some((format!("Save error: {}", e), std::time::Instant::now()));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    state.mode = PageMode::Browse;
+                                }
+                            });
+                        });
+                    }
                 }
             });
 
         ui.ctx().data_mut(|d| d.insert_temp(state_id, state));
-    });
-
-    tui.ui(|ui| {
-        ui.add_space(20.0);
-
-        egui::Frame::default()
-            .fill(ui.visuals().extreme_bg_color)
-            .inner_margin(15.0)
-            .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-            .corner_radius(15.0)
-            .show(ui, |ui| {
-                ui.label(egui::RichText::new("Factory Banks A-H (read-only):").size(11.0).strong());
-                ui.add_space(3.0);
-                ui.label(egui::RichText::new("8 banks x 32 presets = 256 factory presets").size(10.0).color(Color32::GRAY));
-                ui.add_space(8.0);
-                ui.label(egui::RichText::new("User Banks A-H:").size(11.0).strong());
-                ui.add_space(3.0);
-                ui.label(egui::RichText::new("8 banks x 32 presets = 256 user slots (auto-saved to disk)").size(10.0).color(Color32::GRAY));
-            });
     });
 }
 
@@ -1266,7 +1212,6 @@ fn save_params_to_preset_data(
 
     if let Ok(note_pool) = ui_state.note_pool.lock() {
         data.root_note = note_pool.root_note.unwrap_or(48);
-        // Include all notes including root (root note biases are now configurable)
         data.notes = note_pool.notes.iter()
             .map(|n| crate::preset::NotePresetData {
                 midi_note: n.midi_note,
