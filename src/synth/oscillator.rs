@@ -282,7 +282,8 @@ impl PLLOscillator {
         self.filtered_error = 0.0;
         self.pfd_state = 0.0;
         self.overtrack_state = 0.0;
-        self.phase = 0.0;
+        // Phase continues naturally - resetting would cause output discontinuity (click)
+        // PLL loop will handle syncing VCO to reference
     }
 
     fn wrap_pi(x: f64) -> f64 {

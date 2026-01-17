@@ -57,7 +57,7 @@ A novel synthesis method modeling analog PLL circuits. The VCO attempts to track
 **Advanced PLL Parameters:**
 | Param | Description |
 |-------|-------------|
-| Retrigger | 0=hard reset, 0.05=soft reset, 1=legato |
+| Rst (Reset) | Loop state reset intensity on note trigger |
 | Burst Threshold | Track speed level where overtrack engages |
 | Burst Amount | Intensity of frequency bursts |
 | Loop Saturation | Limits integrator runaway |
@@ -88,6 +88,7 @@ The PLL oscillator excels at:
 - Rich stereo imaging with offset parameters
 - FM-like timbres through the FM section
 - DC blocking filter on output handles colored mode saturation artifacts
+- Click-free operation: VCO phase continues smoothly on retrigger
 
 **Sound Design Tips:**
 - Track < 0.3: Slow, gliding portamento character

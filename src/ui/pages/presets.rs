@@ -387,22 +387,24 @@ pub fn render(
 
                                 ui.add_space(8.0);
 
-                                // Init button (only for User presets)
-                                if matches!(state.section, PresetSection::User) {
-                                    let init_btn = egui::Button::new(
-                                        egui::RichText::new("Init").size(16.0)
-                                    ).min_size(egui::vec2(70.0, 40.0))
-                                    .fill(Color32::from_rgb(100, 70, 70));
+                                // Init button - initializes to default empty preset
+                                let init_btn = egui::Button::new(
+                                    egui::RichText::new("Init").size(16.0)
+                                ).min_size(egui::vec2(70.0, 40.0))
+                                .fill(Color32::from_rgb(100, 70, 70));
 
-                                    if ui.add(init_btn).clicked() {
+                                if ui.add(init_btn).clicked() {
+                                    let default_data = crate::preset::PresetData::default();
+                                    load_preset_to_params(&default_data, params, setter, ui_state);
+                                    if matches!(state.section, PresetSection::User) {
                                         if let Ok(mut mgr) = ui_state.preset_manager.lock() {
                                             mgr.init_user_preset(state.user_bank, state.selected_preset);
                                             let _ = mgr.save_user_presets();
-                                            state.status_message = Some(("Preset initialized".to_string(), std::time::Instant::now()));
                                         }
                                     }
-                                    ui.add_space(8.0);
+                                    state.status_message = Some(("Initialized to default".to_string(), std::time::Instant::now()));
                                 }
+                                ui.add_space(8.0);
 
                                 // Save button
                                 let save_btn = egui::Button::new(
@@ -802,6 +804,9 @@ fn load_preset_to_params(
     setter.set_parameter(&params.swing_amount, data.swing_amount);
     setter.set_parameter(&params.note_length_percent, data.note_length_percent);
 
+    setter.set_parameter(&params.legato_mode, data.legato_mode);
+    setter.set_parameter(&params.legato_time, data.legato_time);
+
     setter.set_parameter(&params.len_mod_1_target, data.len_mod_1_target);
     setter.set_parameter(&params.len_mod_1_amount, data.len_mod_1_amount);
     setter.set_parameter(&params.len_mod_1_prob, data.len_mod_1_prob);
@@ -1172,6 +1177,9 @@ fn save_params_to_preset_data(
 
     data.swing_amount = params.swing_amount.modulated_plain_value();
     data.note_length_percent = params.note_length_percent.modulated_plain_value();
+
+    data.legato_mode = params.legato_mode.value();
+    data.legato_time = params.legato_time.modulated_plain_value();
 
     data.len_mod_1_target = params.len_mod_1_target.modulated_plain_value();
     data.len_mod_1_amount = params.len_mod_1_amount.modulated_plain_value();

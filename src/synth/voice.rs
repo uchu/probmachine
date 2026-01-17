@@ -212,6 +212,7 @@ pub struct Voice {
 
     // ===== Target Values =====
     glide_time_ms: f64,
+    legato_mode: bool,
     target_frequency: f64,
     target_pll_volume: f64,
     target_pll_track: f64,
@@ -486,6 +487,7 @@ impl Voice {
             filter_drive_slew: make_slew(),
 
             glide_time_ms: 0.0,
+            legato_mode: false,
             target_frequency: 220.0,
             target_pll_volume: 0.0,
             target_pll_track: 0.5,
@@ -747,6 +749,10 @@ impl Voice {
         self.glide_time_ms = time_ms.max(0.0);
     }
 
+    pub fn set_legato_mode(&mut self, enabled: bool) {
+        self.legato_mode = enabled;
+    }
+
     pub fn set_frequency(&mut self, freq: f64, _pll_feedback: f64, feedback_amount: f64) {
         self.target_frequency = freq;
         self.target_pll_feedback = feedback_amount;
@@ -973,6 +979,12 @@ impl Voice {
     }
 
     pub fn trigger(&mut self) {
+        let is_playing = self.volume_envelope.is_active();
+
+        if self.legato_mode && is_playing {
+            return;
+        }
+
         self.volume_envelope.trigger(
             self.vol_env_attack,
             self.vol_env_attack_shape,

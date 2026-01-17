@@ -7,6 +7,7 @@ pub struct Envelope {
     params: EnvADSRParams,
     gate: f32,
     retrigger_countdown: u8,
+    last_value: f32,
 }
 
 impl Envelope {
@@ -19,7 +20,12 @@ impl Envelope {
             params: EnvADSRParams::default(),
             gate: 0.0,
             retrigger_countdown: 0,
+            last_value: 0.0,
         }
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.gate > 0.0 || self.retrigger_countdown > 0 || self.last_value > 0.001
     }
 
     pub fn trigger(&mut self, attack_ms: f64, attack_shape: f64, decay_ms: f64, decay_shape: f64, sustain: f64, release_ms: f64, release_shape: f64) {
@@ -69,6 +75,7 @@ impl Envelope {
         }
 
         let (env, _) = self.adsr.tick(self.gate, &mut self.params);
+        self.last_value = env;
         env as f64
     }
 }

@@ -210,6 +210,11 @@ pub struct PresetData {
     pub note_length_percent: f32,
 
     #[serde(default)]
+    pub legato_mode: bool,
+    #[serde(default = "default_legato_time")]
+    pub legato_time: f32,
+
+    #[serde(default)]
     pub len_mod_1_target: f32,
     #[serde(default = "default_mod_amount")]
     pub len_mod_1_amount: f32,
@@ -272,6 +277,7 @@ pub struct PresetData {
 }
 
 fn default_swing() -> f32 { 50.0 }
+fn default_legato_time() -> f32 { 50.0 }
 fn default_drift_rate() -> f32 { 0.5 }
 fn default_tube_drive() -> f32 { 0.0 }
 fn default_distortion_threshold() -> f32 { 0.7 }
@@ -420,6 +426,9 @@ impl Default for PresetData {
 
             swing_amount: 50.0,
             note_length_percent: 95.0,
+
+            legato_mode: false,
+            legato_time: 50.0,
 
             len_mod_1_target: 0.0,
             len_mod_1_amount: 100.0,

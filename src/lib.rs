@@ -258,6 +258,11 @@ impl Plugin for Device {
 
             synth.set_pll_glide(self.params.synth_pll_glide.modulated_plain_value());
 
+            synth.set_legato_mode(self.params.legato_mode.value());
+            if self.params.legato_mode.value() {
+                synth.set_legato_time(self.params.legato_time.modulated_plain_value());
+            }
+
             synth.set_filter_params(
                 self.params.synth_filter_enable.value(),
                 self.params.synth_filter_cutoff.modulated_plain_value(),

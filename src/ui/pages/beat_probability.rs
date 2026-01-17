@@ -552,6 +552,54 @@ fn render_timing_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter:
                 setter.set_parameter(&params.swing_amount, swing_edit);
             }
         });
+
+        ui.add_space(16.0);
+
+        ui.horizontal(|ui| {
+            let legato_on = params.legato_mode.value();
+            let button = egui::Button::new(egui::RichText::new("Legato").size(18.0))
+                .min_size(egui::vec2(80.0, 32.0))
+                .selected(legato_on);
+            if ui.add(button).clicked() {
+                setter.set_parameter(&params.legato_mode, !legato_on);
+            }
+
+            ui.add_space(16.0);
+
+            if legato_on {
+                ui.label(egui::RichText::new("Time:").size(18.0));
+                ui.add_space(8.0);
+
+                let mut time = params.legato_time.modulated_plain_value();
+                ui.style_mut().spacing.slider_width = 100.0;
+                ui.style_mut().spacing.slider_rail_height = 10.0;
+                let response = ui.add(
+                    egui::Slider::new(&mut time, 1.0..=500.0)
+                        .fixed_decimals(0)
+                        .clamping(egui::SliderClamping::Always)
+                        .show_value(false)
+                );
+                if response.changed() {
+                    setter.set_parameter(&params.legato_time, time);
+                }
+
+                ui.add_space(8.0);
+                let mut time_edit = time;
+                ui.style_mut().spacing.interact_size.y = 32.0;
+                let edit_response = ui.add_sized(
+                    egui::vec2(70.0, 32.0),
+                    egui::DragValue::new(&mut time_edit)
+                        .range(1.0..=500.0)
+                        .speed(1.0)
+                        .suffix(" ms")
+                        .min_decimals(0)
+                        .max_decimals(0)
+                );
+                if edit_response.changed() {
+                    setter.set_parameter(&params.legato_time, time_edit);
+                }
+            }
+        });
     });
 }
 

@@ -678,6 +678,11 @@ pub struct DeviceParams {
 
     #[id = "swing_amount"]
     pub swing_amount: FloatParam,
+
+    #[id = "legato_mode"]
+    pub legato_mode: BoolParam,
+    #[id = "legato_time"]
+    pub legato_time: FloatParam,
 }
 
 impl DeviceParams {
@@ -2037,6 +2042,13 @@ impl Default for DeviceParams {
                 50.0,
                 FloatRange::Linear { min: 50.0, max: 75.0 }
             ),
+
+            legato_mode: BoolParam::new("Legato", false),
+            legato_time: FloatParam::new(
+                "Legato Time",
+                50.0,
+                FloatRange::Skewed { min: 1.0, max: 500.0, factor: 0.4 }
+            ).with_unit(" ms"),
         }
     }
 }

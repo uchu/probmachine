@@ -79,6 +79,14 @@ impl SynthEngine {
         self.voice.set_glide_time(glide_ms as f64);
     }
 
+    pub fn set_legato_mode(&mut self, enabled: bool) {
+        self.voice.set_legato_mode(enabled);
+    }
+
+    pub fn set_legato_time(&mut self, time_ms: f32) {
+        self.voice.set_glide_time(time_ms as f64);
+    }
+
     pub fn set_pll_fm_params(&mut self, amount: f32, ratio: i32) {
         self.voice.set_pll_fm_params(amount as f64, ratio);
     }

@@ -272,6 +272,25 @@ Within each quarter note, the second eighth is delayed:
 - At 66%: First eighth is 66% of quarter, second is 34%
 - At 75%: First eighth is 75%, second is 25%
 
+## Legato Mode
+
+Legato mode changes how consecutive notes are played.
+
+| Param | Range | Description |
+|-------|-------|-------------|
+| Legato | On/Off | Toggle legato behavior |
+| Time | 1-500ms | Glide time between notes |
+
+**Behavior:**
+- **Legato Off**: Each note triggers envelopes from the start, creating distinct attacks
+- **Legato On**: When a new note plays while the previous is still sounding, envelopes continue without retriggering and pitch glides smoothly to the new note
+
+**Use Cases:**
+- Smooth melodic lines without repeated attacks
+- Portamento/glide effects at slower time settings
+- Bass lines with connected phrasing
+- Fast passages that maintain smooth timbre
+
 ## Tempo
 
 Currently fixed at 120 BPM in 4/4 time.
