@@ -55,12 +55,24 @@ impl SynthEngine {
         self.voice.set_osc_octave(octave);
     }
 
+    pub fn set_osc_tune(&mut self, tune: i32, fine: f32) {
+        self.voice.set_osc_tune(tune, fine as f64);
+    }
+
+    pub fn set_osc_fold(&mut self, fold: f32) {
+        self.voice.set_osc_fold(fold as f64);
+    }
+
     pub fn set_vps_stereo_v_offset(&mut self, offset: f32) {
         self.voice.set_vps_stereo_v_offset(offset as f64);
     }
 
     pub fn set_pll_ref_params(&mut self, octave: i32, pulse_width: f32) {
         self.voice.set_pll_ref_params(octave, pulse_width as f64);
+    }
+
+    pub fn set_pll_ref_tune(&mut self, tune: i32, fine: f32) {
+        self.voice.set_pll_ref_tune(tune, fine as f64);
     }
 
     pub fn set_pll_params(&mut self, track: f32, damp: f32, mult: f32, influence: f32, colored: bool, edge_mode: bool) {

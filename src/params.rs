@@ -400,6 +400,12 @@ pub struct DeviceParams {
     pub synth_osc_volume: FloatParam,
     #[id = "synth_osc_octave"]
     pub synth_osc_octave: IntParam,
+    #[id = "synth_osc_tune"]
+    pub synth_osc_tune: IntParam,
+    #[id = "synth_osc_fine"]
+    pub synth_osc_fine: FloatParam,
+    #[id = "synth_osc_fold"]
+    pub synth_osc_fold: FloatParam,
     #[id = "synth_sub_volume"]
     pub synth_sub_volume: FloatParam,
 
@@ -420,6 +426,10 @@ pub struct DeviceParams {
     pub synth_pll_mode: BoolParam,
     #[id = "synth_pll_ref_octave"]
     pub synth_pll_ref_octave: IntParam,
+    #[id = "synth_pll_ref_tune"]
+    pub synth_pll_ref_tune: IntParam,
+    #[id = "synth_pll_ref_fine"]
+    pub synth_pll_ref_fine: FloatParam,
     #[id = "synth_pll_ref_pulse_width"]
     pub synth_pll_ref_pulse_width: FloatParam,
     #[id = "synth_pll_feedback"]
@@ -1484,6 +1494,21 @@ impl Default for DeviceParams {
                 0,
                 IntRange::Linear { min: -5, max: 5 }
             ),
+            synth_osc_tune: IntParam::new(
+                "VPS Tune".to_string(),
+                0,
+                IntRange::Linear { min: -12, max: 12 }
+            ),
+            synth_osc_fine: FloatParam::new(
+                "VPS Fine".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            synth_osc_fold: FloatParam::new(
+                "VPS Fold".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
             synth_sub_volume: FloatParam::new(
                 "Sub Volume".to_string(),
                 0.0,
@@ -1529,6 +1554,16 @@ impl Default for DeviceParams {
                 0,
                 IntRange::Linear { min: -5, max: 5 }
             ),
+            synth_pll_ref_tune: IntParam::new(
+                "PLL Ref Tune".to_string(),
+                0,
+                IntRange::Linear { min: -12, max: 12 }
+            ),
+            synth_pll_ref_fine: FloatParam::new(
+                "PLL Ref Fine".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
             synth_pll_ref_pulse_width: FloatParam::new(
                 "PLL Ref Pulse Width".to_string(),
                 0.5,
@@ -1563,7 +1598,7 @@ impl Default for DeviceParams {
             // New PLL experimental parameters
             synth_pll_retrigger: FloatParam::new(
                 "PLL Retrigger".to_string(),
-                0.05,
+                1.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
             synth_pll_burst_threshold: FloatParam::new(

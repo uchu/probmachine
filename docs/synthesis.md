@@ -15,6 +15,9 @@ A waveshaping oscillator using synfx-dsp's VPSOscillator algorithm.
 | V | 0.0-1.0 | Shape/timbre control |
 | Stereo V Offset | 0.0-1.0 | V difference between L/R for width |
 | Octave | -5 to +5 | Octave shift |
+| Tune | -12 to +12 | Semitone offset |
+| Fine | -1.0 to +1.0 | Fine tune (cents) |
+| Fold | 0.0-1.0 | Wavefold amount for harmonic enrichment |
 | Volume | 0.0-1.0 | VPS output level |
 
 **Character:**
@@ -28,6 +31,8 @@ A waveshaping oscillator using synfx-dsp's VPSOscillator algorithm.
 - Low D + mid V: Smooth, round tones
 - High D + low V: Aggressive, buzzy timbres
 - Stereo offset creates chorus-like width without pitch modulation
+- Tune/Fine for detuning against PLL oscillator creates thick textures
+- Fold adds harmonic richness, especially effective at higher D values
 
 ### PLL Oscillator (Phase-Locked Loop)
 
@@ -269,10 +274,10 @@ Three independent LFOs with flexible routing.
 **Modulation Slots:** Each LFO has 2 destination slots.
 
 **Available Destinations:**
-- PLL: Damping, Influence, Track Speed, Feedback, FM Amount, Pulse Width, Stereo Phase, Cross Feedback, FM Env Amount
+- PLL: Damping, Influence, Track Speed, FM Amount, Cross Feedback, Overtone (Burst), Range
 - VPS: D parameter, V parameter
 - Filter: Cutoff, Resonance, Drive
-- Coloration: Ring Mod, Wavefold, Drift, Noise, Tube Drive
+- Coloration: Drift, Noise, Tube Drive
 - Reverb: Mix, Decay
 - Volumes: PLL, VPS, Sub
 

@@ -80,16 +80,25 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 &["-5", "-4", "-3", "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5"],
                                 Some(Color32::from_rgb(80, 80, 40)),
                             );
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_pll_ref_tune,
+                                "Tune",
+                                &["-12", "-11", "-10", "-9", "-8", "-7", "-6", "-5", "-4", "-3", "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12"],
+                                Some(Color32::from_rgb(80, 80, 40)),
+                            );
                             render_vertical_slider(
                                 ui,
                                 params,
                                 setter,
-                                &params.synth_pll_ref_pulse_width,
-                                "PW",
-                                0.01,
-                                0.99,
+                                &params.synth_pll_ref_fine,
+                                "Fine",
+                                -1.0,
+                                1.0,
                                 SliderScale::Linear,
-                                |v| format!("{:.2}", v),
+                                |v| format!("{:+.0}c", v * 100.0),
                                 Some(Color32::from_rgb(80, 80, 40)),
                             );
                             render_vertical_slider(
@@ -161,58 +170,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
-                                &params.synth_pll_feedback,
-                                "FB",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                                Some(Color32::from_rgb(40, 40, 80)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_glide,
-                                "Glide",
-                                0.0,
-                                2000.0,
-                                SliderScale::Logarithmic,
-                                |v| {
-                                    if v < 1.0 {
-                                        "Off".to_string()
-                                    } else if v < 1000.0 {
-                                        format!("{:.0}ms", v)
-                                    } else {
-                                        format!("{:.1}s", v / 1000.0)
-                                    }
-                                },
-                                Some(Color32::from_rgb(80, 60, 100)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_retrigger,
-                                "Rst",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| {
-                                    if v < 0.1 {
-                                        "Hard".to_string()
-                                    } else if v > 0.9 {
-                                        "Leg".to_string()
-                                    } else {
-                                        format!("{:.2}", v)
-                                    }
-                                },
-                                Some(Color32::from_rgb(100, 60, 60)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
                                 &params.synth_pll_burst_amount,
                                 "OT",
                                 0.0,
@@ -257,30 +214,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
-                                &params.synth_pll_stereo_track_offset,
-                                "StW",
-                                0.0,
-                                0.5,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                                Some(Color32::from_rgb(80, 60, 100)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_stereo_phase,
-                                "StPh",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.0}°", v * 360.0),
-                                Some(Color32::from_rgb(80, 60, 100)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
                                 &params.synth_pll_cross_feedback,
                                 "XFB",
                                 0.0,
@@ -308,18 +241,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 &params.synth_pll_fm_ratio,
                                 "Rat",
                                 &["×1", "×2", "×3", "×4", "×5", "×6", "×7", "×8"],
-                                Some(Color32::from_rgb(100, 60, 100)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_pll_fm_env_amount,
-                                "FME",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
                                 Some(Color32::from_rgb(100, 60, 100)),
                             );
                             render_vertical_slider(
@@ -409,6 +330,27 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 &["-5", "-4", "-3", "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5"],
                                 Some(Color32::from_rgb(80, 80, 40)),
                             );
+                            render_int_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_osc_tune,
+                                "Tune",
+                                &["-12", "-11", "-10", "-9", "-8", "-7", "-6", "-5", "-4", "-3", "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12"],
+                                Some(Color32::from_rgb(80, 80, 40)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
+                                &params.synth_osc_fine,
+                                "Fine",
+                                -1.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:+.0}c", v * 100.0),
+                                Some(Color32::from_rgb(80, 80, 40)),
+                            );
                             render_vertical_slider(
                                 ui,
                                 params,
@@ -449,6 +391,18 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
+                                &params.synth_osc_fold,
+                                "Fold",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| format!("{:.2}", v),
+                                Some(Color32::from_rgb(120, 80, 60)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
                                 &params.synth_osc_volume,
                                 "Vol",
                                 0.0,
@@ -475,30 +429,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                         ui.label(egui::RichText::new("   Color").size(16.0).strong());
                         ui.add_space(12.0);
                         ui.horizontal(|ui| {
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_ring_mod,
-                                "Ring",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                                Some(Color32::from_rgb(120, 80, 60)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_wavefold,
-                                "Fold",
-                                0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                                Some(Color32::from_rgb(120, 80, 60)),
-                            );
                             render_vertical_slider(
                                 ui,
                                 params,
@@ -554,18 +484,6 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 &params.synth_color_distortion_amount,
                                 "Dist",
                                 0.0,
-                                1.0,
-                                SliderScale::Linear,
-                                |v| format!("{:.2}", v),
-                                Some(Color32::from_rgb(180, 60, 60)),
-                            );
-                            render_vertical_slider(
-                                ui,
-                                params,
-                                setter,
-                                &params.synth_color_distortion_threshold,
-                                "Thr",
-                                0.1,
                                 1.0,
                                 SliderScale::Linear,
                                 |v| format!("{:.2}", v),

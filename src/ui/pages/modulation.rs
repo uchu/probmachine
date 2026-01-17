@@ -10,11 +10,12 @@ const DIVISION_NAMES: [&str; 14] = [
     "1/2.", "1/4.", "1/8.", "1/16.",
     "1/2T", "1/4T", "1/8T", "1/16T",
 ];
-const DEST_NAMES: [&str; 27] = [
-    "None", "PLL Damp", "PLL Infl", "PLL Track", "PLL FB", "PLL FM", "PLL PW",
-    "PLL StPh", "PLL XFB", "PLL FMEnv", "PLL OT", "PLL Rng",
-    "VPS D", "VPS V", "Filt Cut", "Filt Res", "Filt Drv",
-    "Ring Mod", "Wavefold", "Drift", "Noise", "Tube",
+const DEST_NAMES: [&str; 21] = [
+    "None",
+    "PLL Damp", "PLL Infl", "PLL Track", "PLL FM", "PLL XFB", "PLL OT", "PLL Rng",
+    "VPS D", "VPS V",
+    "Filt Cut", "Filt Res", "Filt Drv",
+    "Drift", "Noise", "Tube",
     "Rev Mix", "Rev Decay",
     "PLL Vol", "VPS Vol", "Sub Vol",
 ];

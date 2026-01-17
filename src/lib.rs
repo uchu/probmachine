@@ -181,6 +181,11 @@ impl Plugin for Device {
             synth.set_osc_volume(self.params.synth_osc_volume.modulated_plain_value());
 
             synth.set_osc_octave(self.params.synth_osc_octave.value());
+            synth.set_osc_tune(
+                self.params.synth_osc_tune.value(),
+                self.params.synth_osc_fine.modulated_plain_value(),
+            );
+            synth.set_osc_fold(self.params.synth_osc_fold.modulated_plain_value());
 
             synth.set_vps_stereo_v_offset(self.params.synth_osc_stereo_v_offset.modulated_plain_value());
 
@@ -230,6 +235,10 @@ impl Plugin for Device {
             synth.set_pll_ref_params(
                 self.params.synth_pll_ref_octave.value(),
                 self.params.synth_pll_ref_pulse_width.modulated_plain_value(),
+            );
+            synth.set_pll_ref_tune(
+                self.params.synth_pll_ref_tune.value(),
+                self.params.synth_pll_ref_fine.modulated_plain_value(),
             );
 
             let pll_mult = match self.params.synth_pll_mult.value() {

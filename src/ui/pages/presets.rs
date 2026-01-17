@@ -714,6 +714,8 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_colored, data.synth_pll_colored);
     setter.set_parameter(&params.synth_pll_mode, data.synth_pll_mode);
     setter.set_parameter(&params.synth_pll_ref_octave, data.synth_pll_ref_octave);
+    setter.set_parameter(&params.synth_pll_ref_tune, data.synth_pll_ref_tune);
+    setter.set_parameter(&params.synth_pll_ref_fine, data.synth_pll_ref_fine);
     setter.set_parameter(&params.synth_pll_ref_pulse_width, data.synth_pll_ref_pulse_width);
     setter.set_parameter(&params.synth_pll_feedback, data.synth_pll_feedback);
     setter.set_parameter(&params.synth_pll_volume, data.synth_pll_volume);
@@ -735,6 +737,9 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_enable, data.synth_pll_enable);
 
     setter.set_parameter(&params.synth_osc_octave, data.synth_osc_octave);
+    setter.set_parameter(&params.synth_osc_tune, data.synth_osc_tune);
+    setter.set_parameter(&params.synth_osc_fine, data.synth_osc_fine);
+    setter.set_parameter(&params.synth_osc_fold, data.synth_osc_fold);
     setter.set_parameter(&params.synth_osc_d, data.synth_osc_d);
     setter.set_parameter(&params.synth_osc_v, data.synth_osc_v);
     setter.set_parameter(&params.synth_osc_stereo_v_offset, data.synth_osc_stereo_v_offset);
@@ -1088,6 +1093,8 @@ fn save_params_to_preset_data(
     data.synth_pll_colored = params.synth_pll_colored.value();
     data.synth_pll_mode = params.synth_pll_mode.value();
     data.synth_pll_ref_octave = params.synth_pll_ref_octave.value();
+    data.synth_pll_ref_tune = params.synth_pll_ref_tune.value();
+    data.synth_pll_ref_fine = params.synth_pll_ref_fine.modulated_plain_value();
     data.synth_pll_ref_pulse_width = params.synth_pll_ref_pulse_width.modulated_plain_value();
     data.synth_pll_feedback = params.synth_pll_feedback.modulated_plain_value();
     data.synth_pll_volume = params.synth_pll_volume.modulated_plain_value();
@@ -1109,6 +1116,9 @@ fn save_params_to_preset_data(
     data.synth_pll_enable = params.synth_pll_enable.value();
 
     data.synth_osc_octave = params.synth_osc_octave.value();
+    data.synth_osc_tune = params.synth_osc_tune.value();
+    data.synth_osc_fine = params.synth_osc_fine.modulated_plain_value();
+    data.synth_osc_fold = params.synth_osc_fold.modulated_plain_value();
     data.synth_osc_d = params.synth_osc_d.modulated_plain_value();
     data.synth_osc_v = params.synth_osc_v.modulated_plain_value();
     data.synth_osc_stereo_v_offset = params.synth_osc_stereo_v_offset.modulated_plain_value();

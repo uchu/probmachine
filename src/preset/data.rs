@@ -75,6 +75,10 @@ pub struct PresetData {
     pub synth_pll_colored: bool,
     pub synth_pll_mode: bool,
     pub synth_pll_ref_octave: i32,
+    #[serde(default)]
+    pub synth_pll_ref_tune: i32,
+    #[serde(default)]
+    pub synth_pll_ref_fine: f32,
     pub synth_pll_ref_pulse_width: f32,
     pub synth_pll_feedback: f32,
     pub synth_pll_volume: f32,
@@ -108,6 +112,12 @@ pub struct PresetData {
     pub synth_pll_enable: bool,
 
     pub synth_osc_octave: i32,
+    #[serde(default)]
+    pub synth_osc_tune: i32,
+    #[serde(default)]
+    pub synth_osc_fine: f32,
+    #[serde(default)]
+    pub synth_osc_fold: f32,
     pub synth_osc_d: f32,
     pub synth_osc_v: f32,
     pub synth_osc_stereo_v_offset: f32,
@@ -337,6 +347,8 @@ impl Default for PresetData {
             synth_pll_colored: false,
             synth_pll_mode: true,
             synth_pll_ref_octave: 0,
+            synth_pll_ref_tune: 0,
+            synth_pll_ref_fine: 0.0,
             synth_pll_ref_pulse_width: 0.5,
             synth_pll_feedback: 0.0,
             synth_pll_volume: 0.0,
@@ -344,7 +356,7 @@ impl Default for PresetData {
             synth_pll_glide: 0.0,
             synth_pll_fm_amount: 0.0,
             synth_pll_fm_ratio: 1,
-            synth_pll_retrigger: 0.0,
+            synth_pll_retrigger: 1.0,
             synth_pll_burst_threshold: 0.7,
             synth_pll_burst_amount: 0.0,
             synth_pll_loop_saturation: 1.0,
@@ -358,6 +370,9 @@ impl Default for PresetData {
             synth_pll_enable: true,
 
             synth_osc_octave: 0,
+            synth_osc_tune: 0,
+            synth_osc_fine: 0.0,
+            synth_osc_fold: 0.0,
             synth_osc_d: 0.5,
             synth_osc_v: 0.5,
             synth_osc_stereo_v_offset: 0.0,

@@ -76,6 +76,10 @@ pub struct Voice {
 
     // ===== VPS Oscillator =====
     vps_octave: i32,
+    vps_tune: i32,
+    vps_fine: f64,
+    vps_fold: f64,
+    target_vps_fold: f64,
     vps_d_param: f64,
     vps_v_param: f64,
     vps_volume: f64,
@@ -100,6 +104,8 @@ pub struct Voice {
 
     // ===== PLL Reference =====
     pll_ref_octave: i32,
+    pll_ref_tune: i32,
+    pll_ref_fine: f64,
     pll_ref_pulse_width: f64,
 
     // ===== PLL Experimental =====
@@ -191,6 +197,7 @@ pub struct Voice {
     vps_v_slew: SlewValue<f64>,
     vps_volume_slew: SlewValue<f64>,
     vps_stereo_offset_slew: SlewValue<f64>,
+    vps_fold_slew: SlewValue<f64>,
 
     // Sub slew
     sub_volume_slew: SlewValue<f64>,
@@ -376,6 +383,10 @@ impl Voice {
             pll_damping_stereo_offset: 0.0,
 
             vps_octave: 0,
+            vps_tune: 0,
+            vps_fine: 0.0,
+            vps_fold: 0.0,
+            target_vps_fold: 0.0,
             vps_d_param: 0.5,
             vps_v_param: 0.5,
             vps_volume: 1.0,
@@ -396,6 +407,8 @@ impl Voice {
             pll_fm_ratio: 1,
 
             pll_ref_octave: 0,
+            pll_ref_tune: 0,
+            pll_ref_fine: 0.0,
             pll_ref_pulse_width: 0.5,
 
             // PLL Experimental defaults
@@ -478,6 +491,7 @@ impl Voice {
             vps_v_slew: make_slew(),
             vps_volume_slew: make_slew(),
             vps_stereo_offset_slew: make_slew(),
+            vps_fold_slew: make_slew(),
             sub_volume_slew: make_slew(),
             velocity_slew: make_slew(),
             master_volume_slew: make_slew(),
@@ -657,6 +671,7 @@ impl Voice {
             update_slew(&mut self.vps_v_slew);
             update_slew(&mut self.vps_volume_slew);
             update_slew(&mut self.vps_stereo_offset_slew);
+            update_slew(&mut self.vps_fold_slew);
             update_slew(&mut self.sub_volume_slew);
             update_slew(&mut self.velocity_slew);
             update_slew(&mut self.master_volume_slew);
@@ -775,6 +790,15 @@ impl Voice {
         self.vps_octave = octave;
     }
 
+    pub fn set_osc_tune(&mut self, tune: i32, fine: f64) {
+        self.vps_tune = tune;
+        self.vps_fine = fine;
+    }
+
+    pub fn set_osc_fold(&mut self, fold: f64) {
+        self.target_vps_fold = fold;
+    }
+
     pub fn set_sub_volume(&mut self, volume: f64) {
         self.target_sub_volume = volume;
     }
@@ -782,6 +806,11 @@ impl Voice {
     pub fn set_pll_ref_params(&mut self, octave: i32, pulse_width: f64) {
         self.pll_ref_octave = octave;
         self.target_pll_pulse_width = pulse_width;
+    }
+
+    pub fn set_pll_ref_tune(&mut self, tune: i32, fine: f64) {
+        self.pll_ref_tune = tune;
+        self.pll_ref_fine = fine;
     }
 
     pub fn set_pll_params(&mut self, track: f64, damp: f64, mult: f64, influence: f64, colored: bool, edge_mode: bool) {
@@ -907,12 +936,8 @@ impl Voice {
         self.mod_pll_damping = self.mod_slew_pll_damping.next(mod_values.pll_damping, MOD_SLEW_MS);
         self.mod_pll_influence = self.mod_slew_pll_influence.next(mod_values.pll_influence, MOD_SLEW_MS);
         self.mod_pll_track_speed = self.mod_slew_pll_track.next(mod_values.pll_track_speed, MOD_SLEW_MS);
-        self.mod_pll_feedback = self.mod_slew_pll_feedback.next(mod_values.pll_feedback, MOD_SLEW_MS);
         self.mod_pll_fm_amount = self.mod_slew_pll_fm.next(mod_values.pll_fm_amount, MOD_SLEW_MS);
-        self.mod_pll_pulse_width = self.mod_slew_pll_pw.next(mod_values.pll_pulse_width, MOD_SLEW_MS);
-        self.mod_pll_stereo_phase = self.mod_slew_pll_stereo_phase.next(mod_values.pll_stereo_phase, MOD_SLEW_MS);
         self.mod_pll_cross_feedback = self.mod_slew_pll_cross_fb.next(mod_values.pll_cross_feedback, MOD_SLEW_MS);
-        self.mod_pll_fm_env_amount = self.mod_slew_pll_fm_env.next(mod_values.pll_fm_env_amount, MOD_SLEW_MS);
         self.mod_pll_burst_amount = self.mod_slew_pll_burst.next(mod_values.pll_burst_amount, MOD_SLEW_MS);
         self.mod_pll_range = self.mod_slew_pll_range.next(mod_values.pll_range, MOD_SLEW_MS);
         self.mod_vps_d = self.mod_slew_vps_d.next(mod_values.vps_d, MOD_SLEW_MS);
@@ -920,8 +945,6 @@ impl Voice {
         self.mod_filter_cutoff = self.mod_slew_filter_cut.next(mod_values.filter_cutoff, MOD_SLEW_MS);
         self.mod_filter_resonance = self.mod_slew_filter_res.next(mod_values.filter_resonance, MOD_SLEW_MS);
         self.mod_filter_drive = self.mod_slew_filter_drv.next(mod_values.filter_drive, MOD_SLEW_MS);
-        self.mod_ring_mod = self.mod_slew_ring_mod.next(mod_values.ring_mod, MOD_SLEW_MS);
-        self.mod_wavefold = self.mod_slew_wavefold.next(mod_values.wavefold, MOD_SLEW_MS);
         self.mod_drift_amount = self.mod_slew_drift.next(mod_values.drift_amount, MOD_SLEW_MS);
         self.mod_noise_amount = self.mod_slew_noise.next(mod_values.noise_amount, MOD_SLEW_MS);
         self.mod_tube_drive = self.mod_slew_tube.next(mod_values.tube_drive, MOD_SLEW_MS);
@@ -1060,6 +1083,7 @@ impl Voice {
         self.vps_v_param = (self.vps_v_slew.next(self.target_vps_v, 20.0) + self.mod_vps_v).clamp(0.0, 1.0);
         self.vps_volume = (self.vps_volume_slew.next(self.target_vps_volume, 20.0) + self.mod_vps_volume).clamp(0.0, 1.0);
         self.vps_stereo_v_offset = self.vps_stereo_offset_slew.next(self.target_vps_stereo_offset, 20.0);
+        self.vps_fold = self.vps_fold_slew.next(self.target_vps_fold, 20.0).clamp(0.0, 1.0);
 
         // Sub slew + modulation
         self.sub_volume = (self.sub_volume_slew.next(self.target_sub_volume, 20.0) + self.mod_sub_volume).clamp(0.0, 1.0);
@@ -1109,7 +1133,8 @@ impl Voice {
 
             // VPS Oscillators (no FM or formant applied)
             if self.vps_enabled && self.vps_volume > 0.001 {
-                let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave);
+                let tune_mult = 2.0_f64.powf((self.vps_tune as f64 + self.vps_fine) / 12.0);
+                let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave) * tune_mult;
 
                 let use_stereo = self.vps_stereo_v_offset > 0.0001;
 
@@ -1134,8 +1159,16 @@ impl Voice {
                     raw_l
                 };
 
-                vps_out_l = raw_l * self.vps_volume * volume_env;
-                vps_out_r = raw_r * self.vps_volume * volume_env;
+                // Apply fold if enabled
+                let (folded_l, folded_r) = if self.vps_fold > 0.001 {
+                    let folded = stereo_wavefold(stereo(raw_l, raw_r), self.vps_fold);
+                    (stereo_left(folded), stereo_right(folded))
+                } else {
+                    (raw_l, raw_r)
+                };
+
+                vps_out_l = folded_l * self.vps_volume * volume_env;
+                vps_out_r = folded_r * self.vps_volume * volume_env;
                 mixed_oscillators_l += vps_out_l;
                 mixed_oscillators_r += vps_out_r;
             }
@@ -1156,7 +1189,8 @@ impl Voice {
                     drift_lfo * self.drift_amount * 0.02
                 } else { 0.0 };
 
-                let ref_freq = self.base_frequency * 2.0_f64.powi(self.pll_ref_octave);
+                let pll_tune_mult = 2.0_f64.powf((self.pll_ref_tune as f64 + self.pll_ref_fine) / 12.0);
+                let ref_freq = self.base_frequency * 2.0_f64.powi(self.pll_ref_octave) * pll_tune_mult;
 
                 // FM modulation - modulate the reference frequency (only affects PLL)
                 let fm_freq = ref_freq * self.pll_fm_ratio as f64;

@@ -87,6 +87,9 @@ Complete reference of all parameters and UI controls.
 | synth_osc_v | V | 0.0-1.0 | 0.5 | Shape/timbre |
 | synth_osc_stereo_v_offset | StV | 0.0-1.0 | 0.0 | V offset L/R |
 | synth_osc_octave | Oct | -5 to +5 | 0 | Octave shift |
+| synth_osc_tune | Tune | -12 to +12 | 0 | Semitone offset |
+| synth_osc_fine | Fine | -1.0 to +1.0 | 0.0 | Fine tune (cents) |
+| synth_osc_fold | Fold | 0.0-1.0 | 0.0 | Wavefold amount |
 | synth_osc_volume | Vol | 0.0-1.0 | 1.0 | VPS output level |
 | synth_vps_enable | Enable | - | true | Bypass VPS oscillator |
 
@@ -226,11 +229,10 @@ Complete reference of all parameters and UI controls.
 10=1/2T, 11=1/4T, 12=1/8T, 13=1/16T
 
 **Mod Destinations:**
-0=None, 1=PLL Damp, 2=PLL Infl, 3=PLL Track, 4=PLL FB, 5=PLL FM,
-6=PLL PW, 7=PLL StPh, 8=PLL XFB, 9=PLL FMEnv, 10=PLL OT, 11=PLL Rng,
-12=VPS D, 13=VPS V, 14=Filt Cut, 15=Filt Res, 16=Filt Drv,
-17=Ring, 18=Fold, 19=Drift, 20=Noise, 21=Tube, 22=Rev Mix, 23=Rev Decay,
-24=PLL Vol, 25=VPS Vol, 26=Sub Vol
+0=None, 1=PLL Damp, 2=PLL Infl, 3=PLL Track, 4=PLL FM, 5=PLL XFB,
+6=PLL OT, 7=PLL Rng, 8=VPS D, 9=VPS V, 10=Filt Cut, 11=Filt Res,
+12=Filt Drv, 13=Drift, 14=Noise, 15=Tube, 16=Rev Mix, 17=Rev Decay,
+18=PLL Vol, 19=VPS Vol, 20=Sub Vol
 
 ## Length Page
 
