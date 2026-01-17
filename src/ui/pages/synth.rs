@@ -237,6 +237,26 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                                 ui,
                                 params,
                                 setter,
+                                &params.synth_pll_range,
+                                "Rng",
+                                0.0,
+                                1.0,
+                                SliderScale::Linear,
+                                |v| {
+                                    if v < 0.01 {
+                                        "Slow".to_string()
+                                    } else if v > 0.99 {
+                                        "Fast".to_string()
+                                    } else {
+                                        format!("{:.2}", v)
+                                    }
+                                },
+                                Some(Color32::from_rgb(60, 100, 80)),
+                            );
+                            render_vertical_slider(
+                                ui,
+                                params,
+                                setter,
                                 &params.synth_pll_stereo_track_offset,
                                 "StW",
                                 0.0,

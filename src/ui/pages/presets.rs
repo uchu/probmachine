@@ -725,6 +725,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_loop_saturation, data.synth_pll_loop_saturation);
     setter.set_parameter(&params.synth_pll_color_amount, data.synth_pll_color_amount);
     setter.set_parameter(&params.synth_pll_edge_sensitivity, data.synth_pll_edge_sensitivity);
+    setter.set_parameter(&params.synth_pll_range, data.synth_pll_range);
     setter.set_parameter(&params.synth_pll_stereo_track_offset, data.synth_pll_stereo_track_offset);
     setter.set_parameter(&params.synth_pll_stereo_phase, data.synth_pll_stereo_phase);
     setter.set_parameter(&params.synth_pll_cross_feedback, data.synth_pll_cross_feedback);
@@ -1095,6 +1096,7 @@ fn save_params_to_preset_data(
     data.synth_pll_loop_saturation = params.synth_pll_loop_saturation.modulated_plain_value();
     data.synth_pll_color_amount = params.synth_pll_color_amount.modulated_plain_value();
     data.synth_pll_edge_sensitivity = params.synth_pll_edge_sensitivity.modulated_plain_value();
+    data.synth_pll_range = params.synth_pll_range.modulated_plain_value();
     data.synth_pll_stereo_track_offset = params.synth_pll_stereo_track_offset.modulated_plain_value();
     data.synth_pll_stereo_phase = params.synth_pll_stereo_phase.modulated_plain_value();
     data.synth_pll_cross_feedback = params.synth_pll_cross_feedback.modulated_plain_value();

@@ -63,6 +63,7 @@ A novel synthesis method modeling analog PLL circuits. The VCO attempts to track
 | Loop Saturation | Limits integrator runaway |
 | Color Amount | Harmonic saturation coefficient |
 | Edge Sensitivity | Phase detector edge threshold |
+| Range | PLL lock bandwidth (0=very slow sync, 1=fast sync) |
 
 **Stereo PLL:**
 | Param | Description |
@@ -95,6 +96,9 @@ The PLL oscillator excels at:
 - High Damping: Faster settling, cleaner sound
 - Low Damping: Ringy, resonant behavior
 - Use stereo offsets for massive width without losing mono compatibility
+- Range at 0: Very slow lock, creates characteristic analog PLL "hunting" behavior
+- Range at 1: Fast lock, tight frequency tracking
+- Low Range + any Multiplier: Creates musical portamento-like transitions between pitches
 
 ### Sub Oscillator
 

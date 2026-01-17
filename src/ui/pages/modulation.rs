@@ -12,9 +12,8 @@ const DIVISION_NAMES: [&str; 14] = [
 ];
 const DEST_NAMES: [&str; 27] = [
     "None", "PLL Damp", "PLL Infl", "PLL Track", "PLL FB", "PLL FM", "PLL PW",
-    "PLL StPh", "PLL XFB", "PLL FMEnv",
+    "PLL StPh", "PLL XFB", "PLL FMEnv", "PLL OT", "PLL Rng",
     "VPS D", "VPS V", "Filt Cut", "Filt Res", "Filt Drv",
-    "Fmt Vowel", "Fmt Shift",
     "Ring Mod", "Wavefold", "Drift", "Noise", "Tube",
     "Rev Mix", "Rev Decay",
     "PLL Vol", "VPS Vol", "Sub Vol",
@@ -80,15 +79,21 @@ fn render_lfo_panel(
                     ui.add_space(24.0);
 
                     // Waveform selector
-                    ui.label(egui::RichText::new("Wave:").size(14.0));
+                    ui.label(egui::RichText::new("Wave:").size(16.0));
                     let wf_idx = waveform.value() as usize;
                     egui::ComboBox::from_id_salt(format!("lfo{}_wf", lfo_num))
-                        .width(70.0)
-                        .selected_text(egui::RichText::new(WAVEFORM_NAMES.get(wf_idx).copied().unwrap_or("?")).size(14.0))
+                        .width(100.0)
+                        .height(280.0)
+                        .selected_text(egui::RichText::new(WAVEFORM_NAMES.get(wf_idx).copied().unwrap_or("?")).size(16.0))
                         .show_ui(ui, |ui| {
+                            ui.style_mut().spacing.item_spacing.y = 6.0;
                             for (i, name) in WAVEFORM_NAMES.iter().enumerate() {
-                                if ui.selectable_label(wf_idx == i, *name).clicked() {
+                                let btn = egui::Button::new(egui::RichText::new(*name).size(16.0))
+                                    .min_size(egui::vec2(90.0, 36.0))
+                                    .selected(wf_idx == i);
+                                if ui.add(btn).clicked() {
                                     setter.set_parameter(waveform, i as i32);
+                                    ui.close_menu();
                                 }
                             }
                         });
@@ -105,20 +110,26 @@ fn render_lfo_panel(
 
                     // Rate or division based on sync
                     if tempo_sync.value() {
-                        ui.label(egui::RichText::new("Div:").size(14.0));
+                        ui.label(egui::RichText::new("Div:").size(16.0));
                         let div_idx = sync_division.value() as usize;
                         egui::ComboBox::from_id_salt(format!("lfo{}_div", lfo_num))
-                            .width(70.0)
-                            .selected_text(egui::RichText::new(DIVISION_NAMES.get(div_idx).copied().unwrap_or("?")).size(14.0))
+                            .width(90.0)
+                            .height(400.0)
+                            .selected_text(egui::RichText::new(DIVISION_NAMES.get(div_idx).copied().unwrap_or("?")).size(16.0))
                             .show_ui(ui, |ui| {
+                                ui.style_mut().spacing.item_spacing.y = 6.0;
                                 for (i, name) in DIVISION_NAMES.iter().enumerate() {
-                                    if ui.selectable_label(div_idx == i, *name).clicked() {
+                                    let btn = egui::Button::new(egui::RichText::new(*name).size(16.0))
+                                        .min_size(egui::vec2(80.0, 36.0))
+                                        .selected(div_idx == i);
+                                    if ui.add(btn).clicked() {
                                         setter.set_parameter(sync_division, i as i32);
+                                        ui.close_menu();
                                     }
                                 }
                             });
                     } else {
-                        ui.label(egui::RichText::new("Rate:").size(14.0));
+                        ui.label(egui::RichText::new("Rate:").size(16.0));
                         let mut rate_val = rate.modulated_plain_value();
                         ui.style_mut().spacing.slider_width = 120.0;
                         let slider = egui::Slider::new(&mut rate_val, 0.01..=50.0)
@@ -133,7 +144,7 @@ fn render_lfo_panel(
                     ui.add_space(16.0);
 
                     // Sync source
-                    ui.label(egui::RichText::new("From:").size(14.0));
+                    ui.label(egui::RichText::new("From:").size(16.0));
                     let src = sync_source.value();
                     let src_name = match src {
                         -1 => "None",
@@ -143,17 +154,27 @@ fn render_lfo_panel(
                         _ => "?",
                     };
                     egui::ComboBox::from_id_salt(format!("lfo{}_src", lfo_num))
-                        .width(75.0)
-                        .selected_text(egui::RichText::new(src_name).size(14.0))
+                        .width(95.0)
+                        .height(200.0)
+                        .selected_text(egui::RichText::new(src_name).size(16.0))
                         .show_ui(ui, |ui| {
-                            if ui.selectable_label(src == -1, "None").clicked() {
+                            ui.style_mut().spacing.item_spacing.y = 6.0;
+                            let btn = egui::Button::new(egui::RichText::new("None").size(16.0))
+                                .min_size(egui::vec2(85.0, 36.0))
+                                .selected(src == -1);
+                            if ui.add(btn).clicked() {
                                 setter.set_parameter(sync_source, -1);
+                                ui.close_menu();
                             }
                             for i in 0..3 {
                                 if i + 1 != lfo_num {
                                     let label = format!("LFO {}", i + 1);
-                                    if ui.selectable_label(src == i as i32, &label).clicked() {
+                                    let btn = egui::Button::new(egui::RichText::new(&label).size(16.0))
+                                        .min_size(egui::vec2(85.0, 36.0))
+                                        .selected(src == i as i32);
+                                    if ui.add(btn).clicked() {
                                         setter.set_parameter(sync_source, i as i32);
+                                        ui.close_menu();
                                     }
                                 }
                             }
@@ -206,12 +227,18 @@ fn render_mod_slot(
 
     let dest_idx = dest.value() as usize;
     egui::ComboBox::from_id_salt(format!("lfo{}_{}_dest", lfo_num, slot))
-        .width(110.0)
-        .selected_text(egui::RichText::new(DEST_NAMES.get(dest_idx).copied().unwrap_or("?")).size(14.0))
+        .width(130.0)
+        .height(450.0)
+        .selected_text(egui::RichText::new(DEST_NAMES.get(dest_idx).copied().unwrap_or("?")).size(16.0))
         .show_ui(ui, |ui| {
+            ui.style_mut().spacing.item_spacing.y = 4.0;
             for (i, name) in DEST_NAMES.iter().enumerate() {
-                if ui.selectable_label(dest_idx == i, *name).clicked() {
+                let btn = egui::Button::new(egui::RichText::new(*name).size(16.0))
+                    .min_size(egui::vec2(120.0, 32.0))
+                    .selected(dest_idx == i);
+                if ui.add(btn).clicked() {
                     setter.set_parameter(dest, i as i32);
+                    ui.close_menu();
                 }
             }
         });

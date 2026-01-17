@@ -109,6 +109,10 @@ impl PolyBlepWrapper {
     pub fn get_phase(&self) -> f64 {
         self.phase
     }
+
+    pub fn reset_phase(&mut self) {
+        self.phase = 0.0;
+    }
 }
 
 pub struct PLLOscillator {
@@ -143,16 +147,16 @@ pub struct PLLOscillator {
     freq_slew_state: f64,
     phase_delta: f64,
 
-    dc_x_prev: f64,
-    dc_y_prev: f64,
-
-    // New experimental parameters
     retrigger_amount: f64,
     burst_threshold: f64,
     burst_amount: f64,
     loop_saturation: f64,
     color_amount: f64,
     edge_sensitivity: f64,
+
+    range: f64,
+    mult_crossfade: f64,
+    prev_mult_phase: f64,
 }
 
 impl PLLOscillator {
@@ -189,16 +193,16 @@ impl PLLOscillator {
             freq_slew_state: 0.0,
             phase_delta: 0.0,
 
-            dc_x_prev: 0.0,
-            dc_y_prev: 0.0,
-
-            // Initialize new experimental parameters with defaults
             retrigger_amount: 0.05,
             burst_threshold: 0.7,
             burst_amount: 3.3,
             loop_saturation: 1000.0,
             color_amount: 0.25,
             edge_sensitivity: 0.02,
+
+            range: 1.0,
+            mult_crossfade: 1.0,
+            prev_mult_phase: 0.0,
         };
         pll.prepare_block();
         pll
@@ -226,6 +230,7 @@ impl PLLOscillator {
         loop_saturation: f64,
         color_amount: f64,
         edge_sensitivity: f64,
+        range: f64,
     ) {
         self.retrigger_amount = retrigger.clamp(0.0, 1.0);
         self.burst_threshold = burst_threshold.clamp(0.0, 1.0);
@@ -233,6 +238,7 @@ impl PLLOscillator {
         self.loop_saturation = loop_saturation.clamp(1.0, 500.0);
         self.color_amount = color_amount.clamp(0.0, 1.0);
         self.edge_sensitivity = edge_sensitivity.clamp(0.001, 0.2);
+        self.range = range.clamp(0.0, 1.0);
     }
 
     #[allow(dead_code)]
@@ -241,17 +247,28 @@ impl PLLOscillator {
     }
 
     pub fn prepare_block(&mut self) {
+        let old_mult = self.mult;
         self.mult += (self.desired_mult - self.mult) * 0.02;
+        if (self.mult - old_mult).abs() > 0.01 {
+            self.prev_mult_phase = self.phase * old_mult;
+            self.mult_crossfade = 0.0;
+        }
+        if self.mult_crossfade < 1.0 {
+            self.mult_crossfade = (self.mult_crossfade + 0.02).min(1.0);
+        }
 
         let track_exp = (self.track_speed * 6.0 - 3.0).exp();
         self.cached_alpha = (track_exp / (1.0 + track_exp)).clamp(0.001, 0.995);
 
+        let range_scale = (self.range * self.range * self.range).max(0.0001);
         let mult_penalty = 1.0 / self.mult.sqrt().max(1.0);
         let influence_scaled = 0.1 + self.influence * 9.9;
 
         let damp_factor = 1.0 - self.damping * 0.95;
-        self.cached_kp = influence_scaled * 50.0 * damp_factor * mult_penalty;
-        self.cached_ki = influence_scaled * 5000.0 * damp_factor * mult_penalty;
+        self.cached_kp = influence_scaled * 50.0 * damp_factor * mult_penalty * range_scale;
+        self.cached_ki = influence_scaled * 5000.0 * damp_factor * mult_penalty * range_scale;
+
+        self.cached_alpha *= range_scale.sqrt();
 
         self.color_x = if self.colored {
             (self.color_x + 0.02).min(1.0)
@@ -261,18 +278,11 @@ impl PLLOscillator {
     }
 
     pub fn trigger(&mut self) {
-        // retrigger_amount: 0.0 = hard reset, 0.05 = default soft, 1.0 = legato (no reset)
-        let keep = self.retrigger_amount;
-        self.integrator *= keep;
-        self.filtered_error *= keep;
-        self.pfd_state *= keep;
-        // Only reset overtrack if doing hard/soft retrigger
-        if keep < 0.5 {
-            self.overtrack_state *= keep * 2.0;
-        }
-        // Randomize phase slightly on trigger to avoid consistent DC offset clicks
-        // Small random offset (0-25% of cycle) spreads click energy across the waveform
-        self.phase = (self.phase + rand_01() as f64 * 0.25) % 1.0;
+        self.integrator = 0.0;
+        self.filtered_error = 0.0;
+        self.pfd_state = 0.0;
+        self.overtrack_state = 0.0;
+        self.phase = 0.0;
     }
 
     fn wrap_pi(x: f64) -> f64 {
@@ -349,7 +359,6 @@ impl PLLOscillator {
         self.integrator = self.integrator * integrator_decay + self.filtered_error * (self.cached_ki / self.sample_rate);
         self.integrator = self.integrator.clamp(-self.loop_saturation, self.loop_saturation);
 
-        // Use configurable burst threshold and amount
         let overtrack_amount = (self.track_speed - self.burst_threshold).max(0.0) * self.burst_amount;
         let overtrack_resonance = 1.0 + overtrack_amount * (1.0 - self.damping);
         let correction = (self.cached_kp * self.filtered_error + self.integrator) * overtrack_resonance;
@@ -376,18 +385,21 @@ impl PLLOscillator {
         }
 
         let clean = (self.phase * 2.0 * PI).sin();
-        let colored = ((self.phase * self.mult) * 2.0 * PI).sin();
-        // Use configurable color_amount for saturation coefficient
+
+        let colored_phase = self.phase * self.mult;
+        let prev_colored = (self.prev_mult_phase * 2.0 * PI).sin();
+        let curr_colored = (colored_phase * 2.0 * PI).sin();
+        let colored = prev_colored * (1.0 - self.mult_crossfade) + curr_colored * self.mult_crossfade;
+
         let saturated = colored + self.color_amount * colored.powi(3);
         let colored_out = saturated.clamp(-1.0, 1.0);
 
+        self.prev_mult_phase += self.base_freq * self.desired_mult / self.sample_rate;
+        if self.prev_mult_phase >= 1.0 {
+            self.prev_mult_phase -= 1.0;
+        }
+
         let raw_output = clean * (1.0 - self.color_x) + colored_out * self.color_x;
-
-        let dc_coeff = 0.998;
-        let dc_blocked = raw_output - self.dc_x_prev + dc_coeff * self.dc_y_prev;
-        self.dc_x_prev = raw_output;
-        self.dc_y_prev = dc_blocked;
-
-        dc_blocked.clamp(-1.0, 1.0)
+        raw_output.clamp(-1.0, 1.0)
     }
 }

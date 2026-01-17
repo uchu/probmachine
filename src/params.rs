@@ -446,6 +446,8 @@ pub struct DeviceParams {
     pub synth_pll_color_amount: FloatParam,
     #[id = "synth_pll_edge_sensitivity"]
     pub synth_pll_edge_sensitivity: FloatParam,
+    #[id = "synth_pll_range"]
+    pub synth_pll_range: FloatParam,
     #[id = "synth_pll_stereo_track_offset"]
     pub synth_pll_stereo_track_offset: FloatParam,
     #[id = "synth_pll_stereo_phase"]
@@ -1583,6 +1585,11 @@ impl Default for DeviceParams {
                 "PLL Edge Sensitivity".to_string(),
                 0.02,
                 FloatRange::Skewed { min: 0.001, max: 0.2, factor: 0.5 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_range: FloatParam::new(
+                "PLL Range".to_string(),
+                1.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_stereo_track_offset: FloatParam::new(
                 "PLL Stereo Track Δ".to_string(),

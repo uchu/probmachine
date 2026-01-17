@@ -109,6 +109,7 @@ pub struct Voice {
     pll_loop_saturation: f64,
     pll_color_amount: f64,
     pll_edge_sensitivity: f64,
+    pll_range: f64,
     pll_stereo_track_offset: f64,
     pll_stereo_phase: f64,
     pll_cross_feedback: f64,
@@ -254,6 +255,8 @@ pub struct Voice {
     mod_pll_stereo_phase: f64,
     mod_pll_cross_feedback: f64,
     mod_pll_fm_env_amount: f64,
+    mod_pll_burst_amount: f64,
+    mod_pll_range: f64,
     mod_vps_d: f64,
     mod_vps_v: f64,
     mod_filter_cutoff: f64,
@@ -280,6 +283,8 @@ pub struct Voice {
     mod_slew_pll_stereo_phase: SlewValue<f64>,
     mod_slew_pll_cross_fb: SlewValue<f64>,
     mod_slew_pll_fm_env: SlewValue<f64>,
+    mod_slew_pll_burst: SlewValue<f64>,
+    mod_slew_pll_range: SlewValue<f64>,
     mod_slew_vps_d: SlewValue<f64>,
     mod_slew_vps_v: SlewValue<f64>,
     mod_slew_filter_cut: SlewValue<f64>,
@@ -397,6 +402,7 @@ impl Voice {
             pll_loop_saturation: 100.0,
             pll_color_amount: 0.25,
             pll_edge_sensitivity: 0.02,
+            pll_range: 1.0,
             pll_stereo_track_offset: 0.0,
             pll_stereo_phase: 0.0,
             pll_cross_feedback: 0.0,
@@ -520,6 +526,8 @@ impl Voice {
             mod_pll_stereo_phase: 0.0,
             mod_pll_cross_feedback: 0.0,
             mod_pll_fm_env_amount: 0.0,
+            mod_pll_burst_amount: 0.0,
+            mod_pll_range: 0.0,
             mod_vps_d: 0.0,
             mod_vps_v: 0.0,
             mod_filter_cutoff: 0.0,
@@ -545,6 +553,8 @@ impl Voice {
             mod_slew_pll_stereo_phase: make_slew(),
             mod_slew_pll_cross_fb: make_slew(),
             mod_slew_pll_fm_env: make_slew(),
+            mod_slew_pll_burst: make_slew(),
+            mod_slew_pll_range: make_slew(),
             mod_slew_vps_d: make_slew(),
             mod_slew_vps_v: make_slew(),
             mod_slew_filter_cut: make_slew(),
@@ -653,6 +663,8 @@ impl Voice {
             update_slew(&mut self.mod_slew_pll_stereo_phase);
             update_slew(&mut self.mod_slew_pll_cross_fb);
             update_slew(&mut self.mod_slew_pll_fm_env);
+            update_slew(&mut self.mod_slew_pll_burst);
+            update_slew(&mut self.mod_slew_pll_range);
             update_slew(&mut self.mod_slew_vps_d);
             update_slew(&mut self.mod_slew_vps_v);
             update_slew(&mut self.mod_slew_filter_cut);
@@ -788,6 +800,7 @@ impl Voice {
         loop_saturation: f64,
         color_amount: f64,
         edge_sensitivity: f64,
+        range: f64,
         stereo_track_offset: f64,
     ) {
         self.pll_retrigger = retrigger;
@@ -796,6 +809,7 @@ impl Voice {
         self.pll_loop_saturation = loop_saturation;
         self.target_pll_color_amount = color_amount;
         self.pll_edge_sensitivity = edge_sensitivity;
+        self.pll_range = range;
         self.target_pll_stereo_track_offset = stereo_track_offset;
     }
 
@@ -889,6 +903,8 @@ impl Voice {
         self.mod_pll_stereo_phase = self.mod_slew_pll_stereo_phase.next(mod_values.pll_stereo_phase, MOD_SLEW_MS);
         self.mod_pll_cross_feedback = self.mod_slew_pll_cross_fb.next(mod_values.pll_cross_feedback, MOD_SLEW_MS);
         self.mod_pll_fm_env_amount = self.mod_slew_pll_fm_env.next(mod_values.pll_fm_env_amount, MOD_SLEW_MS);
+        self.mod_pll_burst_amount = self.mod_slew_pll_burst.next(mod_values.pll_burst_amount, MOD_SLEW_MS);
+        self.mod_pll_range = self.mod_slew_pll_range.next(mod_values.pll_range, MOD_SLEW_MS);
         self.mod_vps_d = self.mod_slew_vps_d.next(mod_values.vps_d, MOD_SLEW_MS);
         self.mod_vps_v = self.mod_slew_vps_v.next(mod_values.vps_v, MOD_SLEW_MS);
         self.mod_filter_cutoff = self.mod_slew_filter_cut.next(mod_values.filter_cutoff, MOD_SLEW_MS);
@@ -973,11 +989,13 @@ impl Voice {
             self.filt_env_release_shape,
         );
 
-        // Trigger oscillators with phase randomization to avoid click artifacts
         self.pll_oscillator_left.trigger();
         self.pll_oscillator_right.trigger();
         self.vps_oscillator_left.trigger();
         self.vps_oscillator_right.trigger();
+        self.pll_reference_oscillator.reset_phase();
+        self.pll_prev_out_l = 0.0;
+        self.pll_prev_out_r = 0.0;
     }
 
     pub fn release(&mut self) {
@@ -1003,7 +1021,8 @@ impl Voice {
         self.pll_damping_stereo_offset = self.pll_stereo_offset_slew.next(self.target_pll_stereo_offset, 60.0);
         self.pll_fm_amount = (self.pll_fm_amount_slew.next(self.target_pll_fm_amount, 20.0) + self.mod_pll_fm_amount).clamp(0.0, 1.0);
         self.pll_burst_threshold = self.pll_burst_threshold_slew.next(self.target_pll_burst_threshold, 20.0);
-        self.pll_burst_amount = self.pll_burst_amount_slew.next(self.target_pll_burst_amount, 20.0);
+        self.pll_burst_amount = (self.pll_burst_amount_slew.next(self.target_pll_burst_amount, 20.0) + self.mod_pll_burst_amount * 10.0).clamp(0.0, 10.0);
+        self.pll_range = (self.pll_range + self.mod_pll_range).clamp(0.0, 1.0);
         self.pll_color_amount = self.pll_color_amount_slew.next(self.target_pll_color_amount, 20.0);
         self.pll_stereo_track_offset = self.pll_stereo_track_slew.next(self.target_pll_stereo_track_offset, 60.0);
         self.pll_stereo_phase = (self.pll_stereo_phase_slew.next(self.target_pll_stereo_phase, 60.0) + self.mod_pll_stereo_phase).clamp(0.0, 1.0);
@@ -1169,7 +1188,6 @@ impl Voice {
                     super::oscillator::PllMode::AnalogLikePD
                 };
 
-                // Set experimental params for left oscillator
                 self.pll_oscillator_left.set_experimental_params(
                     self.pll_retrigger,
                     self.pll_burst_threshold,
@@ -1177,12 +1195,12 @@ impl Voice {
                     self.pll_loop_saturation,
                     self.pll_color_amount,
                     self.pll_edge_sensitivity,
+                    self.pll_range,
                 );
                 self.pll_oscillator_left.set_params(track_left, damp_left, self.pll_multiplier, slewed_influence, self.pll_colored, mode);
                 let pll_raw_l = self.pll_oscillator_left.next(ref_phase, ref_mod_l, ref_pulse);
 
                 let pll_raw_r = if use_stereo {
-                    // Set experimental params for right oscillator
                     self.pll_oscillator_right.set_experimental_params(
                         self.pll_retrigger,
                         self.pll_burst_threshold,
@@ -1190,6 +1208,7 @@ impl Voice {
                         self.pll_loop_saturation,
                         self.pll_color_amount,
                         self.pll_edge_sensitivity,
+                        self.pll_range,
                     );
                     self.pll_oscillator_right.set_params(track_right, damp_right, self.pll_multiplier, slewed_influence, self.pll_colored, mode);
                     self.pll_oscillator_right.next(ref_phase_r, ref_mod_r, ref_pulse)

@@ -62,6 +62,7 @@ Complete reference of all parameters and UI controls.
 | synth_pll_loop_saturation | LoopSat | 1-500 | 100 | Integrator limit |
 | synth_pll_color_amount | ColorAmt | 0.0-1.0 | 0.25 | Harmonic saturation |
 | synth_pll_edge_sensitivity | EdgeSns | 0.001-0.2 | 0.02 | PFD edge threshold |
+| synth_pll_range | Rng | 0.0-1.0 | 1.0 | PLL lock bandwidth (slow→fast) |
 
 ### PLL Output
 
@@ -226,8 +227,8 @@ Complete reference of all parameters and UI controls.
 
 **Mod Destinations:**
 0=None, 1=PLL Damp, 2=PLL Infl, 3=PLL Track, 4=PLL FB, 5=PLL FM,
-6=PLL PW, 7=PLL StPh, 8=PLL XFB, 9=PLL FMEnv, 10=VPS D, 11=VPS V,
-12=Filt Cut, 13=Filt Res, 14=Filt Drv, 15=Fmt Vowel, 16=Fmt Shift,
+6=PLL PW, 7=PLL StPh, 8=PLL XFB, 9=PLL FMEnv, 10=PLL OT, 11=PLL Rng,
+12=VPS D, 13=VPS V, 14=Filt Cut, 15=Filt Res, 16=Filt Drv,
 17=Ring, 18=Fold, 19=Drift, 20=Noise, 21=Tube, 22=Rev Mix, 23=Rev Decay,
 24=PLL Vol, 25=VPS Vol, 26=Sub Vol
 

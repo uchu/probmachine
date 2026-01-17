@@ -94,6 +94,8 @@ pub struct PresetData {
     pub synth_pll_color_amount: f32,
     #[serde(default = "default_edge_sensitivity")]
     pub synth_pll_edge_sensitivity: f32,
+    #[serde(default = "default_pll_range")]
+    pub synth_pll_range: f32,
     #[serde(default)]
     pub synth_pll_stereo_track_offset: f32,
     #[serde(default)]
@@ -279,6 +281,7 @@ fn default_mod_amount() -> f32 { 100.0 }
 fn default_burst_threshold() -> f32 { 0.7 }
 fn default_loop_saturation() -> f32 { 1.0 }
 fn default_edge_sensitivity() -> f32 { 0.5 }
+fn default_pll_range() -> f32 { 1.0 }
 
 impl Default for PresetData {
     fn default() -> Self {
@@ -341,6 +344,7 @@ impl Default for PresetData {
             synth_pll_loop_saturation: 1.0,
             synth_pll_color_amount: 0.0,
             synth_pll_edge_sensitivity: 0.5,
+            synth_pll_range: 1.0,
             synth_pll_stereo_track_offset: 0.0,
             synth_pll_stereo_phase: 0.0,
             synth_pll_cross_feedback: 0.0,

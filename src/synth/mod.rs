@@ -91,6 +91,7 @@ impl SynthEngine {
         loop_saturation: f32,
         color_amount: f32,
         edge_sensitivity: f32,
+        range: f32,
         stereo_track_offset: f32,
     ) {
         self.voice.set_pll_experimental_params(
@@ -100,6 +101,7 @@ impl SynthEngine {
             loop_saturation as f64,
             color_amount as f64,
             edge_sensitivity as f64,
+            range as f64,
             stereo_track_offset as f64,
         );
     }

@@ -198,6 +198,7 @@ impl Plugin for Device {
                 self.params.synth_pll_loop_saturation.modulated_plain_value(),
                 self.params.synth_pll_color_amount.modulated_plain_value(),
                 self.params.synth_pll_edge_sensitivity.modulated_plain_value(),
+                self.params.synth_pll_range.modulated_plain_value(),
                 self.params.synth_pll_stereo_track_offset.modulated_plain_value(),
             );
 

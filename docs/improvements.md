@@ -100,6 +100,12 @@ Many parameters only need updates on change:
 
 #### 2. PLL Enhancements
 
+**Variable Lock Range** ✅ COMPLETE
+- Range parameter controls PLL lock bandwidth (inspired by WMD Synchrodyne)
+- At low range, PLL takes longer to synchronize even at x1 multiplier
+- Creates characteristic analog PLL "hunting" behavior
+- Anti-click improvements: output envelope on trigger, multiplier crossfading
+
 **Chaos Mode**
 - Add Lorenz attractor modulation
 - Logistic map for controlled chaos
@@ -265,6 +271,7 @@ Current warnings to address:
 | Enhancement | Effort | Impact | Priority | Status |
 |-------------|--------|--------|----------|--------|
 | SIMD stereo | Medium | High | High | ✅ Complete |
+| PLL Range/Anti-click | Medium | High | High | ✅ Complete |
 | Block LFO | Low | Medium | High | Pending |
 | Lock-free state | Medium | Low | Medium | Pending |
 | Additional filters | Medium | High | High | Pending |
