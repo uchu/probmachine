@@ -80,6 +80,7 @@ pub struct StereoReverb {
     target_mix: f64,
     target_ducking: f64,
     target_decay: f64,
+    decay_mod: f64,
 }
 
 impl StereoReverb {
@@ -120,6 +121,7 @@ impl StereoReverb {
             target_mix: 0.0,
             target_ducking: 0.0,
             target_decay: 0.8,
+            decay_mod: 0.0,
         }
     }
 
@@ -170,11 +172,19 @@ impl StereoReverb {
         self.reverb.set_time_scale(time_scale);
     }
 
+    pub fn apply_decay_mod(&mut self, mod_amount: f64) {
+        // Store modulation offset to be applied in process()
+        self.decay_mod = mod_amount;
+    }
+
     pub fn process(&mut self, left: f64, right: f64) -> (f64, f64) {
         // Apply slews for click-free parameter changes (50ms for smooth transitions)
         self.mix = self.mix_slew.next(self.target_mix, 50.0);
         self.ducking = self.ducking_slew.next(self.target_ducking, 50.0);
-        self.params.decay = self.decay_slew.next(self.target_decay, 50.0);
+        let base_decay = self.decay_slew.next(self.target_decay, 50.0);
+        // Apply modulation to decay (0-1 range)
+        self.params.decay = (base_decay + self.decay_mod).clamp(0.0, 1.0);
+        self.decay_mod = 0.0; // Reset mod for next frame
 
         let (wet_l, wet_r) = self.reverb.process(&mut self.params, left, right);
 

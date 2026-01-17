@@ -175,6 +175,7 @@ pub struct Voice {
     pll_stereo_phase_slew: SlewValue<f64>,
     pll_cross_feedback_slew: SlewValue<f64>,
     pll_fm_env_slew: SlewValue<f64>,
+    pll_range_slew: SlewValue<f64>,
 
     // Coloration slews
     ring_mod_slew: SlewValue<f64>,
@@ -227,6 +228,7 @@ pub struct Voice {
     target_pll_stereo_phase: f64,
     target_pll_cross_feedback: f64,
     target_pll_fm_env_amount: f64,
+    target_pll_range: f64,
     target_ring_mod: f64,
     target_wavefold: f64,
     target_drift_amount: f64,
@@ -463,6 +465,7 @@ impl Voice {
             pll_stereo_phase_slew: make_slew(),
             pll_cross_feedback_slew: make_slew(),
             pll_fm_env_slew: make_slew(),
+            pll_range_slew: make_slew(),
             ring_mod_slew: make_slew(),
             wavefold_slew: make_slew(),
             drift_amount_slew: make_slew(),
@@ -499,6 +502,7 @@ impl Voice {
             target_pll_stereo_phase: 0.0,
             target_pll_cross_feedback: 0.0,
             target_pll_fm_env_amount: 0.0,
+            target_pll_range: 1.0,
             target_ring_mod: 0.0,
             target_wavefold: 0.0,
             target_drift_amount: 0.0,
@@ -809,7 +813,7 @@ impl Voice {
         self.pll_loop_saturation = loop_saturation;
         self.target_pll_color_amount = color_amount;
         self.pll_edge_sensitivity = edge_sensitivity;
-        self.pll_range = range;
+        self.target_pll_range = range;
         self.target_pll_stereo_track_offset = stereo_track_offset;
     }
 
@@ -1022,7 +1026,7 @@ impl Voice {
         self.pll_fm_amount = (self.pll_fm_amount_slew.next(self.target_pll_fm_amount, 20.0) + self.mod_pll_fm_amount).clamp(0.0, 1.0);
         self.pll_burst_threshold = self.pll_burst_threshold_slew.next(self.target_pll_burst_threshold, 20.0);
         self.pll_burst_amount = (self.pll_burst_amount_slew.next(self.target_pll_burst_amount, 20.0) + self.mod_pll_burst_amount * 10.0).clamp(0.0, 10.0);
-        self.pll_range = (self.pll_range + self.mod_pll_range).clamp(0.0, 1.0);
+        self.pll_range = (self.pll_range_slew.next(self.target_pll_range, 20.0) + self.mod_pll_range).clamp(0.0, 1.0);
         self.pll_color_amount = self.pll_color_amount_slew.next(self.target_pll_color_amount, 20.0);
         self.pll_stereo_track_offset = self.pll_stereo_track_slew.next(self.target_pll_stereo_track_offset, 60.0);
         self.pll_stereo_phase = (self.pll_stereo_phase_slew.next(self.target_pll_stereo_phase, 60.0) + self.mod_pll_stereo_phase).clamp(0.0, 1.0);
@@ -1059,7 +1063,7 @@ impl Voice {
         let cutoff_mod_hz = self.mod_filter_cutoff * 10000.0; // Scale modulation to ±10kHz
         self.filter_cutoff = self.target_filter_cutoff;
         self.filter_resonance = (self.target_filter_resonance + self.mod_filter_resonance).clamp(0.0, 0.99);
-        self.filter_drive = (self.target_filter_drive + self.mod_filter_drive).clamp(1.0, 15.0);
+        self.filter_drive = (self.target_filter_drive + self.mod_filter_drive * 14.0).clamp(1.0, 15.0); // Range 1-15, scale by 14
 
         let cutoff = (self.filter_cutoff + filter_env * self.filter_envelope_amount + cutoff_mod_hz)
             .clamp(20.0, 20000.0);
@@ -1294,16 +1298,22 @@ impl Voice {
             direct_out_r = buf_r[0] as f64;
         }
 
-        // Apply reverb at oversampled rate
-        if self.reverb_enabled && self.reverb.mix > 0.0 {
+        // Apply reverb at oversampled rate with modulation
+        // Apply modulation to reverb mix (0-1 range)
+        let reverb_mix_modulated = (self.reverb.mix + self.mod_reverb_mix).clamp(0.0, 1.0);
+        // Apply modulation to decay via temporary adjustment
+        if self.mod_reverb_decay.abs() > 0.001 {
+            self.reverb.apply_decay_mod(self.mod_reverb_decay);
+        }
+        if self.reverb_enabled && reverb_mix_modulated > 0.0 {
             for i in 0..iterations {
                 let dry_l = if use_oversampling { buf_l[i] as f64 } else { direct_out_l };
                 let dry_r = if use_oversampling { buf_r[i] as f64 } else { direct_out_r };
 
                 let (wet_l, wet_r) = self.reverb.process(dry_l, dry_r);
 
-                let out_l = (dry_l * (1.0 - self.reverb.mix) + wet_l * self.reverb.mix) as f32;
-                let out_r = (dry_r * (1.0 - self.reverb.mix) + wet_r * self.reverb.mix) as f32;
+                let out_l = (dry_l * (1.0 - reverb_mix_modulated) + wet_l * reverb_mix_modulated) as f32;
+                let out_r = (dry_r * (1.0 - reverb_mix_modulated) + wet_r * reverb_mix_modulated) as f32;
 
                 if use_oversampling {
                     buf_l[i] = out_l;
