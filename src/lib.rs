@@ -169,6 +169,9 @@ impl Plugin for Device {
             if let Ok(strength_values) = self.ui_state.strength_values.lock() {
                 synth.update_strength_values(strength_values.clone());
             }
+            if let Ok(octave_rand) = self.ui_state.octave_randomization.lock() {
+                synth.update_octave_randomization(octave_rand.clone());
+            }
 
             synth.set_osc_params(
                 self.params.synth_osc_d.modulated_plain_value(),

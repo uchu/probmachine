@@ -127,7 +127,7 @@ impl FavoriteLocation {
         }
     }
 
-    pub fn to_preset_location(&self) -> Option<PresetLocation> {
+    pub fn to_preset_location(self) -> Option<PresetLocation> {
         if self.is_factory {
             FactoryBank::from_index(self.bank_index)
                 .map(|bank| PresetLocation::Factory(bank, self.preset_index))

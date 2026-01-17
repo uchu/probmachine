@@ -42,10 +42,16 @@ impl Oscillator {
         self.v = v;
     }
 
+    pub fn trigger(&mut self) {
+        // Randomize phase slightly on trigger to avoid consistent DC offset clicks
+        self.phase = rand_01() as f64 * 0.25;
+    }
+
     pub fn next(&mut self, d: f64, v: f64) -> f64 {
         let israte = 1.0 / self.sample_rate;
         let d_f32 = d as f32;
         let v_f32 = v as f32;
+        // limit_v() prevents DC offset by blending out problematic d/v combinations
         let v_limited = VPSOscillator::limit_v(d_f32, v_f32);
 
         self.phase += self.freq * israte;
@@ -264,6 +270,9 @@ impl PLLOscillator {
         if keep < 0.5 {
             self.overtrack_state *= keep * 2.0;
         }
+        // Randomize phase slightly on trigger to avoid consistent DC offset clicks
+        // Small random offset (0-25% of cycle) spreads click energy across the waveform
+        self.phase = (self.phase + rand_01() as f64 * 0.25) % 1.0;
     }
 
     fn wrap_pi(x: f64) -> f64 {

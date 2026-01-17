@@ -1,6 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
-use synfx_dsp::{DattorroReverb, DattorroReverbParams};
+use synfx_dsp::{DattorroReverb, DattorroReverbParams, SlewValue};
 
 pub struct ReverbParams {
     pub pre_delay_ms: f64,
@@ -73,6 +73,13 @@ pub struct StereoReverb {
     pub mix: f64,
     pub ducking: f64,
     ducking_envelope: f64,
+    // Slew limiters for click-free parameter changes
+    mix_slew: SlewValue<f64>,
+    ducking_slew: SlewValue<f64>,
+    decay_slew: SlewValue<f64>,
+    target_mix: f64,
+    target_ducking: f64,
+    target_decay: f64,
 }
 
 impl StereoReverb {
@@ -80,6 +87,13 @@ impl StereoReverb {
         let mut reverb = DattorroReverb::new();
         reverb.set_sample_rate(sample_rate as f64);
         reverb.set_time_scale(0.85);
+
+        let sample_rate_f64 = sample_rate as f64;
+        let make_slew = || {
+            let mut s = SlewValue::new();
+            s.set_sample_rate(sample_rate_f64);
+            s
+        };
 
         Self {
             reverb,
@@ -100,11 +114,20 @@ impl StereoReverb {
             mix: 0.0,
             ducking: 0.0,
             ducking_envelope: 0.0,
+            mix_slew: make_slew(),
+            ducking_slew: make_slew(),
+            decay_slew: make_slew(),
+            target_mix: 0.0,
+            target_ducking: 0.0,
+            target_decay: 0.8,
         }
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: f64) {
         self.reverb.set_sample_rate(sample_rate);
+        self.mix_slew.set_sample_rate(sample_rate);
+        self.ducking_slew.set_sample_rate(sample_rate);
+        self.decay_slew.set_sample_rate(sample_rate);
     }
 
     pub fn set_params(
@@ -124,8 +147,14 @@ impl StereoReverb {
         decay: f64,
         ducking: f64,
     ) {
+        // Set targets for slewed parameters
+        // Also set current values so mix > 0.0 checks work before process() is called
+        self.target_mix = mix;
         self.mix = mix;
-        self.ducking = ducking;
+        self.target_ducking = ducking;
+        self.target_decay = decay;
+
+        // Non-slewed parameters (less critical for clicks)
         self.params.pre_delay_ms = pre_delay_ms;
         self.params.time_scale = time_scale;
         self.params.input_hpf_hz = input_hpf_hz;
@@ -137,12 +166,16 @@ impl StereoReverb {
         self.params.mod_shape = mod_shape;
         self.params.input_diffusion_mix = input_diffusion_mix;
         self.params.diffusion = diffusion;
-        self.params.decay = decay;
 
         self.reverb.set_time_scale(time_scale);
     }
 
     pub fn process(&mut self, left: f64, right: f64) -> (f64, f64) {
+        // Apply slews for click-free parameter changes (50ms for smooth transitions)
+        self.mix = self.mix_slew.next(self.target_mix, 50.0);
+        self.ducking = self.ducking_slew.next(self.target_ducking, 50.0);
+        self.params.decay = self.decay_slew.next(self.target_decay, 50.0);
+
         let (wet_l, wet_r) = self.reverb.process(&mut self.params, left, right);
 
         // Apply ducking - reduce reverb when dry signal is loud

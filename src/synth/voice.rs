@@ -143,7 +143,7 @@ pub struct Voice {
     vol_env_sustain: f64,
     vol_env_release: f64,
     vol_env_release_shape: f64,
-    vol_env_decay_multiplier: f64,
+    velocity: f64,
 
     // ===== Filter Envelope =====
     filt_env_attack: f64,
@@ -193,6 +193,13 @@ pub struct Voice {
     // Sub slew
     sub_volume_slew: SlewValue<f64>,
 
+    // Velocity slew for click-free velocity changes
+    velocity_slew: SlewValue<f64>,
+
+    // Master volume slew for click-free volume changes
+    master_volume_slew: SlewValue<f64>,
+    target_master_volume: f64,
+
     // Filter slew - not used since nih_plug parameters have built-in smoothing
     #[allow(dead_code)]
     filter_cutoff_slew: SlewValue<f64>,
@@ -232,6 +239,7 @@ pub struct Voice {
     target_vps_volume: f64,
     target_vps_stereo_offset: f64,
     target_sub_volume: f64,
+    target_velocity: f64,
     target_filter_cutoff: f64,
     target_filter_resonance: f64,
     target_filter_drive: f64,
@@ -421,7 +429,7 @@ impl Voice {
             vol_env_sustain: 1.0,
             vol_env_release: 5.0,
             vol_env_release_shape: 0.5,
-            vol_env_decay_multiplier: 1.0,
+            velocity: 1.0,
 
             filt_env_attack: 1.0,
             filt_env_attack_shape: 0.5,
@@ -461,6 +469,9 @@ impl Voice {
             vps_volume_slew: make_slew(),
             vps_stereo_offset_slew: make_slew(),
             sub_volume_slew: make_slew(),
+            velocity_slew: make_slew(),
+            master_volume_slew: make_slew(),
+            target_master_volume: 0.8,
             filter_cutoff_slew: make_slew(),
             filter_resonance_slew: make_slew(),
             filter_drive_slew: make_slew(),
@@ -495,6 +506,7 @@ impl Voice {
             target_vps_volume: 1.0,
             target_vps_stereo_offset: 0.0,
             target_sub_volume: 0.0,
+            target_velocity: 1.0,
             target_filter_cutoff: 1000.0,
             target_filter_resonance: 0.0,
             target_filter_drive: 1.0,
@@ -630,6 +642,8 @@ impl Voice {
             update_slew(&mut self.vps_volume_slew);
             update_slew(&mut self.vps_stereo_offset_slew);
             update_slew(&mut self.sub_volume_slew);
+            update_slew(&mut self.velocity_slew);
+            update_slew(&mut self.master_volume_slew);
             update_slew(&mut self.mod_slew_pll_damping);
             update_slew(&mut self.mod_slew_pll_influence);
             update_slew(&mut self.mod_slew_pll_track);
@@ -893,7 +907,7 @@ impl Voice {
     }
 
     pub fn set_volume(&mut self, volume: f64) {
-        self.master_volume = volume;
+        self.target_master_volume = volume;
     }
 
     pub fn set_volume_envelope(
@@ -915,8 +929,8 @@ impl Voice {
         self.vol_env_release_shape = release_shape;
     }
 
-    pub fn set_decay_multiplier(&mut self, multiplier: f64) {
-        self.vol_env_decay_multiplier = multiplier;
+    pub fn set_velocity(&mut self, velocity: u8) {
+        self.target_velocity = velocity as f64 / 127.0;
     }
 
     pub fn set_filter_envelope(
@@ -939,11 +953,10 @@ impl Voice {
     }
 
     pub fn trigger(&mut self) {
-        let modulated_decay = self.vol_env_decay * self.vol_env_decay_multiplier;
         self.volume_envelope.trigger(
             self.vol_env_attack,
             self.vol_env_attack_shape,
-            modulated_decay,
+            self.vol_env_decay,
             self.vol_env_decay_shape,
             self.vol_env_sustain,
             self.vol_env_release,
@@ -960,8 +973,11 @@ impl Voice {
             self.filt_env_release_shape,
         );
 
+        // Trigger oscillators with phase randomization to avoid click artifacts
         self.pll_oscillator_left.trigger();
         self.pll_oscillator_right.trigger();
+        self.vps_oscillator_left.trigger();
+        self.vps_oscillator_right.trigger();
     }
 
     pub fn release(&mut self) {
@@ -1012,6 +1028,12 @@ impl Voice {
 
         // Sub slew + modulation
         self.sub_volume = (self.sub_volume_slew.next(self.target_sub_volume, 20.0) + self.mod_sub_volume).clamp(0.0, 1.0);
+
+        // Velocity slew for click-free note transitions (5ms is fast but smooth)
+        self.velocity = self.velocity_slew.next(self.target_velocity, 5.0);
+
+        // Master volume slew for click-free volume changes (20ms)
+        self.master_volume = self.master_volume_slew.next(self.target_master_volume, 20.0);
 
         // Filter parameters - cutoff already smoothed by nih_plug parameter smoother
         // Using target values directly to avoid double-smoothing issues
@@ -1292,27 +1314,28 @@ impl Voice {
 
         self.pll_feedback_state = feedback;
 
+        let vel_scale = self.velocity;
         let (final_l, final_r) = match self.effective_oversample_ratio {
-            1 => (direct_out_l * self.master_volume, direct_out_r * self.master_volume),
+            1 => (direct_out_l * self.master_volume * vel_scale, direct_out_r * self.master_volume * vel_scale),
             2 => {
                 let downsampled_l = self.oversampling_2x_left.downsample() as f64;
                 let downsampled_r = self.oversampling_2x_right.downsample() as f64;
-                (downsampled_l * self.master_volume, downsampled_r * self.master_volume)
+                (downsampled_l * self.master_volume * vel_scale, downsampled_r * self.master_volume * vel_scale)
             }
             4 => {
                 let downsampled_l = self.oversampling_4x_left.downsample() as f64;
                 let downsampled_r = self.oversampling_4x_right.downsample() as f64;
-                (downsampled_l * self.master_volume, downsampled_r * self.master_volume)
+                (downsampled_l * self.master_volume * vel_scale, downsampled_r * self.master_volume * vel_scale)
             }
             8 => {
                 let downsampled_l = self.oversampling_8x_left.downsample() as f64;
                 let downsampled_r = self.oversampling_8x_right.downsample() as f64;
-                (downsampled_l * self.master_volume, downsampled_r * self.master_volume)
+                (downsampled_l * self.master_volume * vel_scale, downsampled_r * self.master_volume * vel_scale)
             }
             _ => {
                 let downsampled_l = self.oversampling_16x_left.downsample() as f64;
                 let downsampled_r = self.oversampling_16x_right.downsample() as f64;
-                (downsampled_l * self.master_volume, downsampled_r * self.master_volume)
+                (downsampled_l * self.master_volume * vel_scale, downsampled_r * self.master_volume * vel_scale)
             }
         };
 

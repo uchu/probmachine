@@ -22,6 +22,7 @@ A waveshaping oscillator using synfx-dsp's VPSOscillator algorithm.
 - V morphs the waveform character
 - Stereo V offset creates rich width through different L/R timbres
 - Clean, digital precision
+- Built-in DC offset prevention via `limit_v()` parameter limiting
 
 **Sound Design Tips:**
 - Low D + mid V: Smooth, round tones
@@ -85,6 +86,7 @@ The PLL oscillator excels at:
 - Chaotic, textured sounds with high feedback
 - Rich stereo imaging with offset parameters
 - FM-like timbres through the FM section
+- DC blocking filter on output handles colored mode saturation artifacts
 
 **Sound Design Tips:**
 - Track < 0.3: Slow, gliding portamento character
@@ -210,6 +212,8 @@ High-quality plate reverb algorithm from synfx-dsp.
 | Mix | Dry/wet balance |
 | Ducking | Reduce reverb when input is loud |
 
+**Smoothing:** Mix, ducking, and decay parameters are smoothed over 50ms for click-free transitions.
+
 ## Envelopes
 
 Two ADSR envelopes with shape control per segment.
@@ -221,10 +225,18 @@ Controls amplitude of all oscillators.
 **Parameters:**
 | Stage | Range | Shape |
 |-------|-------|-------|
-| Attack | 1-5000 ms | -5 to +5 (log→lin→exp) |
-| Decay | 1-10000 ms | -5 to +5 |
+| Attack | 1-400 ms | -5 to +5 (log→lin→exp) |
+| Decay | 1-1000 ms | -5 to +5 |
 | Sustain | 0-1 | - |
-| Release | 1-10000 ms | -5 to +5 |
+| Release | 1-1000 ms | -5 to +5 |
+
+**Anti-Click Behavior:**
+- Minimum attack time: 1ms (2ms on retrigger for smoother transitions)
+- Minimum release time: 1ms
+- Velocity changes are smoothed over 5ms to prevent amplitude discontinuities
+- Master volume changes are smoothed over 20ms
+- Oscillator phases are randomized on note trigger to avoid consistent click artifacts
+- VPS uses `limit_v()` for DC offset prevention, PLL uses DC blocking filter for colored mode
 
 **Special:** Decay time can be modified per-note by the sequencer's decay modifier system.
 

@@ -226,8 +226,10 @@ pub fn render(
                                 }
                             } else if is_empty {
                                 if is_group_start { Color32::from_rgb(28, 28, 28) } else { Color32::from_rgb(35, 35, 35) }
+                            } else if is_group_start {
+                                Color32::from_rgb(42, 42, 42)
                             } else {
-                                if is_group_start { Color32::from_rgb(42, 42, 42) } else { Color32::from_rgb(50, 50, 50) }
+                                Color32::from_rgb(50, 50, 50)
                             };
 
                             let label = if is_favorite {
@@ -293,8 +295,10 @@ pub fn render(
                                 }
                             } else if is_empty {
                                 if is_group_start { Color32::from_rgb(28, 28, 28) } else { Color32::from_rgb(35, 35, 35) }
+                            } else if is_group_start {
+                                Color32::from_rgb(42, 42, 42)
                             } else {
-                                if is_group_start { Color32::from_rgb(42, 42, 42) } else { Color32::from_rgb(50, 50, 50) }
+                                Color32::from_rgb(50, 50, 50)
                             };
 
                             let label = if is_favorite {
@@ -805,13 +809,12 @@ fn load_preset_to_params(
     setter.set_parameter(&params.len_mod_2_amount, data.len_mod_2_amount);
     setter.set_parameter(&params.len_mod_2_prob, data.len_mod_2_prob);
 
-    setter.set_parameter(&params.decay_mod_1_target, data.decay_mod_1_target);
-    setter.set_parameter(&params.decay_mod_1_amount, data.decay_mod_1_amount);
-    setter.set_parameter(&params.decay_mod_1_prob, data.decay_mod_1_prob);
-
-    setter.set_parameter(&params.decay_mod_2_target, data.decay_mod_2_target);
-    setter.set_parameter(&params.decay_mod_2_amount, data.decay_mod_2_amount);
-    setter.set_parameter(&params.decay_mod_2_prob, data.decay_mod_2_prob);
+    setter.set_parameter(&params.vel_strength_target, data.vel_strength_target);
+    setter.set_parameter(&params.vel_strength_amount, data.vel_strength_amount);
+    setter.set_parameter(&params.vel_strength_prob, data.vel_strength_prob);
+    setter.set_parameter(&params.vel_length_target, data.vel_length_target);
+    setter.set_parameter(&params.vel_length_amount, data.vel_length_amount);
+    setter.set_parameter(&params.vel_length_prob, data.vel_length_prob);
 
     setter.set_parameter(&params.pos_mod_1_target, data.pos_mod_1_target);
     setter.set_parameter(&params.pos_mod_1_shift, data.pos_mod_1_shift);
@@ -1176,13 +1179,12 @@ fn save_params_to_preset_data(
     data.len_mod_2_amount = params.len_mod_2_amount.modulated_plain_value();
     data.len_mod_2_prob = params.len_mod_2_prob.modulated_plain_value();
 
-    data.decay_mod_1_target = params.decay_mod_1_target.modulated_plain_value();
-    data.decay_mod_1_amount = params.decay_mod_1_amount.modulated_plain_value();
-    data.decay_mod_1_prob = params.decay_mod_1_prob.modulated_plain_value();
-
-    data.decay_mod_2_target = params.decay_mod_2_target.modulated_plain_value();
-    data.decay_mod_2_amount = params.decay_mod_2_amount.modulated_plain_value();
-    data.decay_mod_2_prob = params.decay_mod_2_prob.modulated_plain_value();
+    data.vel_strength_target = params.vel_strength_target.modulated_plain_value();
+    data.vel_strength_amount = params.vel_strength_amount.modulated_plain_value();
+    data.vel_strength_prob = params.vel_strength_prob.modulated_plain_value();
+    data.vel_length_target = params.vel_length_target.modulated_plain_value();
+    data.vel_length_amount = params.vel_length_amount.modulated_plain_value();
+    data.vel_length_prob = params.vel_length_prob.modulated_plain_value();
 
     data.pos_mod_1_target = params.pos_mod_1_target.modulated_plain_value();
     data.pos_mod_1_shift = params.pos_mod_1_shift.modulated_plain_value();

@@ -73,6 +73,7 @@ impl StrengthStyle {
         }
     }
 
+    #[allow(clippy::needless_range_loop)]
     pub fn generate_pattern(&self) -> [u8; 96] {
         let mut s = [40u8; 96];
 

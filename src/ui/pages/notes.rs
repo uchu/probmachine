@@ -28,7 +28,7 @@ impl Default for NoteState {
             note_chances: HashMap::new(),
             note_beats: HashMap::new(),
             note_beat_lengths: HashMap::new(),
-            scroll_offset: 18.0,
+            scroll_offset: 14.0,
             last_preset_version: 0,
             scale: Scale::default(),
             stability_pattern: StabilityPattern::default(),
@@ -335,7 +335,7 @@ fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
 
             ui.add_space(12.0);
 
-            let total_white_keys = 43.0;
+            let total_white_keys = 50.0;
             let visible_white_keys = 15.0;
             let max_scroll = total_white_keys - visible_white_keys;
 
@@ -437,7 +437,7 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
             let response = ui.allocate_rect(key_rect, egui::Sense::click());
 
             let note_offset = white_key_pattern[note_in_octave];
-            let midi_note = (octave * 12) as u8 + note_offset;
+            let midi_note = (octave * 12) as u8 + note_offset + 12;
 
             let label = if note_in_octave == 0 {
                 let midi_octave = (midi_note / 12) as i32 - 1;
@@ -468,9 +468,9 @@ fn render_piano_keys(ui: &mut egui::Ui, state: &mut NoteState) {
 
             if has_black_key_after && !is_last_white_key {
                 let black_note = white_note + 1;
-                let midi_note = (octave * 12) as u8 + black_note;
+                let midi_note = (octave * 12) as u8 + black_note + 12;
 
-                if midi_note <= 72 {
+                if midi_note <= 96 {
                     let x = start_pos.x + (local_white_key_idx as f32 * white_key_width) + white_key_width - (black_key_width / 2.0);
                     let y = start_pos.y;
 

@@ -5,4 +5,4 @@ pub mod manager;
 mod defaults;
 
 pub use data::{Preset, PresetData, NotePresetData, OctaveRandomizationPresetData};
-pub use manager::{PresetManager, FavoriteLocation};
+pub use manager::PresetManager;

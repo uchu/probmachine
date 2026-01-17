@@ -222,18 +222,18 @@ pub struct PresetData {
     pub len_mod_2_prob: f32,
 
     #[serde(default)]
-    pub decay_mod_1_target: f32,
-    #[serde(default = "default_mod_amount")]
-    pub decay_mod_1_amount: f32,
+    pub vel_strength_target: f32,
     #[serde(default)]
-    pub decay_mod_1_prob: f32,
+    pub vel_strength_amount: f32,
+    #[serde(default)]
+    pub vel_strength_prob: f32,
 
     #[serde(default)]
-    pub decay_mod_2_target: f32,
-    #[serde(default = "default_mod_amount")]
-    pub decay_mod_2_amount: f32,
+    pub vel_length_target: f32,
     #[serde(default)]
-    pub decay_mod_2_prob: f32,
+    pub vel_length_amount: f32,
+    #[serde(default)]
+    pub vel_length_prob: f32,
 
     #[serde(default)]
     pub pos_mod_1_target: f32,
@@ -271,7 +271,7 @@ pub struct PresetData {
 
 fn default_swing() -> f32 { 50.0 }
 fn default_drift_rate() -> f32 { 0.5 }
-fn default_tube_drive() -> f32 { 1.0 }
+fn default_tube_drive() -> f32 { 0.0 }
 fn default_distortion_threshold() -> f32 { 0.7 }
 fn default_true() -> bool { true }
 fn default_note_length() -> f32 { 95.0 }
@@ -425,13 +425,13 @@ impl Default for PresetData {
             len_mod_2_amount: 100.0,
             len_mod_2_prob: 0.0,
 
-            decay_mod_1_target: 0.0,
-            decay_mod_1_amount: 100.0,
-            decay_mod_1_prob: 0.0,
+            vel_strength_target: 0.0,
+            vel_strength_amount: 0.0,
+            vel_strength_prob: 0.0,
 
-            decay_mod_2_target: 0.0,
-            decay_mod_2_amount: 100.0,
-            decay_mod_2_prob: 0.0,
+            vel_length_target: 0.0,
+            vel_length_amount: 0.0,
+            vel_length_prob: 0.0,
 
             pos_mod_1_target: 0.0,
             pos_mod_1_shift: 0.0,

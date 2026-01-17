@@ -23,9 +23,16 @@ impl Envelope {
     }
 
     pub fn trigger(&mut self, attack_ms: f64, attack_shape: f64, decay_ms: f64, decay_shape: f64, sustain: f64, release_ms: f64, release_shape: f64) {
-        // Enforce minimum 1ms for attack and release to avoid clicks
+        let is_retrigger = self.gate > 0.0;
+
+        // Enforce minimum times to avoid clicks:
+        // - Normal attack: 1ms minimum
+        // - Retrigger attack: 2ms minimum (smoother transition when cutting off previous note)
+        // - Release: 1ms minimum
+        let min_attack = if is_retrigger { 2.0 } else { 1.0 };
+
         self.params = EnvADSRParams {
-            attack_ms: attack_ms.max(1.0) as f32,
+            attack_ms: attack_ms.max(min_attack) as f32,
             attack_shape: attack_shape as f32,
             decay_ms: decay_ms.max(1.0) as f32,
             decay_shape: decay_shape as f32,
@@ -34,7 +41,7 @@ impl Envelope {
             release_shape: release_shape as f32,
         };
 
-        if self.gate > 0.0 {
+        if is_retrigger {
             self.retrigger_countdown = 2;
         } else {
             self.gate = 1.0;

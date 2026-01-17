@@ -158,6 +158,11 @@ impl NotePool {
     }
 
     pub fn select_note_with_length(&self, strength_value: f32, length_value: f32, rng: &mut impl rand::Rng) -> Option<f32> {
+        self.select_midi_note_with_length(strength_value, length_value, rng)
+            .map(midi_to_frequency)
+    }
+
+    pub fn select_midi_note_with_length(&self, strength_value: f32, length_value: f32, rng: &mut impl rand::Rng) -> Option<u8> {
         let mut weighted_notes = Vec::new();
 
         for note in &self.notes {
@@ -180,11 +185,11 @@ impl NotePool {
         for (midi_note, weight) in &weighted_notes {
             random_value -= weight;
             if random_value <= 0.0 {
-                return Some(midi_to_frequency(*midi_note));
+                return Some(*midi_note);
             }
         }
 
-        Some(midi_to_frequency(weighted_notes.last()?.0))
+        Some(weighted_notes.last()?.0)
     }
 
     fn calculate_bias_modifier(&self, bias: f32, value: f32) -> f32 {

@@ -13,7 +13,7 @@ struct NoteEvent {
     sample_position: usize,
     frequency: f64,
     duration_samples: usize,
-    decay_multiplier: f32,
+    velocity: u8,
 }
 
 pub struct Sequencer {
@@ -28,7 +28,8 @@ pub struct Sequencer {
     #[allow(dead_code)]
     tempo_bpm: f64,
     pub note_pool: NotePool,
-    pub strength_values: Vec<f32>, // 96 positions for strength grid
+    pub strength_values: Vec<f32>,
+    pub octave_randomization: OctaveRandomization,
 }
 
 impl Sequencer {
@@ -50,6 +51,7 @@ impl Sequencer {
             tempo_bpm,
             note_pool: NotePool::new(),
             strength_values,
+            octave_randomization: OctaveRandomization::default(),
         }
     }
 
@@ -111,11 +113,77 @@ impl Sequencer {
         self.strength_values[grid_position]
     }
 
+    /// Compute min/max strength from the strength grid
+    fn get_strength_range(&self) -> (f32, f32) {
+        let mut min = f32::MAX;
+        let mut max = f32::MIN;
+        for &v in &self.strength_values {
+            if v < min { min = v; }
+            if v > max { max = v; }
+        }
+        if (max - min).abs() < 0.001 {
+            // All values same - return full range so normalization gives 0.5
+            (0.0, 1.0)
+        } else {
+            (min, max)
+        }
+    }
+
+    /// Compute min/max normalized beat length from enabled beat divisions
+    fn get_enabled_length_range(&self, params: &DeviceParams) -> (f32, f32) {
+        let mut min_duration = f32::MAX;
+        let mut max_duration = f32::MIN;
+
+        for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+            for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
+                for index in 0..*count {
+                    let param = params.get_division_param(mode, *count, index);
+                    let probability = param.modulated_plain_value();
+
+                    if probability > 0.0 {
+                        let (start, end) = DeviceParams::get_beat_time_span(mode, *count, index);
+                        let duration = end - start;
+                        if duration < min_duration { min_duration = duration; }
+                        if duration > max_duration { max_duration = duration; }
+                    }
+                }
+            }
+        }
+
+        if min_duration == f32::MAX {
+            // No enabled beats
+            return (0.0, 1.0);
+        }
+
+        // Normalize using log scale (same as beat length normalization)
+        let min_normalized = ((min_duration.log2() + 5.0) / 5.0).clamp(0.0, 1.0);
+        let max_normalized = ((max_duration.log2() + 5.0) / 5.0).clamp(0.0, 1.0);
+
+        if (max_normalized - min_normalized).abs() < 0.001 {
+            (0.0, 1.0)
+        } else {
+            (min_normalized, max_normalized)
+        }
+    }
+
+    /// Normalize a value to 0-1 range relative to min/max
+    fn normalize_to_range(value: f32, min: f32, max: f32) -> f32 {
+        if (max - min).abs() < 0.001 {
+            0.5 // All values same, return middle
+        } else {
+            ((value - min) / (max - min)).clamp(0.0, 1.0)
+        }
+    }
+
     fn generate_bar(&self, params: &DeviceParams) -> Vec<NoteEvent> {
         let mut events = Vec::new();
         let mut rng = rand::thread_rng();
 
         let total_samples = self.bar_length_samples;
+
+        // Compute ranges for relative normalization
+        let strength_range = self.get_strength_range();
+        let length_range = self.get_enabled_length_range(params);
 
         use std::collections::HashSet;
         let mut unique_start_times: HashSet<(u32, u32)> = HashSet::new();
@@ -136,7 +204,14 @@ impl Sequencer {
             .collect();
         start_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
+        let mut occupied_until: f32 = 0.0;
+        let mut lost_beats: Vec<(f32, f32)> = Vec::new();
+
         for &start_time in &start_times {
+            if start_time < occupied_until - 0.0001 {
+                continue;
+            }
+
             let mut candidates: Vec<(BeatMode, usize, usize, f32)> = Vec::new();
 
             for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
@@ -163,65 +238,94 @@ impl Sequencer {
             let total_probability: f32 = candidates.iter().map(|(_, _, _, p)| p).sum();
 
             if total_probability > 0.0 {
-                let random_value = rng.gen_range(0.0..127.0);
+                let lost_probability: f32 = lost_beats
+                    .iter()
+                    .filter(|(end_time, _)| *end_time > start_time + 0.0001)
+                    .map(|(_, prob)| prob)
+                    .sum();
+                let remaining_space = (127.0 - lost_probability).max(0.001);
+
+                let random_value = rng.gen_range(0.0..remaining_space);
 
                 if random_value < total_probability {
                     let mut cumulative = 0.0;
-                    for (mode, count, index, probability) in candidates {
+                    let mut winner_idx: Option<usize> = None;
+
+                    for (idx, (mode, count, index, probability)) in candidates.iter().enumerate() {
                         cumulative += probability;
                         if random_value < cumulative {
-                            let (start, end) = DeviceParams::get_beat_time_span(mode, count, index);
+                            let (start, end) = DeviceParams::get_beat_time_span(*mode, *count, *index);
                             let duration_normalized = end - start;
 
-                            // Get the strength value at this position (for note selection and length modifiers)
                             let strength = self.get_strength_at_position(start_time);
 
-                            // Calculate base duration
                             let note_length_percent = params.note_length_percent.modulated_plain_value();
                             let base_multiplier = note_length_percent / 100.0;
 
-                            // Apply length modifiers based on strength
                             let length_mod_multiplier = params.calculate_length_multiplier(strength, &mut rng);
                             let final_multiplier = base_multiplier * length_mod_multiplier;
 
-                            // Cap at 200% of beat duration to allow legato but prevent overflow
                             let capped_multiplier = final_multiplier.min(2.0);
                             let duration_samples = ((duration_normalized * total_samples as f32) * capped_multiplier) as usize;
 
-                            // Apply position modifier (humanization)
                             let position_shift = params.calculate_position_shift(strength, duration_normalized, &mut rng);
                             let shifted_time = (start_time + position_shift).clamp(0.0, 1.0);
 
-                            // Apply swing to the shifted time
                             let swing_amount = params.swing_amount.modulated_plain_value();
                             let swung_start_time = DeviceParams::apply_swing(shifted_time, swing_amount);
                             let sample_position = (swung_start_time * total_samples as f32) as usize;
 
-                            // Calculate length value for note selection (0.0 = short, 0.5 = normal, 1.0 = long)
+                            // length_value for note selection (based on gate time multiplier)
                             let length_value = (capped_multiplier / 2.0).clamp(0.0, 1.0);
 
-                            // Select a note from the pool based on strength and length
-                            let frequency = if let Some(freq) = self.note_pool.select_note_with_length(strength, length_value, &mut rng) {
-                                freq as f64
-                            } else if let Some(root_midi) = self.note_pool.root_note {
-                                // Fallback to root note if no notes selected from pool
-                                midi_to_frequency(root_midi) as f64
+                            let midi_note = self.note_pool.select_midi_note_with_length(strength, length_value, &mut rng)
+                                .or(self.note_pool.root_note)
+                                .unwrap_or(48);
+
+                            let final_midi_note = if let Some(shift) = self.octave_randomization.should_shift(strength, length_value, &mut rng) {
+                                (midi_note as i16 + shift as i16 * 12).clamp(0, 127) as u8
                             } else {
-                                // Fallback to C3 (130.81Hz) only if no root note is set
-                                130.81
+                                midi_note
                             };
 
-                            // Calculate decay multiplier for volume envelope
-                            let decay_multiplier = params.calculate_decay_multiplier(strength, &mut rng);
+                            let frequency = midi_to_frequency(final_midi_note) as f64;
+
+                            // Normalize beat duration using log scale
+                            let abs_beat_length = ((duration_normalized.log2() + 5.0) / 5.0).clamp(0.0, 1.0);
+
+                            // Normalize strength and length relative to actual ranges for velocity targeting
+                            let relative_strength = Self::normalize_to_range(strength, strength_range.0, strength_range.1);
+                            let relative_length = Self::normalize_to_range(abs_beat_length, length_range.0, length_range.1);
+
+                            let velocity = params.calculate_velocity_relative(
+                                relative_strength,
+                                relative_length,
+                                &mut rng
+                            );
 
                             events.push(NoteEvent {
                                 sample_position,
                                 frequency,
                                 duration_samples,
-                                decay_multiplier,
+                                velocity,
                             });
+
+                            occupied_until = end;
+                            winner_idx = Some(idx);
                             break;
                         }
+                    }
+
+                    for (idx, (mode, count, index, probability)) in candidates.iter().enumerate() {
+                        if Some(idx) != winner_idx {
+                            let (_, end) = DeviceParams::get_beat_time_span(*mode, *count, *index);
+                            lost_beats.push((end, *probability));
+                        }
+                    }
+                } else {
+                    for (mode, count, index, probability) in &candidates {
+                        let (_, end) = DeviceParams::get_beat_time_span(*mode, *count, *index);
+                        lost_beats.push((end, *probability));
                     }
                 }
             }
@@ -230,7 +334,7 @@ impl Sequencer {
         events
     }
 
-    pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64, f32) {
+    pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64, u8) {
         let new_hash = Self::hash_params(params);
         let params_changed = new_hash != self.params_hash;
 
@@ -241,14 +345,14 @@ impl Sequencer {
 
         let mut should_trigger = false;
         let mut should_release = false;
-        let mut frequency = 130.81; // Default frequency (C3)
-        let mut decay_multiplier = 1.0_f32;
+        let mut frequency = 130.81;
+        let mut velocity = 100_u8;
 
         for event in &self.current_bar {
             if event.sample_position == self.bar_position_samples {
                 should_trigger = true;
                 frequency = event.frequency;
-                decay_multiplier = event.decay_multiplier;
+                velocity = event.velocity;
                 self.current_note = Some((
                     event.sample_position,
                     event.sample_position + event.duration_samples,
@@ -275,6 +379,6 @@ impl Sequencer {
             self.current_note = None;
         }
 
-        (should_trigger, should_release, frequency, decay_multiplier)
+        (should_trigger, should_release, frequency, velocity)
     }
 }

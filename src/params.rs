@@ -19,32 +19,50 @@ impl BeatMode {
     }
 }
 
-/// Check if a note's strength matches the target slider value
-/// target: -100 to 100 where negative=weak, 0=off, positive=strong
-/// strength: 0.0 to 1.0 (normalized note strength from grid)
-pub fn strength_target_matches(target: f32, strength: f32) -> bool {
-    // Dead zone near center = modifier is off
-    if target.abs() < 5.0 {
-        return false;
-    }
-
-    // Must have some strength to match
-    if strength <= 0.0 {
-        return false;
+/// Check if a note's value matches the target slider value
+/// target: -100 to 100 where negative=weak/short, 0=any, positive=strong/long
+/// value: 0.0 to 1.0 (normalized value - strength or length)
+///
+/// At center (Any): affects ALL notes
+/// At Weak/Short (-100): affects only notes with lowest value
+/// At Strong/Long (+100): affects only notes with highest value
+pub fn target_matches(target: f32, value: f32) -> bool {
+    // At center (Any): affects all notes
+    if target.abs() < 1.0 {
+        return true;
     }
 
     if target < 0.0 {
-        // Targeting weak notes
-        // At -100: only very weak (strength < 0.15)
-        // At -5: up to medium-weak (strength < 0.48)
-        let threshold = 0.5 + (target + 5.0) / 285.0; // Maps -100 to 0.17, -5 to 0.5
-        strength < threshold
+        // Targeting weak/short: affects notes with value below threshold
+        // At -100: threshold ≈ 0.15 (only very weak/short)
+        // At -1: threshold ≈ 0.99 (almost all)
+        let threshold = 1.0 - (target.abs() / 100.0) * 0.85;
+        value < threshold
     } else {
-        // Targeting strong notes
-        // At +5: above medium-strong (strength > 0.52)
-        // At +100: only very strong (strength > 0.85)
-        let threshold = 0.5 + (target - 5.0) / 285.0; // Maps +5 to 0.5, +100 to 0.83
-        strength > threshold
+        // Targeting strong/long: affects notes with value above threshold
+        // At +100: threshold ≈ 0.85 (only very strong/long)
+        // At +1: threshold ≈ 0.01 (almost all)
+        let threshold = (target / 100.0) * 0.85;
+        value > threshold
+    }
+}
+
+/// Legacy function name for backwards compatibility
+pub fn strength_target_matches(target: f32, strength: f32) -> bool {
+    target_matches(target, strength)
+}
+
+/// Generate a random value "up to" the given amount
+/// If amount > 0: returns random value in [0, amount]
+/// If amount < 0: returns random value in [amount, 0]
+/// If amount == 0: returns 0
+pub fn random_up_to(amount: f32, rng: &mut impl rand::Rng) -> f32 {
+    if amount > 0.0 {
+        rng.gen_range(0.0..=amount)
+    } else if amount < 0.0 {
+        rng.gen_range(amount..=0.0)
+    } else {
+        0.0
     }
 }
 
@@ -628,19 +646,19 @@ pub struct DeviceParams {
     #[id = "len_mod_2_prob"]
     pub len_mod_2_prob: FloatParam,
 
-    #[id = "decay_mod_1_target"]
-    pub decay_mod_1_target: FloatParam,
-    #[id = "decay_mod_1_amount"]
-    pub decay_mod_1_amount: FloatParam,
-    #[id = "decay_mod_1_prob"]
-    pub decay_mod_1_prob: FloatParam,
+    #[id = "vel_strength_target"]
+    pub vel_strength_target: FloatParam,
+    #[id = "vel_strength_amount"]
+    pub vel_strength_amount: FloatParam,
+    #[id = "vel_strength_prob"]
+    pub vel_strength_prob: FloatParam,
 
-    #[id = "decay_mod_2_target"]
-    pub decay_mod_2_target: FloatParam,
-    #[id = "decay_mod_2_amount"]
-    pub decay_mod_2_amount: FloatParam,
-    #[id = "decay_mod_2_prob"]
-    pub decay_mod_2_prob: FloatParam,
+    #[id = "vel_length_target"]
+    pub vel_length_target: FloatParam,
+    #[id = "vel_length_amount"]
+    pub vel_length_amount: FloatParam,
+    #[id = "vel_length_prob"]
+    pub vel_length_prob: FloatParam,
 
     #[id = "pos_mod_1_target"]
     pub pos_mod_1_target: FloatParam,
@@ -717,29 +735,13 @@ impl DeviceParams {
         ]
     }
 
-    /// Get all decay modifiers as (target, amount, probability) tuples
-    pub fn get_decay_modifiers(&self) -> [(f32, f32, f32); 2] {
-        [
-            (
-                self.decay_mod_1_target.value(),
-                self.decay_mod_1_amount.value(),
-                self.decay_mod_1_prob.value(),
-            ),
-            (
-                self.decay_mod_2_target.value(),
-                self.decay_mod_2_amount.value(),
-                self.decay_mod_2_prob.value(),
-            ),
-        ]
-    }
-
     /// Calculate the length multiplier based on strength and modifiers
     /// Returns the multiplier (1.0 = base length, 2.0 = double length)
+    /// Amount is applied as "up to" - random value between 1.0 and the configured multiplier
     pub fn calculate_length_multiplier(&self, strength: f32, rng: &mut impl rand::Rng) -> f32 {
         let modifiers = self.get_length_modifiers();
 
-        // Collect matching modifiers
-        let mut candidates: Vec<(f32, f32)> = Vec::new(); // (amount, probability)
+        let mut candidates: Vec<(f32, f32)> = Vec::new();
         for (target, amount, prob) in modifiers.iter() {
             if strength_target_matches(*target, strength) && *prob > 0.0 {
                 candidates.push((*amount, *prob));
@@ -754,55 +756,96 @@ impl DeviceParams {
         let roll = rng.gen_range(0.0..127.0);
 
         if roll >= total_prob {
-            return 1.0; // No modifier applies
+            return 1.0;
         }
 
-        // Pick winner proportionally
         let mut cumulative = 0.0;
         for (amount, prob) in candidates {
             cumulative += prob;
             if roll < cumulative {
-                return amount / 100.0; // Convert percent to multiplier
+                let target_multiplier = amount / 100.0;
+                // Apply "up to" logic: random between 1.0 and target multiplier
+                if target_multiplier > 1.0 {
+                    return rng.gen_range(1.0..=target_multiplier);
+                } else if target_multiplier < 1.0 {
+                    return rng.gen_range(target_multiplier..=1.0);
+                } else {
+                    return 1.0;
+                }
             }
         }
 
         1.0
     }
 
-    /// Calculate the decay multiplier based on strength and modifiers
-    /// Returns the multiplier (1.0 = base decay, 2.0 = double decay time)
-    pub fn calculate_decay_multiplier(&self, strength: f32, rng: &mut impl rand::Rng) -> f32 {
-        let modifiers = self.get_decay_modifiers();
+    /// Calculate the velocity for a note based on strength, length, and modifiers
+    /// strength: 0.0 to 1.0 (beat strength from grid)
+    /// length: 0.0 to 1.0 (normalized beat duration, 0=shortest like 1/32, 1=longest like 1/1)
+    /// Returns velocity 1-127
+    #[allow(dead_code)]
+    pub fn calculate_velocity(&self, strength: f32, length: f32, rng: &mut impl rand::Rng) -> u8 {
+        let mut velocity: f32 = 100.0;
 
-        // Collect matching modifiers
-        let mut candidates: Vec<(f32, f32)> = Vec::new(); // (amount, probability)
-        for (target, amount, prob) in modifiers.iter() {
-            if strength_target_matches(*target, strength) && *prob > 0.0 {
-                candidates.push((*amount, *prob));
+        // Strength-based velocity modifier (targets weak/any/strong beats)
+        let strength_target = self.vel_strength_target.value();
+        let strength_amount = self.vel_strength_amount.value();
+        let strength_prob = self.vel_strength_prob.value();
+
+        if target_matches(strength_target, strength) && strength_prob > 0.0 {
+            let roll = rng.gen_range(0.0..127.0);
+            if roll < strength_prob {
+                velocity += strength_amount;
             }
         }
 
-        if candidates.is_empty() {
-            return 1.0;
-        }
+        // Length-based velocity modifier (targets short/any/long notes)
+        let length_target = self.vel_length_target.value();
+        let length_amount = self.vel_length_amount.value();
+        let length_prob = self.vel_length_prob.value();
 
-        let total_prob: f32 = candidates.iter().map(|(_, p)| p).sum();
-        let roll = rng.gen_range(0.0..127.0);
-
-        if roll >= total_prob {
-            return 1.0; // No modifier applies
-        }
-
-        // Pick winner proportionally
-        let mut cumulative = 0.0;
-        for (amount, prob) in candidates {
-            cumulative += prob;
-            if roll < cumulative {
-                return amount / 100.0; // Convert percent to multiplier
+        if target_matches(length_target, length) && length_prob > 0.0 {
+            let roll = rng.gen_range(0.0..127.0);
+            if roll < length_prob {
+                velocity += length_amount;
             }
         }
 
-        1.0
+        velocity.clamp(1.0, 127.0) as u8
+    }
+
+    /// Calculate velocity using relative strength and length for targeting
+    /// Amount is applied as "up to" - random value between 0 and amount
+    pub fn calculate_velocity_relative(
+        &self,
+        relative_strength: f32,
+        relative_length: f32,
+        rng: &mut impl rand::Rng
+    ) -> u8 {
+        let mut velocity: f32 = 100.0;
+
+        let strength_target = self.vel_strength_target.value();
+        let strength_amount = self.vel_strength_amount.value();
+        let strength_prob = self.vel_strength_prob.value();
+
+        if target_matches(strength_target, relative_strength) && strength_prob > 0.0 {
+            let roll = rng.gen_range(0.0..127.0);
+            if roll < strength_prob {
+                velocity += random_up_to(strength_amount, rng);
+            }
+        }
+
+        let length_target = self.vel_length_target.value();
+        let length_amount = self.vel_length_amount.value();
+        let length_prob = self.vel_length_prob.value();
+
+        if target_matches(length_target, relative_length) && length_prob > 0.0 {
+            let roll = rng.gen_range(0.0..127.0);
+            if roll < length_prob {
+                velocity += random_up_to(length_amount, rng);
+            }
+        }
+
+        velocity.clamp(1.0, 127.0) as u8
     }
 
     /// Get position modifiers as (target, shift, probability) tuples
@@ -823,6 +866,7 @@ impl DeviceParams {
 
     /// Calculate the position shift based on strength and modifiers
     /// Returns the shift as a fraction of beat duration (-0.5 to +0.5)
+    /// Shift is applied as "up to" - random value between 0 and the configured shift
     pub fn calculate_position_shift(&self, strength: f32, beat_duration: f32, rng: &mut impl rand::Rng) -> f32 {
         let modifiers = self.get_position_modifiers();
 
@@ -850,8 +894,10 @@ impl DeviceParams {
         for (shift, prob) in candidates {
             cumulative += prob;
             if roll < cumulative {
+                // Apply "up to" logic: random value between 0 and shift
+                let actual_shift = random_up_to(shift, rng);
                 // Convert shift percentage to actual time offset
-                return (shift / 100.0) * beat_duration;
+                return (actual_shift / 100.0) * beat_duration;
             }
         }
 
@@ -1231,7 +1277,6 @@ impl DeviceParams {
 
     fn create_param(name: String, default: f32) -> FloatParam {
         FloatParam::new(name, default, FloatRange::Linear { min: 0.0, max: 127.0 })
-            .with_smoother(SmoothingStyle::Linear(50.0))
     }
 }
 
@@ -1654,7 +1699,7 @@ impl Default for DeviceParams {
             synth_vol_attack: FloatParam::new(
                 "Vol Attack".to_string(),
                 10.0,
-                FloatRange::Linear { min: 0.0, max: 1000.0 }
+                FloatRange::Linear { min: 1.0, max: 1000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_attack_shape: FloatParam::new(
                 "Vol Attack Shape".to_string(),
@@ -1664,7 +1709,7 @@ impl Default for DeviceParams {
             synth_vol_decay: FloatParam::new(
                 "Vol Decay".to_string(),
                 100.0,
-                FloatRange::Linear { min: 0.0, max: 1000.0 }
+                FloatRange::Linear { min: 1.0, max: 1000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_decay_shape: FloatParam::new(
                 "Vol Decay Shape".to_string(),
@@ -1679,7 +1724,7 @@ impl Default for DeviceParams {
             synth_vol_release: FloatParam::new(
                 "Vol Release".to_string(),
                 200.0,
-                FloatRange::Linear { min: 0.0, max: 1000.0 }
+                FloatRange::Linear { min: 1.0, max: 1000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_release_shape: FloatParam::new(
                 "Vol Release Shape".to_string(),
@@ -1690,7 +1735,7 @@ impl Default for DeviceParams {
             synth_filt_attack: FloatParam::new(
                 "Filt Attack".to_string(),
                 10.0,
-                FloatRange::Linear { min: 0.0, max: 1000.0 }
+                FloatRange::Linear { min: 1.0, max: 1000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_filt_attack_shape: FloatParam::new(
                 "Filt Attack Shape".to_string(),
@@ -1700,7 +1745,7 @@ impl Default for DeviceParams {
             synth_filt_decay: FloatParam::new(
                 "Filt Decay".to_string(),
                 100.0,
-                FloatRange::Linear { min: 0.0, max: 1000.0 }
+                FloatRange::Linear { min: 1.0, max: 1000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_filt_decay_shape: FloatParam::new(
                 "Filt Decay Shape".to_string(),
@@ -1715,7 +1760,7 @@ impl Default for DeviceParams {
             synth_filt_release: FloatParam::new(
                 "Filt Release".to_string(),
                 200.0,
-                FloatRange::Linear { min: 0.0, max: 1000.0 }
+                FloatRange::Linear { min: 1.0, max: 1000.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_filt_release_shape: FloatParam::new(
                 "Filt Release Shape".to_string(),
@@ -1882,7 +1927,7 @@ impl Default for DeviceParams {
                 "Note Length %".to_string(),
                 95.0,
                 FloatRange::Linear { min: 1.0, max: 200.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            ),
 
             len_mod_1_target: FloatParam::new(
                 "Len Mod 1 Target",
@@ -1916,34 +1961,34 @@ impl Default for DeviceParams {
                 FloatRange::Linear { min: 0.0, max: 127.0 }
             ),
 
-            decay_mod_1_target: FloatParam::new(
-                "Decay Mod 1 Target",
-                -75.0,
+            vel_strength_target: FloatParam::new(
+                "Vel Strength Target",
+                0.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
-            decay_mod_1_amount: FloatParam::new(
-                "Decay Mod 1 Amount",
-                100.0,
-                FloatRange::Linear { min: 0.0, max: 200.0 }
+            vel_strength_amount: FloatParam::new(
+                "Vel Strength Amount",
+                0.0,
+                FloatRange::Linear { min: -99.0, max: 27.0 }
             ),
-            decay_mod_1_prob: FloatParam::new(
-                "Decay Mod 1 Prob",
+            vel_strength_prob: FloatParam::new(
+                "Vel Strength Prob",
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 127.0 }
             ),
 
-            decay_mod_2_target: FloatParam::new(
-                "Decay Mod 2 Target",
-                75.0,
+            vel_length_target: FloatParam::new(
+                "Vel Length Target",
+                0.0,
                 FloatRange::Linear { min: -100.0, max: 100.0 }
             ),
-            decay_mod_2_amount: FloatParam::new(
-                "Decay Mod 2 Amount",
-                100.0,
-                FloatRange::Linear { min: 0.0, max: 200.0 }
+            vel_length_amount: FloatParam::new(
+                "Vel Length Amount",
+                0.0,
+                FloatRange::Linear { min: -99.0, max: 27.0 }
             ),
-            decay_mod_2_prob: FloatParam::new(
-                "Decay Mod 2 Prob",
+            vel_length_prob: FloatParam::new(
+                "Vel Length Prob",
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 127.0 }
             ),

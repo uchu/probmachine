@@ -184,6 +184,10 @@ impl SynthEngine {
         }
     }
 
+    pub fn update_octave_randomization(&mut self, octave_randomization: crate::sequencer::OctaveRandomization) {
+        self.sequencer.octave_randomization = octave_randomization;
+    }
+
     pub fn set_reverb_params(
         &mut self,
         mix: f32,
@@ -259,11 +263,11 @@ impl SynthEngine {
         let bpm = self.sequencer.get_bpm();
 
         for (l, r) in output_l.iter_mut().zip(output_r.iter_mut()) {
-            let (should_trigger, should_release, frequency, decay_multiplier) = self.sequencer.update(params);
+            let (should_trigger, should_release, frequency, velocity) = self.sequencer.update(params);
 
             if should_trigger {
                 self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
-                self.voice.set_decay_multiplier(decay_multiplier as f64);
+                self.voice.set_velocity(velocity);
                 self.voice.trigger();
             }
 
