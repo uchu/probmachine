@@ -18,18 +18,19 @@ use params::DeviceParams;
 use std::sync::Arc;
 use ui::{Page, SharedUiState};
 use synth::{SynthEngine, MasterLimiter};
-use midi::MidiCCState;
+use midi::MidiProcessor;
 
 pub struct Device {
     params: Arc<DeviceParams>,
     synth_engine: Option<SynthEngine>,
     ui_state: Arc<SharedUiState>,
-    midi_state: MidiCCState,
+    midi_processor: MidiProcessor,
     sample_rate: f32,
     cpu_load_smoothed: f32,
     volume_slew: f32,
     output_level_smoothed: f32,
     limiter: MasterLimiter,
+    midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
 }
 
 impl Default for Device {
@@ -38,12 +39,13 @@ impl Default for Device {
             params: Arc::new(DeviceParams::default()),
             synth_engine: None,
             ui_state: Arc::new(SharedUiState::new()),
-            midi_state: MidiCCState::new(),
+            midi_processor: MidiProcessor::new(),
             sample_rate: 44100.0,
             cpu_load_smoothed: 0.0,
             volume_slew: 0.5,
             output_level_smoothed: 0.0,
             limiter: MasterLimiter::new(44100.0),
+            midi_events_buffer: Vec::with_capacity(64),
         }
     }
 }
@@ -64,7 +66,7 @@ impl Plugin for Device {
     }];
 
     const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
-    const MIDI_OUTPUT: MidiConfig = MidiConfig::None;
+    const MIDI_OUTPUT: MidiConfig = MidiConfig::MidiCCs;
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
     type SysExMessage = ();
@@ -132,7 +134,6 @@ impl Plugin for Device {
         buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        // Workaround for jack crate bug on macOS: use SAMPLE_RATE env var if set
         let new_sample_rate = std::env::var("SAMPLE_RATE")
             .ok()
             .and_then(|s| s.parse::<f32>().ok())
@@ -158,9 +159,15 @@ impl Plugin for Device {
         _aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        self.midi_processor.begin_buffer();
+
         while let Some(event) = context.next_event() {
-            midi::process_midi_event(event, &mut self.midi_state, &self.params);
+            self.midi_processor.process_incoming_event(event);
         }
+
+        let transport = context.transport();
+        let tempo = transport.tempo.unwrap_or(120.0);
+        let is_playing = transport.playing;
 
         if let Some(synth) = &mut self.synth_engine {
             if let Ok(note_pool) = self.ui_state.note_pool.lock() {
@@ -302,8 +309,6 @@ impl Plugin for Device {
                 self.params.synth_filt_release_shape.modulated_plain_value(),
             );
 
-            // VPS dry/wet removed - reverb now has its own mix control
-
             synth.set_reverb_params(
                 self.params.synth_reverb_mix.modulated_plain_value(),
                 self.params.synth_reverb_pre_delay.modulated_plain_value(),
@@ -321,7 +326,6 @@ impl Plugin for Device {
                 self.params.synth_reverb_ducking.modulated_plain_value(),
             );
 
-            // LFO 1 params
             synth.set_lfo_params(
                 0,
                 self.params.lfo1_rate.modulated_plain_value(),
@@ -334,7 +338,6 @@ impl Plugin for Device {
             synth.set_lfo_modulation(0, 0, self.params.lfo1_dest1.value(), self.params.lfo1_amount1.modulated_plain_value());
             synth.set_lfo_modulation(0, 1, self.params.lfo1_dest2.value(), self.params.lfo1_amount2.modulated_plain_value());
 
-            // LFO 2 params
             synth.set_lfo_params(
                 1,
                 self.params.lfo2_rate.modulated_plain_value(),
@@ -347,7 +350,6 @@ impl Plugin for Device {
             synth.set_lfo_modulation(1, 0, self.params.lfo2_dest1.value(), self.params.lfo2_amount1.modulated_plain_value());
             synth.set_lfo_modulation(1, 1, self.params.lfo2_dest2.value(), self.params.lfo2_amount2.modulated_plain_value());
 
-            // LFO 3 params
             synth.set_lfo_params(
                 2,
                 self.params.lfo3_rate.modulated_plain_value(),
@@ -367,8 +369,31 @@ impl Plugin for Device {
             let base_freq = 220.0;
 
             let start_time = std::time::Instant::now();
-            synth.process_block(&mut output_l, &mut output_r, &self.params, pll_feedback_amt, base_freq);
+            synth.process_block(
+                &mut output_l,
+                &mut output_r,
+                &self.params,
+                pll_feedback_amt,
+                base_freq,
+                &mut self.midi_events_buffer,
+            );
             let elapsed = start_time.elapsed();
+
+            for (is_note_on, is_note_off, midi_note, velocity, sample_idx) in &self.midi_events_buffer {
+                if *is_note_on {
+                    self.midi_processor.note_on_from_sequencer(*midi_note, *velocity, *sample_idx as u32);
+                } else if *is_note_off {
+                    self.midi_processor.note_off_from_sequencer(*sample_idx as u32);
+                }
+            }
+
+            self.midi_processor.send_output::<Device>(
+                context,
+                is_playing,
+                buffer.samples(),
+                self.sample_rate,
+                tempo,
+            );
 
             let buffer_time_secs = buffer.samples() as f32 / self.sample_rate;
             let cpu_load = (elapsed.as_secs_f32() / buffer_time_secs) * 100.0;

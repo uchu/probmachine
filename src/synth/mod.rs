@@ -281,26 +281,34 @@ impl SynthEngine {
         self.lfo_bank.get_lfo_output(idx) as f32
     }
 
-    pub fn process_block(&mut self, output_l: &mut [f32], output_r: &mut [f32], params: &DeviceParams, feedback_amount: f32, _base_freq: f32) {
+    pub fn process_block(
+        &mut self,
+        output_l: &mut [f32],
+        output_r: &mut [f32],
+        params: &DeviceParams,
+        feedback_amount: f32,
+        _base_freq: f32,
+        midi_events: &mut Vec<(bool, bool, u8, u8, usize)>,
+    ) {
         let bpm = self.sequencer.get_bpm();
+        midi_events.clear();
 
-        for (l, r) in output_l.iter_mut().zip(output_r.iter_mut()) {
-            let (should_trigger, should_release, frequency, velocity) = self.sequencer.update(params);
+        for (sample_idx, (l, r)) in output_l.iter_mut().zip(output_r.iter_mut()).enumerate() {
+            let (should_trigger, should_release, frequency, velocity, midi_note) = self.sequencer.update(params);
 
             if should_trigger {
                 self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
                 self.voice.set_velocity(velocity);
                 self.voice.trigger();
+                midi_events.push((true, false, midi_note, velocity, sample_idx));
             }
 
             if should_release {
                 self.voice.release();
+                midi_events.push((false, true, midi_note, velocity, sample_idx));
             }
 
-            // Process LFOs and get modulation values
             let mod_values = self.lfo_bank.process(bpm);
-
-            // Apply modulation to voice
             self.voice.apply_modulation(&mod_values);
 
             let (left_sample, right_sample) = self.voice.process(self.pll_feedback);

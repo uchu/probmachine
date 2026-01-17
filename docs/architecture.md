@@ -48,7 +48,7 @@ src/
 ├── lib.rs              # Plugin entry, process callback
 ├── main.rs             # Standalone binary entry
 ├── params.rs           # All automatable parameters (~250 params)
-├── midi.rs             # MIDI CC processing
+├── midi.rs             # Full MIDI I/O processing
 ├── synth/
 │   ├── mod.rs          # SynthEngine coordinator
 │   ├── voice.rs        # Main voice with signal routing
@@ -182,8 +182,36 @@ debug = true
 strip = "none"
 ```
 
+## MIDI Support
+
+### MIDI Input
+- **Note Events**: NoteOn/NoteOff from external MIDI controllers (any channel)
+- **Control Changes**: CC messages stored in state, accessible for parameter modulation
+- **14-bit CC**: Support for high-resolution control (CC 0-31 + CC 32-63)
+- **NRPN**: Non-Registered Parameter Number tracking
+
+### MIDI Output
+- **Sequencer Notes**: Generated notes output as MIDI NoteOn/NoteOff
+- **Velocity**: Per-note velocity passed through to MIDI output
+- **Sample-accurate timing**: All MIDI events aligned to buffer positions
+- **Host tempo sync**: Reads tempo from DAW transport
+
+### MIDI Processing Architecture
+```
+MIDI Input → MidiProcessor.input → MidiState
+                                   ├── CC tracking
+                                   └── External note events
+
+Sequencer → SynthEngine.process_block() → midi_events_buffer
+                                              ↓
+MidiProcessor.output ← note_on/note_off_from_sequencer()
+       ↓
+context.send_event() → MIDI Output
+```
+
 ## Version History
 
+- **v1.7.0**: Full MIDI I/O - note input/output, CC handling, transport sync
 - **v1.6.0**: SIMD stereo DSP - Moog filter, wavefold, tube saturation, distortion
 - **v1.5.0**: Portable SIMD infrastructure for future stereo DSP optimization
 - **v1.4.0**: JACK as primary backend, multi-platform support

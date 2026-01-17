@@ -14,6 +14,7 @@ struct NoteEvent {
     frequency: f64,
     duration_samples: usize,
     velocity: u8,
+    midi_note: u8,
 }
 
 pub struct Sequencer {
@@ -308,6 +309,7 @@ impl Sequencer {
                                 frequency,
                                 duration_samples,
                                 velocity,
+                                midi_note: final_midi_note,
                             });
 
                             occupied_until = end;
@@ -334,7 +336,7 @@ impl Sequencer {
         events
     }
 
-    pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64, u8) {
+    pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64, u8, u8) {
         let new_hash = Self::hash_params(params);
         let params_changed = new_hash != self.params_hash;
 
@@ -347,12 +349,14 @@ impl Sequencer {
         let mut should_release = false;
         let mut frequency = 130.81;
         let mut velocity = 100_u8;
+        let mut midi_note = 48_u8;
 
         for event in &self.current_bar {
             if event.sample_position == self.bar_position_samples {
                 should_trigger = true;
                 frequency = event.frequency;
                 velocity = event.velocity;
+                midi_note = event.midi_note;
                 self.current_note = Some((
                     event.sample_position,
                     event.sample_position + event.duration_samples,
@@ -379,6 +383,6 @@ impl Sequencer {
             self.current_note = None;
         }
 
-        (should_trigger, should_release, frequency, velocity)
+        (should_trigger, should_release, frequency, velocity, midi_note)
     }
 }

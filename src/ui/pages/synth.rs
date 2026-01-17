@@ -566,21 +566,35 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
         // Tab 1: Envelopes & FX
         else if current_tab == 1 {
             ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("VOL ENV").size(16.0).strong());
-                    ui.add_space(8.0);
-                    render_envelope_controls_compact(ui, params, setter, "vol");
-                });
+                egui::Frame::default()
+                    .fill(ui.visuals().extreme_bg_color)
+                    .inner_margin(egui::Margin { left: 16, right: 16, top: 16, bottom: 16 })
+                    .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                    .corner_radius(15.0)
+                    .show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.label(egui::RichText::new("VOL ENV").size(16.0).strong());
+                            ui.add_space(12.0);
+                            render_envelope_controls_compact(ui, params, setter, "vol");
+                        });
+                    });
 
-                ui.add_space(40.0);
+                ui.add_space(16.0);
 
-                ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("FILT ENV").size(16.0).strong());
-                    ui.add_space(8.0);
-                    render_envelope_controls_compact(ui, params, setter, "filt");
-                });
+                egui::Frame::default()
+                    .fill(ui.visuals().extreme_bg_color)
+                    .inner_margin(egui::Margin { left: 16, right: 16, top: 16, bottom: 16 })
+                    .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
+                    .corner_radius(15.0)
+                    .show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.label(egui::RichText::new("FILT ENV").size(16.0).strong());
+                            ui.add_space(12.0);
+                            render_envelope_controls_compact(ui, params, setter, "filt");
+                        });
+                    });
 
-                ui.add_space(40.0);
+                ui.add_space(16.0);
 
                 egui::Frame::default()
                     .fill(ui.visuals().extreme_bg_color)
