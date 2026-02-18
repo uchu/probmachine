@@ -297,11 +297,8 @@ pub fn render(
     let swing = params.swing_amount.modulated_plain_value();
 
     tui.ui(|ui| {
-        ui.add_space(12.0);
+        ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.heading(egui::RichText::new("    Strength").size(22.0));
-            ui.add_space(40.0);
-
             let mut state = ui.ctx().data_mut(|d| d.get_temp::<StrengthState>(state_id).unwrap_or_default());
             let state_before = state.clone();
 

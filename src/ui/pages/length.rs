@@ -10,12 +10,6 @@ pub fn render(
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
 ) {
-    tui.ui(|ui| {
-        ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Length & Position").size(22.0));
-        ui.add_space(8.0);
-    });
-
     tui.style(Style {
         flex_grow: 1.0,
         align_items: Some(AlignItems::Stretch),

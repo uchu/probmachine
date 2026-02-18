@@ -31,6 +31,7 @@ pub struct Device {
     output_level_smoothed: f32,
     limiter: MasterLimiter,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
+    host_transport_detected: bool,
 }
 
 impl Default for Device {
@@ -46,6 +47,7 @@ impl Default for Device {
             output_level_smoothed: 0.0,
             limiter: MasterLimiter::new(44100.0),
             midi_events_buffer: Vec::with_capacity(64),
+            host_transport_detected: false,
         }
     }
 }
@@ -168,6 +170,10 @@ impl Plugin for Device {
         let transport = context.transport();
         let tempo = transport.tempo.unwrap_or(120.0);
         let is_playing = transport.playing;
+
+        if !is_playing {
+            self.host_transport_detected = true;
+        }
 
         if let Some(synth) = &mut self.synth_engine {
             if let Ok(note_pool) = self.ui_state.note_pool.lock() {
@@ -368,6 +374,12 @@ impl Plugin for Device {
             let pll_feedback_amt = self.params.synth_pll_feedback.modulated_plain_value();
             let base_freq = 220.0;
 
+            let seq_playing = if self.host_transport_detected {
+                self.params.sequencer_enable.value() || is_playing
+            } else {
+                self.params.sequencer_enable.value()
+            };
+
             let start_time = std::time::Instant::now();
             synth.process_block(
                 &mut output_l,
@@ -376,6 +388,7 @@ impl Plugin for Device {
                 pll_feedback_amt,
                 base_freq,
                 &mut self.midi_events_buffer,
+                seq_playing,
             );
             let elapsed = start_time.elapsed();
 
@@ -412,9 +425,7 @@ impl Plugin for Device {
                 output_r[i] *= self.volume_slew;
             }
 
-            if self.params.limiter_enable.value() {
-                self.limiter.process_block(&mut output_l, &mut output_r);
-            }
+            self.limiter.process_block(&mut output_l, &mut output_r);
 
             let mut peak: f32 = 0.0;
             for (i, channel_samples) in buffer.iter_samples().enumerate() {

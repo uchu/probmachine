@@ -209,6 +209,19 @@ Install XCB development libraries:
 sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 ```
 
+### Windows standalone has no sound
+Run from a command prompt to see backend errors:
+```bash
+device.exe
+```
+
+If you see "falling back to the dummy audio backend", try specifying the backend and sample rate:
+```bash
+device.exe --backend wasapi
+device.exe --sample-rate 44100
+device.exe --output-device ""  # Lists available devices
+```
+
 ### Raspberry Pi performance
 For best performance on Raspberry Pi:
 1. Use the standalone binary (not VST3)

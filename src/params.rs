@@ -693,6 +693,9 @@ pub struct DeviceParams {
     pub legato_mode: BoolParam,
     #[id = "legato_time"]
     pub legato_time: FloatParam,
+
+    #[id = "sequencer_enable"]
+    pub sequencer_enable: BoolParam,
 }
 
 impl DeviceParams {
@@ -2084,6 +2087,8 @@ impl Default for DeviceParams {
                 50.0,
                 FloatRange::Skewed { min: 1.0, max: 500.0, factor: 0.4 }
             ).with_unit(" ms"),
+
+            sequencer_enable: BoolParam::new("Sequencer Enable", false),
         }
     }
 }

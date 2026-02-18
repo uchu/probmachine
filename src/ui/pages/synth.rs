@@ -18,12 +18,8 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
     });
 
     tui.ui(|ui| {
-        ui.add_space(12.0);
+        ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.heading(egui::RichText::new("    Synth").size(22.0));
-            ui.add_space(40.0);
-
-            // Tab buttons
             let button_sound = egui::Button::new(egui::RichText::new("Sound").size(14.0))
                 .min_size(egui::vec2(80.0, 28.0))
                 .corner_radius(egui::CornerRadius { nw: 6, ne: 6, sw: 0, se: 0 })
@@ -39,6 +35,14 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
             if ui.add(button_env).clicked() {
                 current_tab = 1;
             }
+
+            let button_mod = egui::Button::new(egui::RichText::new("Mod").size(14.0))
+                .min_size(egui::vec2(80.0, 28.0))
+                .corner_radius(egui::CornerRadius { nw: 6, ne: 6, sw: 0, se: 0 })
+                .selected(current_tab == 2);
+            if ui.add(button_mod).clicked() {
+                current_tab = 2;
+            }
         });
         ui.add_space(8.0);
 
@@ -48,6 +52,9 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
         });
     });
 
+    if current_tab == 2 {
+        super::modulation::render(tui, params, setter);
+    } else {
     tui.style(Style {
         flex_grow: 1.0,
         align_items: Some(AlignItems::Stretch),
@@ -821,6 +828,7 @@ pub fn render(tui: &mut egui_taffy::Tui, params: &Arc<DeviceParams>, setter: &Pa
                 });
         }
     });
+    }
 }
 
 enum SliderScale {

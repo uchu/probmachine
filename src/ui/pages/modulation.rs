@@ -25,12 +25,6 @@ pub fn render(
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
 ) {
-    tui.ui(|ui| {
-        ui.add_space(12.0);
-        ui.heading(egui::RichText::new("    Modulation").size(22.0));
-        ui.add_space(8.0);
-    });
-
     // LFO 1
     render_lfo_panel(tui, params, setter, 1,
         &params.lfo1_rate, &params.lfo1_waveform, &params.lfo1_tempo_sync,

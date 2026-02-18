@@ -16,28 +16,24 @@ pub fn render(
     let (beat_mode, num_sliders) = tui.ui(get_beat_state);
 
     tui.ui(|ui| {
-        ui.add_space(16.0);
-        ui.horizontal(|ui| {
-            ui.heading(egui::RichText::new("    Beat Probability").size(22.0));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add_space(166.0);
-                let clear_button = egui::Button::new(egui::RichText::new("Clear All").size(14.0))
-                    .min_size(egui::vec2(80.0, 28.0));
-                if ui.add(clear_button).clicked() {
-                    for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
-                        for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
-                            for index in 0..*count {
-                                let param = params.get_division_param(mode, *count, index);
-                                setter.begin_set_parameter(param);
-                                setter.set_parameter(param, 0.0);
-                                setter.end_set_parameter(param);
-                            }
+        ui.add_space(8.0);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.add_space(166.0);
+            let clear_button = egui::Button::new(egui::RichText::new("Clear All").size(14.0))
+                .min_size(egui::vec2(80.0, 28.0));
+            if ui.add(clear_button).clicked() {
+                for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+                    for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
+                        for index in 0..*count {
+                            let param = params.get_division_param(mode, *count, index);
+                            setter.begin_set_parameter(param);
+                            setter.set_parameter(param, 0.0);
+                            setter.end_set_parameter(param);
                         }
                     }
                 }
-            });
+            }
         });
-        ui.add_space(12.0);
     });
 
     tui.style(Style {

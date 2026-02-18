@@ -104,12 +104,8 @@ pub fn render(
 
         let state_before = state.clone();
 
-        ui.add_space(16.0);
+        ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.heading(egui::RichText::new("    Note Stability").size(22.0));
-
-            ui.add_space(120.0);
-
             ui.label(egui::RichText::new("Scale:").size(18.0));
             ui.add_space(8.0);
 

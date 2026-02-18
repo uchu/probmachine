@@ -10,20 +10,18 @@ pub enum Page {
     Notes,
     Strength,
     Synth,
-    Modulation,
     Presets,
 }
 
 impl Page {
-    pub fn all() -> [Page; 7] {
+    pub fn all() -> [Page; 6] {
         [
+            Page::Presets,
+            Page::Synth,
             Page::BeatProbability,
-            Page::Length,
             Page::Notes,
             Page::Strength,
-            Page::Synth,
-            Page::Modulation,
-            Page::Presets,
+            Page::Length,
         ]
     }
 
@@ -34,7 +32,6 @@ impl Page {
             Page::Notes => "Notes",
             Page::Strength => "Strength",
             Page::Synth => "Synth",
-            Page::Modulation => "Mod",
             Page::Presets => "Presets",
         }
     }
@@ -61,9 +58,6 @@ impl Page {
             }
             Page::Synth => {
                 super::pages::synth::render(tui, params, setter, ui_state)
-            }
-            Page::Modulation => {
-                super::pages::modulation::render(tui, params, setter)
             }
             Page::Presets => {
                 super::pages::presets::render(tui, params, setter, ui_state)
