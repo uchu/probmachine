@@ -144,20 +144,14 @@ impl SynthEngine {
         wavefold: f32,
         drift_amount: f32,
         drift_rate: f32,
-        noise: f32,
         tube: f32,
-        distortion_amount: f32,
-        distortion_threshold: f32,
     ) {
         self.voice.set_coloration_params(
             ring_mod as f64,
             wavefold as f64,
             drift_amount as f64,
             drift_rate as f64,
-            noise as f64,
             tube as f64,
-            distortion_amount as f64,
-            distortion_threshold as f64,
         );
     }
 

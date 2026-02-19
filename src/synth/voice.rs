@@ -1,12 +1,12 @@
 #![allow(clippy::too_many_arguments)]
 
-use synfx_dsp::{Oversampling, SlewValue, rand_01};
+use synfx_dsp::{Oversampling, SlewValue};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator};
 use super::filter::StereoMoogFilter;
 use super::envelope::Envelope;
 use super::reverb::StereoReverb;
 use super::lfo::ModulationValues;
-use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_tube_saturate, stereo_distort_bram};
+use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_tube_saturate};
 
 struct SineOscillator {
     phase: f64,
@@ -130,10 +130,7 @@ pub struct Voice {
     drift_rate: f64,
     drift_phase_l: f64,
     drift_phase_r: f64,
-    noise_amount: f64,
     tube_drive: f64,
-    color_distortion_amount: f64,
-    color_distortion_threshold: f64,
 
     // ===== Filter (Moog Ladder LP) =====
     filter_enabled: bool,
@@ -187,10 +184,7 @@ pub struct Voice {
     ring_mod_slew: SlewValue<f64>,
     wavefold_slew: SlewValue<f64>,
     drift_amount_slew: SlewValue<f64>,
-    noise_slew: SlewValue<f64>,
     tube_drive_slew: SlewValue<f64>,
-    color_distortion_slew: SlewValue<f64>,
-    color_distortion_threshold_slew: SlewValue<f64>,
 
     // VPS slew limiters
     vps_d_slew: SlewValue<f64>,
@@ -241,10 +235,7 @@ pub struct Voice {
     target_wavefold: f64,
     target_drift_amount: f64,
     target_drift_rate: f64,
-    target_noise_amount: f64,
     target_tube_drive: f64,
-    target_color_distortion: f64,
-    target_color_distortion_threshold: f64,
     target_vps_d: f64,
     target_vps_v: f64,
     target_vps_volume: f64,
@@ -275,7 +266,6 @@ pub struct Voice {
     mod_ring_mod: f64,
     mod_wavefold: f64,
     mod_drift_amount: f64,
-    mod_noise_amount: f64,
     mod_tube_drive: f64,
     mod_reverb_mix: f64,
     mod_reverb_decay: f64,
@@ -303,7 +293,6 @@ pub struct Voice {
     mod_slew_ring_mod: SlewValue<f64>,
     mod_slew_wavefold: SlewValue<f64>,
     mod_slew_drift: SlewValue<f64>,
-    mod_slew_noise: SlewValue<f64>,
     mod_slew_tube: SlewValue<f64>,
     mod_slew_rev_mix: SlewValue<f64>,
     mod_slew_rev_decay: SlewValue<f64>,
@@ -433,10 +422,7 @@ impl Voice {
             drift_rate: 0.3,
             drift_phase_l: 0.0,
             drift_phase_r: 0.33,
-            noise_amount: 0.0,
             tube_drive: 0.0,
-            color_distortion_amount: 0.0,
-            color_distortion_threshold: 0.7,
 
             filter_enabled: true,
             filter_cutoff: 1000.0,
@@ -483,10 +469,7 @@ impl Voice {
             ring_mod_slew: make_slew(),
             wavefold_slew: make_slew(),
             drift_amount_slew: make_slew(),
-            noise_slew: make_slew(),
             tube_drive_slew: make_slew(),
-            color_distortion_slew: make_slew(),
-            color_distortion_threshold_slew: make_slew(),
             vps_d_slew: make_slew(),
             vps_v_slew: make_slew(),
             vps_volume_slew: make_slew(),
@@ -523,10 +506,7 @@ impl Voice {
             target_wavefold: 0.0,
             target_drift_amount: 0.0,
             target_drift_rate: 0.3,
-            target_noise_amount: 0.0,
             target_tube_drive: 0.0,
-            target_color_distortion: 0.0,
-            target_color_distortion_threshold: 0.7,
             target_vps_d: 0.5,
             target_vps_v: 0.5,
             target_vps_volume: 1.0,
@@ -556,7 +536,6 @@ impl Voice {
             mod_ring_mod: 0.0,
             mod_wavefold: 0.0,
             mod_drift_amount: 0.0,
-            mod_noise_amount: 0.0,
             mod_tube_drive: 0.0,
             mod_reverb_mix: 0.0,
             mod_reverb_decay: 0.0,
@@ -583,7 +562,6 @@ impl Voice {
             mod_slew_ring_mod: make_slew(),
             mod_slew_wavefold: make_slew(),
             mod_slew_drift: make_slew(),
-            mod_slew_noise: make_slew(),
             mod_slew_tube: make_slew(),
             mod_slew_rev_mix: make_slew(),
             mod_slew_rev_decay: make_slew(),
@@ -663,10 +641,7 @@ impl Voice {
             update_slew(&mut self.ring_mod_slew);
             update_slew(&mut self.wavefold_slew);
             update_slew(&mut self.drift_amount_slew);
-            update_slew(&mut self.noise_slew);
             update_slew(&mut self.tube_drive_slew);
-            update_slew(&mut self.color_distortion_slew);
-            update_slew(&mut self.color_distortion_threshold_slew);
             update_slew(&mut self.vps_d_slew);
             update_slew(&mut self.vps_v_slew);
             update_slew(&mut self.vps_volume_slew);
@@ -694,7 +669,6 @@ impl Voice {
             update_slew(&mut self.mod_slew_ring_mod);
             update_slew(&mut self.mod_slew_wavefold);
             update_slew(&mut self.mod_slew_drift);
-            update_slew(&mut self.mod_slew_noise);
             update_slew(&mut self.mod_slew_tube);
             update_slew(&mut self.mod_slew_rev_mix);
             update_slew(&mut self.mod_slew_rev_decay);
@@ -870,19 +844,13 @@ impl Voice {
         wavefold: f64,
         drift_amount: f64,
         drift_rate: f64,
-        noise: f64,
         tube: f64,
-        distortion_amount: f64,
-        distortion_threshold: f64,
     ) {
         self.target_ring_mod = ring_mod;
         self.target_wavefold = wavefold;
         self.target_drift_amount = drift_amount;
         self.target_drift_rate = drift_rate;
-        self.target_noise_amount = noise;
         self.target_tube_drive = tube;
-        self.target_color_distortion = distortion_amount;
-        self.target_color_distortion_threshold = distortion_threshold;
     }
 
     pub fn set_filter_params(&mut self, enabled: bool, cutoff: f64, resonance: f64, env_amount: f64, drive: f64) {
@@ -946,7 +914,6 @@ impl Voice {
         self.mod_filter_resonance = self.mod_slew_filter_res.next(mod_values.filter_resonance, MOD_SLEW_MS);
         self.mod_filter_drive = self.mod_slew_filter_drv.next(mod_values.filter_drive, MOD_SLEW_MS);
         self.mod_drift_amount = self.mod_slew_drift.next(mod_values.drift_amount, MOD_SLEW_MS);
-        self.mod_noise_amount = self.mod_slew_noise.next(mod_values.noise_amount, MOD_SLEW_MS);
         self.mod_tube_drive = self.mod_slew_tube.next(mod_values.tube_drive, MOD_SLEW_MS);
         self.mod_reverb_mix = self.mod_slew_rev_mix.next(mod_values.reverb_mix, MOD_SLEW_MS);
         self.mod_reverb_decay = self.mod_slew_rev_decay.next(mod_values.reverb_decay, MOD_SLEW_MS);
@@ -1073,10 +1040,7 @@ impl Voice {
         self.wavefold_amount = (self.wavefold_slew.next(self.target_wavefold, 20.0) + self.mod_wavefold).clamp(0.0, 1.0);
         self.drift_amount = (self.drift_amount_slew.next(self.target_drift_amount, 50.0) + self.mod_drift_amount).clamp(0.0, 1.0);
         self.drift_rate = self.target_drift_rate;
-        self.noise_amount = (self.noise_slew.next(self.target_noise_amount, 20.0) + self.mod_noise_amount).clamp(0.0, 1.0);
         self.tube_drive = (self.tube_drive_slew.next(self.target_tube_drive, 20.0) + self.mod_tube_drive).clamp(0.0, 1.0);
-        self.color_distortion_amount = self.color_distortion_slew.next(self.target_color_distortion, 20.0);
-        self.color_distortion_threshold = self.color_distortion_threshold_slew.next(self.target_color_distortion_threshold, 20.0);
 
         // VPS slews + modulation
         self.vps_d_param = (self.vps_d_slew.next(self.target_vps_d, 20.0) + self.mod_vps_d).clamp(0.0, 1.0);
@@ -1297,30 +1261,12 @@ impl Voice {
                 mixed_oscillators_r = stereo_right(folded);
             }
 
-            // Noise injection for organic texture
-            if self.coloration_enabled && self.noise_amount > 0.001 {
-                let noise_l = (rand_01() as f64 * 2.0 - 1.0) * self.noise_amount * 0.1 * volume_env;
-                let noise_r = (rand_01() as f64 * 2.0 - 1.0) * self.noise_amount * 0.1 * volume_env;
-                mixed_oscillators_l += noise_l;
-                mixed_oscillators_r += noise_r;
-            }
-
             // Tube saturation (SIMD stereo asymmetric soft clipping)
             if self.coloration_enabled && self.tube_drive > 0.001 {
                 let mixed = stereo(mixed_oscillators_l, mixed_oscillators_r);
                 let saturated = stereo_tube_saturate(mixed, self.tube_drive);
                 mixed_oscillators_l = stereo_left(saturated);
                 mixed_oscillators_r = stereo_right(saturated);
-            }
-
-            // Color Distortion (SIMD stereo) - Bram de Jong waveshaper
-            if self.coloration_enabled && self.color_distortion_amount > 0.001 {
-                let dist_gain = 1.0 + self.color_distortion_amount * 49.0;
-                let comp = 1.0 / dist_gain.sqrt() * 0.5;
-                let mixed = stereo(mixed_oscillators_l, mixed_oscillators_r);
-                let distorted = stereo_distort_bram(mixed, dist_gain, self.color_distortion_threshold);
-                mixed_oscillators_l = stereo_left(distorted) * comp;
-                mixed_oscillators_r = stereo_right(distorted) * comp;
             }
 
             buf_l[i] = mixed_oscillators_l as f32;

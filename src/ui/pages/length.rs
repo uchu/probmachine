@@ -39,11 +39,11 @@ fn render_length_section(
     setter: &ParamSetter,
     params: &Arc<DeviceParams>,
 ) {
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(16.0)
-        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-        .corner_radius(15.0)
+
+
         .show(ui, |ui| {
             ui.set_min_width(440.0);
             ui.vertical(|ui| {
@@ -127,11 +127,11 @@ fn render_velocity_section(
     setter: &ParamSetter,
     params: &Arc<DeviceParams>,
 ) {
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(16.0)
-        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-        .corner_radius(15.0)
+
+
         .show(ui, |ui| {
             ui.set_min_width(440.0);
             ui.vertical(|ui| {
@@ -266,11 +266,11 @@ fn render_position_section(
     setter: &ParamSetter,
     params: &Arc<DeviceParams>,
 ) {
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(16.0)
-        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-        .corner_radius(15.0)
+
+
         .show(ui, |ui| {
             ui.set_min_width(440.0);
             ui.vertical(|ui| {

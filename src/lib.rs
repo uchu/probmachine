@@ -86,6 +86,12 @@ impl Plugin for Device {
             (),
             |_, _| {},
             move |egui_ctx, setter, _state| {
+                egui_ctx.style_mut(|style| {
+                    let bg = egui::Color32::from_gray(18);
+                    style.visuals.panel_fill = bg;
+                    style.visuals.window_fill = bg;
+                    style.visuals.faint_bg_color = bg;
+                });
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
                     taffy_layout(ui, ui.id().with("page_layout"))
                         .reserve_available_space()
@@ -229,10 +235,7 @@ impl Plugin for Device {
                 self.params.synth_wavefold.modulated_plain_value(),
                 self.params.synth_drift_amount.modulated_plain_value(),
                 self.params.synth_drift_rate.modulated_plain_value(),
-                self.params.synth_noise_amount.modulated_plain_value(),
                 self.params.synth_tube_drive.modulated_plain_value(),
-                self.params.synth_color_distortion_amount.modulated_plain_value(),
-                self.params.synth_color_distortion_threshold.modulated_plain_value(),
             );
 
             synth.set_bypass_switches(

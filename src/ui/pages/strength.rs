@@ -405,14 +405,11 @@ fn render_beat_strength_grid(ui: &mut egui::Ui, state: &mut StrengthState, swing
     ui.set_min_size(egui::vec2(1220.0, container_height));
     ui.set_max_width(1220.0);
 
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(0.0)
-        .stroke(egui::Stroke::new(
-            1.0,
-            ui.visuals().window_stroke.color,
-        ))
-        .corner_radius(15.0)
+
+
         .show(ui, |ui| {
             let num_sliders = match state.beat_strength_mode {
                 BeatStrengthMode::Straight => 32,

@@ -236,11 +236,11 @@ fn render_octave_randomization(ui: &mut egui::Ui, state: &mut NoteState) {
     let label_width = 80.0;
     let slider_width = 280.0;
 
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(16.0)
-        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-        .corner_radius(15.0)
+
+
         .show(ui, |ui| {
             ui.set_min_width(450.0);
             ui.vertical(|ui| {
@@ -321,11 +321,11 @@ fn render_octave_randomization(ui: &mut egui::Ui, state: &mut NoteState) {
 fn render_piano_container(ui: &mut egui::Ui, state: &mut NoteState) {
     ui.set_max_width(1220.0);
 
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(16.0)
-        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-        .corner_radius(15.0)
+
+
         .show(ui, |ui| {
             render_piano_keys(ui, state);
 
@@ -693,11 +693,11 @@ fn render_selected_note_info(ui: &mut egui::Ui, state: &mut NoteState) {
     let label_width = 80.0;
     let slider_width = 280.0;
 
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(16.0)
-        .stroke(egui::Stroke::new(1.0, ui.visuals().window_stroke.color))
-        .corner_radius(15.0)
+
+
         .show(ui, |ui| {
             ui.set_min_width(450.0);
             ui.vertical(|ui| {

@@ -74,12 +74,6 @@ pub fn render(
 
         let screen_rect = ui.ctx().screen_rect();
         let top_y = ui.cursor().min.y;
-        let bg_color = ui.visuals().extreme_bg_color;
-        let bg_rect = egui::Rect::from_min_max(
-            egui::pos2(screen_rect.left(), top_y),
-            egui::pos2(screen_rect.right(), screen_rect.bottom()),
-        );
-        ui.painter().rect_filled(bg_rect, 0.0, bg_color);
 
         let padding = 20.0;
         let content_rect = egui::Rect::from_min_max(
@@ -846,10 +840,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_wavefold, data.synth_wavefold);
     setter.set_parameter(&params.synth_drift_amount, data.synth_drift_amount);
     setter.set_parameter(&params.synth_drift_rate, data.synth_drift_rate);
-    setter.set_parameter(&params.synth_noise_amount, data.synth_noise_amount);
     setter.set_parameter(&params.synth_tube_drive, data.synth_tube_drive);
-    setter.set_parameter(&params.synth_color_distortion_amount, data.synth_color_distortion_amount);
-    setter.set_parameter(&params.synth_color_distortion_threshold, data.synth_color_distortion_threshold);
     setter.set_parameter(&params.synth_vps_enable, data.synth_vps_enable);
 
     if let Ok(mut strength_values) = ui_state.strength_values.lock() {
@@ -1225,10 +1216,10 @@ fn save_params_to_preset_data(
     data.synth_wavefold = params.synth_wavefold.modulated_plain_value();
     data.synth_drift_amount = params.synth_drift_amount.modulated_plain_value();
     data.synth_drift_rate = params.synth_drift_rate.modulated_plain_value();
-    data.synth_noise_amount = params.synth_noise_amount.modulated_plain_value();
+    data.synth_noise_amount = 0.0;
     data.synth_tube_drive = params.synth_tube_drive.modulated_plain_value();
-    data.synth_color_distortion_amount = params.synth_color_distortion_amount.modulated_plain_value();
-    data.synth_color_distortion_threshold = params.synth_color_distortion_threshold.modulated_plain_value();
+    data.synth_color_distortion_amount = 0.0;
+    data.synth_color_distortion_threshold = 0.7;
     data.synth_vps_enable = params.synth_vps_enable.value();
 
     if let Ok(strength_values) = ui_state.strength_values.lock() {

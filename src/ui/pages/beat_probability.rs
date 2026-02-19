@@ -83,14 +83,10 @@ fn render_grid_container(
 
     let swing = params.swing_amount.modulated_plain_value();
 
-    egui::Frame::default()
-        .fill(ui.visuals().extreme_bg_color)
+    egui::Frame::NONE
+
         .inner_margin(0.0)
-        .stroke(egui::Stroke::new(
-            1.0,
-            ui.visuals().window_stroke.color,
-        ))
-        .corner_radius(15.0)
+
         .show(ui, |ui| {
             render_grid_lines(ui, beat_mode, num_sliders, container_height, swing);
             render_occupied_space(ui, params, beat_mode, num_sliders, container_height);
@@ -451,11 +447,8 @@ fn render_sliders(
 
 fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter, beat_mode: BeatMode, num_sliders: usize) {
     ui.horizontal(|ui| {
-        egui::Frame::default()
-            .fill(Color32::from_rgb(30, 30, 30))
+        egui::Frame::NONE
             .inner_margin(12.0)
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
-            .corner_radius(15.0)
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     render_division_buttons(ui, params, beat_mode, num_sliders);
@@ -466,11 +459,8 @@ fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_p
 
         ui.add_space(16.0);
 
-        egui::Frame::default()
-            .fill(Color32::from_rgb(30, 30, 30))
+        egui::Frame::NONE
             .inner_margin(12.0)
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 40)))
-            .corner_radius(15.0)
             .show(ui, |ui| {
                 render_timing_controls(ui, params, setter);
             });
