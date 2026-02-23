@@ -184,8 +184,24 @@ impl SynthEngine {
         self.voice.set_base_rate(rate_option);
     }
 
+    pub fn set_vps_stereo_d_offset(&mut self, offset: f32) {
+        self.voice.set_vps_stereo_d_offset(offset as f64);
+    }
+
+    pub fn set_vps_shape(&mut self, shape_type: i32, amount: f32) {
+        self.voice.set_vps_shape(shape_type, amount as f64);
+    }
+
+    pub fn set_vps_phase_mode(&mut self, mode: i32) {
+        self.voice.set_vps_phase_mode(mode);
+    }
+
     pub fn set_sub_volume(&mut self, volume: f32) {
         self.voice.set_sub_volume(volume as f64);
+    }
+
+    pub fn set_sub_source(&mut self, source: i32) {
+        self.voice.set_sub_source(source);
     }
 
     pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32) {

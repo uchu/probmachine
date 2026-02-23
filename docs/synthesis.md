@@ -13,26 +13,41 @@ A waveshaping oscillator using synfx-dsp's VPSOscillator algorithm.
 |-------|-------|-------------|
 | D | 0.0-1.0 | Phase distortion amount |
 | V | 0.0-1.0 | Shape/timbre control |
-| Stereo V Offset | 0.0-1.0 | V difference between L/R for width |
-| Octave | -5 to +5 | Octave shift |
+| Stereo V Offset (VΔ) | 0.0-0.3 | V difference between L/R for width |
+| Stereo D Offset (DΔ) | 0.0-0.3 | D difference between L/R for stereo phase distortion |
+| Octave | -3 to +3 | Octave shift |
 | Tune | -12 to +12 | Semitone offset |
 | Fine | -1.0 to +1.0 | Fine tune (cents) |
 | Fold | 0.0-1.0 | Wavefold amount for harmonic enrichment |
+| Shape Type | SOFT/FOLD | Waveshaper type (Soft Clip via tanh, Foldback distortion) |
+| Shape Amount (SHP) | 0.0-1.0 | Waveshaper intensity |
+| Phase Mode | FREE/SYNC | Phase behavior (toggle) |
 | Volume | 0.0-1.0 | VPS output level |
+
+**Phase Modes:**
+- **FREE**: Randomized phase on note trigger (default, avoids DC clicks)
+- **SYNC**: VPS phase resets when PLL reference oscillator completes a cycle (hard sync character, creates harmonically rich timbres that track the PLL reference frequency)
+
+**Shape Types (toggle, active when SHP > 0):**
+- **SOFT**: Tanh soft clipping — smooth saturation that compresses peaks
+- **FOLD**: Foldback distortion — aggressive harmonic generation, distinct from the sine-based Fold parameter
 
 **Character:**
 - D controls phase distortion (soft at 0, harsh at 1)
 - V morphs the waveform character
 - Stereo V offset creates rich width through different L/R timbres
+- Stereo D offset creates width through different L/R phase distortion
 - Clean, digital precision
 - Built-in DC offset prevention via `limit_v()` parameter limiting
 
 **Sound Design Tips:**
 - Low D + mid V: Smooth, round tones
 - High D + low V: Aggressive, buzzy timbres
-- Stereo offset creates chorus-like width without pitch modulation
+- Stereo V+D offsets together create complex, wide stereo fields
 - Tune/Fine for detuning against PLL oscillator creates thick textures
 - Fold adds harmonic richness, especially effective at higher D values
+- Shape FOLD + low amount creates different harmonics than Fold parameter
+- PLL SYNC mode with different PLL reference octave creates classic hard sync sweeps
 
 ### PLL Oscillator (Phase-Locked Loop)
 
@@ -41,7 +56,7 @@ A novel synthesis method modeling analog PLL circuits. The VCO attempts to track
 **Reference Section (Yellow):**
 | Param | Range | Description |
 |-------|-------|-------------|
-| Oct | -5 to +5 | Reference octave |
+| Oct | -3 to +3 | Reference octave |
 | Tune | -12 to +12 | Semitone offset |
 | Fine | -1.0 to +1.0 | Fine tune (cents) |
 | PW | 0.01-0.99 | Reference pulse width |
@@ -111,12 +126,17 @@ The PLL oscillator excels at:
 
 ### Sub Oscillator
 
-A simple sine oscillator one octave below the base frequency.
+An oscillator one octave below the base frequency with selectable source.
 
 **Parameters:**
 | Param | Range | Description |
 |-------|-------|-------------|
 | Volume | 0.0-1.0 | Sub level in mix |
+| Source | SIN/VPS | Sine wave or VPS-shaped sub |
+
+**Source Modes:**
+- **SIN**: Pure sine wave sub — clean, fundamental bass reinforcement
+- **VPS**: Uses a VPS oscillator at -1 octave with the same D/V parameters as the main VPS oscillator. Creates a sub that tonally matches the main sound, giving a more coherent low end that evolves with the same timbre settings.
 
 **Signal Path:** Added post-reverb to remain clean and punchy, bypassing all effects processing.
 
@@ -278,7 +298,7 @@ Three independent LFOs with flexible routing.
 
 **Available Destinations:**
 - PLL: Damping, Influence, Track Speed, FM Amount, Cross Feedback, Overtone (Burst), Range, Multiplier (discrete), Multiplier Direct (continuous)
-- VPS: D parameter, V parameter
+- VPS: D parameter, V parameter, Stereo V Offset, Stereo D Offset, Fold, Shape Amount
 - Filter: Cutoff, Resonance, Drive
 - Coloration: Drift, Tube Drive
 - Reverb: Mix, Decay

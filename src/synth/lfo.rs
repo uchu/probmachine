@@ -324,6 +324,11 @@ pub enum ModDestination {
     // PLL discrete
     PllMult,
     PllMultDirect,
+    // VPS shape
+    VpsShapeAmount,
+    VpsStereoDOffset,
+    VpsFold,
+    VpsStereoVOffset,
 }
 
 impl ModDestination {
@@ -351,6 +356,10 @@ impl ModDestination {
             19 => ModDestination::SubVolume,
             20 => ModDestination::PllMult,
             21 => ModDestination::PllMultDirect,
+            22 => ModDestination::VpsShapeAmount,
+            23 => ModDestination::VpsStereoDOffset,
+            24 => ModDestination::VpsFold,
+            25 => ModDestination::VpsStereoVOffset,
             _ => ModDestination::None,
         }
     }
@@ -379,6 +388,10 @@ impl ModDestination {
             ModDestination::SubVolume => "Sub Vol",
             ModDestination::PllMult => "PLL Mult",
             ModDestination::PllMultDirect => "PLL Mult D",
+            ModDestination::VpsShapeAmount => "VPS SHP",
+            ModDestination::VpsStereoDOffset => "VPS DΔ",
+            ModDestination::VpsFold => "VPS Fold",
+            ModDestination::VpsStereoVOffset => "VPS VΔ",
         }
     }
 }
@@ -407,6 +420,10 @@ pub struct ModulationValues {
     pub sub_volume: f64,
     pub pll_mult: f64,
     pub pll_mult_direct: f64,
+    pub vps_shape_amount: f64,
+    pub vps_stereo_d_offset: f64,
+    pub vps_fold: f64,
+    pub vps_stereo_v_offset: f64,
 }
 
 impl ModulationValues {
@@ -432,6 +449,10 @@ impl ModulationValues {
         self.sub_volume += other.sub_volume;
         self.pll_mult += other.pll_mult;
         self.pll_mult_direct += other.pll_mult_direct;
+        self.vps_shape_amount += other.vps_shape_amount;
+        self.vps_stereo_d_offset += other.vps_stereo_d_offset;
+        self.vps_fold += other.vps_fold;
+        self.vps_stereo_v_offset += other.vps_stereo_v_offset;
     }
 
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
@@ -459,6 +480,10 @@ impl ModulationValues {
             ModDestination::SubVolume => self.sub_volume += mod_value,
             ModDestination::PllMult => self.pll_mult += mod_value,
             ModDestination::PllMultDirect => self.pll_mult_direct += mod_value,
+            ModDestination::VpsShapeAmount => self.vps_shape_amount += mod_value,
+            ModDestination::VpsStereoDOffset => self.vps_stereo_d_offset += mod_value,
+            ModDestination::VpsFold => self.vps_fold += mod_value,
+            ModDestination::VpsStereoVOffset => self.vps_stereo_v_offset += mod_value,
         }
     }
 }

@@ -406,8 +406,18 @@ pub struct DeviceParams {
     pub synth_osc_fine: FloatParam,
     #[id = "synth_osc_fold"]
     pub synth_osc_fold: FloatParam,
+    #[id = "synth_osc_stereo_d_offset"]
+    pub synth_osc_stereo_d_offset: FloatParam,
+    #[id = "synth_vps_shape_type"]
+    pub synth_vps_shape_type: IntParam,
+    #[id = "synth_vps_shape_amount"]
+    pub synth_vps_shape_amount: FloatParam,
+    #[id = "synth_vps_phase_mode"]
+    pub synth_vps_phase_mode: IntParam,
     #[id = "synth_sub_volume"]
     pub synth_sub_volume: FloatParam,
+    #[id = "synth_sub_source"]
+    pub synth_sub_source: IntParam,
 
     #[id = "synth_pll_fm_amount"]
     pub synth_pll_fm_amount: FloatParam,
@@ -1545,7 +1555,7 @@ impl Default for DeviceParams {
             synth_osc_octave: IntParam::new(
                 "VPS Octave".to_string(),
                 0,
-                IntRange::Linear { min: -5, max: 5 }
+                IntRange::Linear { min: -3, max: 3 }
             ),
             synth_osc_tune: IntParam::new(
                 "VPS Tune".to_string(),
@@ -1562,11 +1572,36 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
+            synth_osc_stereo_d_offset: FloatParam::new(
+                "VPS Stereo D Δ".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 0.3 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_vps_shape_type: IntParam::new(
+                "VPS Shape Type".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 1 }
+            ),
+            synth_vps_shape_amount: FloatParam::new(
+                "VPS Shape Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            synth_vps_phase_mode: IntParam::new(
+                "VPS Phase Mode".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 1 }
+            ),
             synth_sub_volume: FloatParam::new(
                 "Sub Volume".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_sub_source: IntParam::new(
+                "Sub Source".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 1 }
+            ),
 
             synth_pll_fm_amount: FloatParam::new(
                 "PLL FM Amount".to_string(),
@@ -1609,7 +1644,7 @@ impl Default for DeviceParams {
             synth_pll_ref_octave: IntParam::new(
                 "PLL Ref Octave".to_string(),
                 0,
-                IntRange::Linear { min: -5, max: 5 }
+                IntRange::Linear { min: -3, max: 3 }
             ),
             synth_pll_ref_tune: IntParam::new(
                 "PLL Ref Tune".to_string(),

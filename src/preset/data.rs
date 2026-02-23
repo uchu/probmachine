@@ -123,9 +123,19 @@ pub struct PresetData {
     pub synth_osc_d: f32,
     pub synth_osc_v: f32,
     pub synth_osc_stereo_v_offset: f32,
+    #[serde(default)]
+    pub synth_osc_stereo_d_offset: f32,
+    #[serde(default)]
+    pub synth_vps_shape_type: i32,
+    #[serde(default)]
+    pub synth_vps_shape_amount: f32,
+    #[serde(default)]
+    pub synth_vps_phase_mode: i32,
     pub synth_osc_volume: f32,
 
     pub synth_sub_volume: f32,
+    #[serde(default)]
+    pub synth_sub_source: i32,
 
     pub synth_filter_enable: bool,
     pub synth_filter_cutoff: f32,
@@ -410,9 +420,14 @@ impl Default for PresetData {
             synth_osc_d: 0.5,
             synth_osc_v: 0.5,
             synth_osc_stereo_v_offset: 0.0,
+            synth_osc_stereo_d_offset: 0.0,
+            synth_vps_shape_type: 0,
+            synth_vps_shape_amount: 0.0,
+            synth_vps_phase_mode: 0,
             synth_osc_volume: 0.0,
 
             synth_sub_volume: 0.0,
+            synth_sub_source: 0,
 
             synth_filter_enable: false,
             synth_filter_cutoff: 1000.0,

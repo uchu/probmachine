@@ -173,29 +173,37 @@ fn render_sound_tab(
         .inner_margin(FRAME_MARGIN)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new("Phase Locked Loop OSC")
-                        .size(HEADER_FONT)
-                        .strong(),
-                );
-                ui.add_space(460.0);
-                let mut colored = params.synth_pll_colored.value();
-                render_toggle(ui, &mut colored, "COLOR");
-                if colored != params.synth_pll_colored.value() {
-                    setter.set_parameter(&params.synth_pll_colored, colored);
-                }
-                ui.add_space(120.0);
-                let mut edge_mode = params.synth_pll_mode.value();
-                render_toggle(ui, &mut edge_mode, "EDGE");
-                if edge_mode != params.synth_pll_mode.value() {
-                    setter.set_parameter(&params.synth_pll_mode, edge_mode);
-                }
-                ui.add_space(100.0);
-                let mut mult_slew_fast = params.synth_pll_mult_slew.value();
-                render_labeled_toggle(ui, &mut mult_slew_fast, "SLOW", "FAST");
-                if mult_slew_fast != params.synth_pll_mult_slew.value() {
-                    setter.set_parameter(&params.synth_pll_mult_slew, mult_slew_fast);
-                }
+                egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 0, bottom: 0 })
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new("PLL OSC")
+                                .size(HEADER_FONT)
+                                .strong(),
+                        );
+                    });
+                ui.add_space(625.0);
+                egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let mut colored = params.synth_pll_colored.value();
+                            render_toggle(ui, &mut colored, "COLOR");
+                            if colored != params.synth_pll_colored.value() {
+                                setter.set_parameter(&params.synth_pll_colored, colored);
+                            }
+                            ui.add_space(100.0);
+                            let mut edge_mode = params.synth_pll_mode.value();
+                            render_toggle(ui, &mut edge_mode, "EDGE");
+                            if edge_mode != params.synth_pll_mode.value() {
+                                setter.set_parameter(&params.synth_pll_mode, edge_mode);
+                            }
+                            ui.add_space(80.0);
+                            let mut mult_slew_fast = params.synth_pll_mult_slew.value();
+                            render_labeled_toggle(ui, &mut mult_slew_fast, "SLOW", "FAST");
+                            if mult_slew_fast != params.synth_pll_mult_slew.value() {
+                                setter.set_parameter(&params.synth_pll_mult_slew, mult_slew_fast);
+                            }
+                        });
+                    });
             });
             ui.add_space(10.0);
             ui.horizontal(|ui| {
@@ -210,6 +218,13 @@ fn render_sound_tab(
                     &params.synth_pll_ref_tune, "TUNE",
                     Some(Color32::from_rgb(80, 80, 40)),
                     Some(&[-12, 0, 12]), None,
+                );
+                render_int_vertical_slider(
+                    ui, params, setter,
+                    &params.synth_pll_mult, "MULT",
+                    Some(Color32::from_rgb(40, 40, 80)),
+                    None,
+                    Some(&["1", "2", "4", "8", "16", "32", "64"]),
                 );
                 render_vertical_slider(
                     ui, params, setter,
@@ -234,13 +249,6 @@ fn render_sound_tab(
                     &params.synth_pll_stereo_damp_offset, "STΔ",
                     0.0, 0.5, SliderScale::Linear,
                     Some(Color32::from_rgb(80, 40, 80)),
-                );
-                render_int_vertical_slider(
-                    ui, params, setter,
-                    &params.synth_pll_mult, "MULT",
-                    Some(Color32::from_rgb(40, 40, 80)),
-                    None,
-                    Some(&["1", "2", "4", "8", "16", "32", "64"]),
                 );
                 render_vertical_slider(
                     ui, params, setter,
@@ -318,7 +326,7 @@ fn render_sound_tab(
             .inner_margin(egui::Margin { left: FRAME_MARGIN.left + 25, right: 0, ..FRAME_MARGIN })
             .show(ui, |ui| {
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("Sub").size(HEADER_FONT).strong());
+                    ui.label(egui::RichText::new("SUB").size(HEADER_FONT).strong());
                     ui.add_space(10.0);
                     ui.horizontal(|ui| {
                         render_vertical_slider(
@@ -341,14 +349,35 @@ fn render_sound_tab(
             .inner_margin(egui::Margin { left: 40, right: -10, ..FRAME_MARGIN })
             .show(ui, |ui| {
                 ui.vertical(|ui| {
-                    ui.label(
-                        egui::RichText::new("Vector Phase Shaping OSC")
-                            .size(HEADER_FONT)
-                            .strong(),
-                    );
+                    ui.horizontal(|ui| {
+                        egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 0, bottom: 0 })
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new("VPS")
+                                        .size(HEADER_FONT)
+                                        .strong(),
+                                );
+                            });
+                        ui.add_space(206.0);
+                        egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    let mut phase_sync = params.synth_vps_phase_mode.value() == 1;
+                                    render_labeled_toggle(ui, &mut phase_sync, "FREE", "SYNC");
+                                    if (phase_sync as i32) != params.synth_vps_phase_mode.value() {
+                                        setter.set_parameter(&params.synth_vps_phase_mode, if phase_sync { 1 } else { 0 });
+                                    }
+                                    ui.add_space(82.0);
+                                    let mut shape_fold = params.synth_vps_shape_type.value() == 1;
+                                    render_labeled_toggle(ui, &mut shape_fold, "SOFT", "FOLD");
+                                    if (shape_fold as i32) != params.synth_vps_shape_type.value() {
+                                        setter.set_parameter(&params.synth_vps_shape_type, if shape_fold { 1 } else { 0 });
+                                    }
+                                });
+                            });
+                    });
                     ui.add_space(10.0);
                     ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x -= 10.0;
                         render_int_vertical_slider(
                             ui, params, setter,
                             &params.synth_osc_octave, "OCT",
@@ -375,7 +404,13 @@ fn render_sound_tab(
                         );
                         render_vertical_slider(
                             ui, params, setter,
-                            &params.synth_osc_stereo_v_offset, "STΔ",
+                            &params.synth_osc_stereo_v_offset, "VΔ",
+                            0.0, 0.3, SliderScale::Linear,
+                            Some(Color32::from_rgb(80, 40, 80)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_osc_stereo_d_offset, "DΔ",
                             0.0, 0.3, SliderScale::Linear,
                             Some(Color32::from_rgb(80, 40, 80)),
                         );
@@ -387,9 +422,72 @@ fn render_sound_tab(
                         );
                         render_vertical_slider(
                             ui, params, setter,
+                            &params.synth_vps_shape_amount, "SHP",
+                            0.0, 1.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(120, 80, 60)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
                             &params.synth_osc_volume, "VOL",
                             0.0, 1.0, SliderScale::Linear,
                             Some(Color32::from_rgb(40, 80, 40)),
+                        );
+                    });
+                });
+            });
+
+        let line_rect2 = ui.available_rect_before_wrap();
+        ui.painter().line_segment(
+            [egui::pos2(line_rect2.left(), sep_rect.top()), egui::pos2(line_rect2.left(), line_rect2.bottom() - 5.0)],
+            egui::Stroke::new(1.0, Color32::BLACK),
+        );
+
+        egui::Frame::NONE
+            .inner_margin(egui::Margin { left: 40, right: -10, ..FRAME_MARGIN })
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 0, bottom: 0 })
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new("FILTER").size(HEADER_FONT).strong(),
+                                );
+                            });
+                        ui.add_space(16.0);
+                        egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
+                            .show(ui, |ui| {
+                                let mut enabled = params.synth_filter_enable.value();
+                                render_toggle(ui, &mut enabled, "ON");
+                                if enabled != params.synth_filter_enable.value() {
+                                    setter.set_parameter(&params.synth_filter_enable, enabled);
+                                }
+                            });
+                    });
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_cutoff, "CUT",
+                            20.0, 20000.0, SliderScale::Logarithmic,
+                            Some(Color32::from_rgb(180, 120, 60)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_resonance, "RES",
+                            0.0, 0.98, SliderScale::Linear,
+                            Some(Color32::from_rgb(180, 120, 60)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_env_amount, "ENV",
+                            -5000.0, 5000.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(140, 100, 80)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_drive, "DRV",
+                            1.0, 15.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(140, 100, 80)),
                         );
                     });
                 });
@@ -425,50 +523,6 @@ fn render_envelopes_tab(
                     render_envelope_controls_compact(ui, params, setter, "filt");
                 });
             });
-
-        egui::Frame::NONE
-            .inner_margin(FRAME_MARGIN)
-            .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            egui::RichText::new("Moog Filter").size(HEADER_FONT).strong(),
-                        );
-                        ui.add_space(16.0);
-                        let mut enabled = params.synth_filter_enable.value();
-                        if ui.checkbox(&mut enabled, "").changed() {
-                            setter.set_parameter(&params.synth_filter_enable, enabled);
-                        }
-                    });
-                    ui.add_space(10.0);
-                    ui.horizontal(|ui| {
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_cutoff, "CUT",
-                            20.0, 20000.0, SliderScale::Logarithmic,
-                            Some(Color32::from_rgb(180, 120, 60)),
-                        );
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_resonance, "RES",
-                            0.0, 0.98, SliderScale::Linear,
-                            Some(Color32::from_rgb(180, 120, 60)),
-                        );
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_env_amount, "ENV",
-                            -5000.0, 5000.0, SliderScale::Linear,
-                            Some(Color32::from_rgb(140, 100, 80)),
-                        );
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_drive, "DRV",
-                            1.0, 15.0, SliderScale::Linear,
-                            Some(Color32::from_rgb(140, 100, 80)),
-                        );
-                    });
-                });
-            });
     });
 
     ui.horizontal(|ui| {
@@ -476,7 +530,15 @@ fn render_envelopes_tab(
             .inner_margin(FRAME_MARGIN)
             .show(ui, |ui| {
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("REVERB").size(HEADER_FONT).strong());
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("REVERB").size(HEADER_FONT).strong());
+                        ui.add_space(16.0);
+                        let mut rev_enabled = params.synth_reverb_enable.value();
+                        render_toggle(ui, &mut rev_enabled, "ON");
+                        if rev_enabled != params.synth_reverb_enable.value() {
+                            setter.set_parameter(&params.synth_reverb_enable, rev_enabled);
+                        }
+                    });
                     ui.add_space(10.0);
                     ui.horizontal(|ui| {
                         render_vertical_slider(
@@ -584,14 +646,6 @@ fn render_envelopes_tab(
                         .changed()
                     {
                         setter.set_parameter(&params.synth_coloration_enable, color);
-                    }
-
-                    let mut reverb = params.synth_reverb_enable.value();
-                    if ui
-                        .checkbox(&mut reverb, egui::RichText::new("Reverb").size(UI_FONT))
-                        .changed()
-                    {
-                        setter.set_parameter(&params.synth_reverb_enable, reverb);
                     }
 
                     ui.add_space(8.0);

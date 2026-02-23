@@ -73,7 +73,6 @@ pub struct StereoReverb {
     pub mix: f64,
     pub ducking: f64,
     ducking_envelope: f64,
-    // Slew limiters for click-free parameter changes
     mix_slew: SlewValue<f64>,
     ducking_slew: SlewValue<f64>,
     decay_slew: SlewValue<f64>,
@@ -149,14 +148,11 @@ impl StereoReverb {
         decay: f64,
         ducking: f64,
     ) {
-        // Set targets for slewed parameters
-        // Also set current values so mix > 0.0 checks work before process() is called
         self.target_mix = mix;
         self.mix = mix;
         self.target_ducking = ducking;
         self.target_decay = decay;
 
-        // Non-slewed parameters (less critical for clicks)
         self.params.pre_delay_ms = pre_delay_ms;
         self.params.time_scale = time_scale;
         self.params.input_hpf_hz = input_hpf_hz;
@@ -173,25 +169,20 @@ impl StereoReverb {
     }
 
     pub fn apply_decay_mod(&mut self, mod_amount: f64) {
-        // Store modulation offset to be applied in process()
         self.decay_mod = mod_amount;
     }
 
     pub fn process(&mut self, left: f64, right: f64) -> (f64, f64) {
-        // Apply slews for click-free parameter changes (50ms for smooth transitions)
         self.mix = self.mix_slew.next(self.target_mix, 50.0);
         self.ducking = self.ducking_slew.next(self.target_ducking, 50.0);
         let base_decay = self.decay_slew.next(self.target_decay, 50.0);
-        // Apply modulation to decay (0-1 range)
         self.params.decay = (base_decay + self.decay_mod).clamp(0.0, 1.0);
-        self.decay_mod = 0.0; // Reset mod for next frame
+        self.decay_mod = 0.0;
 
         let (wet_l, wet_r) = self.reverb.process(&mut self.params, left, right);
 
-        // Apply ducking - reduce reverb when dry signal is loud
         if self.ducking > 0.001 {
             let dry_level = (left.abs() + right.abs()) * 0.5;
-            // Envelope follower for smooth ducking
             let attack = 0.01;
             let release = 0.995;
             if dry_level > self.ducking_envelope {
@@ -199,7 +190,6 @@ impl StereoReverb {
             } else {
                 self.ducking_envelope *= release;
             }
-            // Apply ducking amount
             let duck_factor = 1.0 - (self.ducking_envelope * self.ducking).min(0.95);
             return (wet_l * duck_factor, wet_r * duck_factor);
         }

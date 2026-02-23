@@ -8,6 +8,12 @@ pub enum PllMode {
     EdgePFD,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum VpsPhaseMode {
+    Free,
+    PllSync,
+}
+
 pub struct Oscillator {
     osc: VPSOscillator,
     sample_rate: f64,
@@ -43,8 +49,15 @@ impl Oscillator {
     }
 
     pub fn trigger(&mut self) {
-        // Randomize phase slightly on trigger to avoid consistent DC offset clicks
         self.phase = rand_01() as f64 * 0.25;
+    }
+
+    pub fn hard_reset(&mut self) {
+        self.phase = 0.0;
+    }
+
+    pub fn sync_reset(&mut self) {
+        self.phase = 0.0;
     }
 
     pub fn next(&mut self, d: f64, v: f64) -> f64 {

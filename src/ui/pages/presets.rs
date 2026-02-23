@@ -744,9 +744,14 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_osc_d, data.synth_osc_d);
     setter.set_parameter(&params.synth_osc_v, data.synth_osc_v);
     setter.set_parameter(&params.synth_osc_stereo_v_offset, data.synth_osc_stereo_v_offset);
+    setter.set_parameter(&params.synth_osc_stereo_d_offset, data.synth_osc_stereo_d_offset);
+    setter.set_parameter(&params.synth_vps_shape_type, data.synth_vps_shape_type);
+    setter.set_parameter(&params.synth_vps_shape_amount, data.synth_vps_shape_amount);
+    setter.set_parameter(&params.synth_vps_phase_mode, data.synth_vps_phase_mode);
     setter.set_parameter(&params.synth_osc_volume, data.synth_osc_volume);
 
     setter.set_parameter(&params.synth_sub_volume, data.synth_sub_volume);
+    setter.set_parameter(&params.synth_sub_source, data.synth_sub_source);
 
     setter.set_parameter(&params.synth_filter_enable, data.synth_filter_enable);
     setter.set_parameter(&params.synth_filter_cutoff, data.synth_filter_cutoff);
@@ -1147,9 +1152,14 @@ fn save_params_to_preset_data(
     data.synth_osc_d = params.synth_osc_d.modulated_plain_value();
     data.synth_osc_v = params.synth_osc_v.modulated_plain_value();
     data.synth_osc_stereo_v_offset = params.synth_osc_stereo_v_offset.modulated_plain_value();
+    data.synth_osc_stereo_d_offset = params.synth_osc_stereo_d_offset.modulated_plain_value();
+    data.synth_vps_shape_type = params.synth_vps_shape_type.value();
+    data.synth_vps_shape_amount = params.synth_vps_shape_amount.modulated_plain_value();
+    data.synth_vps_phase_mode = params.synth_vps_phase_mode.value();
     data.synth_osc_volume = params.synth_osc_volume.modulated_plain_value();
 
     data.synth_sub_volume = params.synth_sub_volume.modulated_plain_value();
+    data.synth_sub_source = params.synth_sub_source.value();
 
     data.synth_filter_enable = params.synth_filter_enable.value();
     data.synth_filter_cutoff = params.synth_filter_cutoff.modulated_plain_value();

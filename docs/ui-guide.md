@@ -297,7 +297,7 @@ Same structure as Beat Probability grid (1220 × 420, 1184 inner width).
 
 #### Tab 0: Sound
 
-**PLL Oscillator** — header "Phase Locked Loop OSC", toggles: COLOR, EDGE, SLOW/FAST (spacing 540px from header, 80px between toggles)
+**PLL OSC** — header "PLL OSC", toggles: COLOR, EDGE, SLOW/FAST (spacing 460px from header)
 
 | Slider | Color |
 |--------|-------|
@@ -312,23 +312,23 @@ Same structure as Beat Probability grid (1220 × 420, 1184 inner width).
 | FM, Rat | RGB(100, 60, 100) |
 | Vol | RGB(40, 80, 40) |
 
-**Moog Filter** — inner_margin 16, sliders: Cut/Res RGB(180, 120, 60), Env/Drv RGB(140, 100, 80)
+**SUB** — inner_margin left FRAME_MARGIN+25, right 0. Single Vol slider RGB(40, 80, 40)
 
-**Sub** — inner_margin left 16, right 8, top/bottom 16. Single Vol slider RGB(40, 80, 40)
+**VPS** — inner_margin left 40, right -10. FREE/SYNC toggle, SOFT/FOLD toggle (38px spacing), sliders: Oct/Tune RGB(80, 80, 40), D/V RGB(40, 40, 80), VΔ/DΔ RGB(80, 40, 80), Fold/SHP RGB(120, 80, 60), Vol RGB(40, 80, 40)
 
-**VPS OSC** — inner_margin left 16, right 8, top/bottom 16
+**FILTER** — after VPS with vertical separator. inner_margin left 40, right -10. Toggle enable, sliders: Cut/Res RGB(180, 120, 60), Env/Drv RGB(140, 100, 80)
 
-**Color** — inner_margin 16. Sliders: Drft/Rate RGB(80, 100, 80), Nois RGB(100, 100, 60), Tube RGB(140, 80, 80), Dist RGB(180, 60, 60)
+Layout: Sub | vertical separator | VPS | vertical separator | Filter (horizontal row)
 
 #### Tab 1: Envelopes & FX
 
 **VOL ENV / FILT ENV** — 4 sliders each (A, D, S, R), Exponential(2.0) scale, spacing 4.0
 
-**REVERB** — 9 sliders, Dry/Wet color RGB(100, 80, 140)
+**REVERB** — header with ON toggle, 9 sliders, Dry/Wet color RGB(100, 80, 140)
 
 **PERF Frame** — inner_margin left/right 16, top/bottom 12, corner_radius 10.0
 - CPU color thresholds: >80% red, >50% yellow, <50% green
-- Bypass checkboxes: PLL, VPS, Color, Reverb (size 14.0)
+- Bypass checkboxes: PLL, VPS, Color (size 14.0)
 - Oversampling ComboBox: width 70.0
 - Option buttons: 60 × 36
 

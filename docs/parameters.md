@@ -19,7 +19,7 @@ Complete reference of all parameters and UI controls.
 
 | ID | Name | Range | Default | Description |
 |----|------|-------|---------|-------------|
-| synth_pll_ref_octave | Oct | -5 to +5 | 0 | Reference octave |
+| synth_pll_ref_octave | Oct | -3 to +3 | 0 | Reference octave |
 | synth_pll_ref_tune | Tune | -12 to +12 | 0 | Semitone offset |
 | synth_pll_ref_fine_tune | Fine | -1.0 to +1.0 | 0.0 | Fine tune (cents-like) |
 | synth_pll_ref_pulse_width | PW | 0.01-0.99 | 0.5 | Reference pulse width |
@@ -85,11 +85,15 @@ Complete reference of all parameters and UI controls.
 |----|------|-------|---------|-------------|
 | synth_osc_d | D | 0.0-1.0 | 0.5 | Phase distortion |
 | synth_osc_v | V | 0.0-1.0 | 0.5 | Shape/timbre |
-| synth_osc_stereo_v_offset | StV | 0.0-1.0 | 0.0 | V offset L/R |
-| synth_osc_octave | Oct | -5 to +5 | 0 | Octave shift |
+| synth_osc_stereo_v_offset | VΔ | 0.0-0.3 | 0.0 | V offset L/R |
+| synth_osc_stereo_d_offset | DΔ | 0.0-0.3 | 0.0 | D offset L/R |
+| synth_osc_octave | Oct | -3 to +3 | 0 | Octave shift |
 | synth_osc_tune | Tune | -12 to +12 | 0 | Semitone offset |
 | synth_osc_fine | Fine | -1.0 to +1.0 | 0.0 | Fine tune (cents) |
 | synth_osc_fold | Fold | 0.0-1.0 | 0.0 | Wavefold amount |
+| synth_vps_shape_type | SHP | 0-1 | 0 | Waveshaper type (0=Soft, 1=Foldback) |
+| synth_vps_shape_amount | SHP | 0.0-1.0 | 0.0 | Waveshaper intensity |
+| synth_vps_phase_mode | Phase | 0-1 | 0 | Phase mode (0=Free, 1=PLL Sync) |
 | synth_osc_volume | Vol | 0.0-1.0 | 1.0 | VPS output level |
 | synth_vps_enable | Enable | - | true | Bypass VPS oscillator |
 
@@ -97,7 +101,8 @@ Complete reference of all parameters and UI controls.
 
 | ID | Name | Range | Default | Description |
 |----|------|-------|---------|-------------|
-| synth_sub_volume | Sub | 0.0-1.0 | 0.0 | Sub level (sine, -1 oct) |
+| synth_sub_volume | Sub | 0.0-1.0 | 0.0 | Sub level (-1 oct) |
+| synth_sub_source | Src | 0-1 | 0 | Sub source (0=Sine, 1=VPS) |
 
 ### Filter
 
@@ -216,9 +221,9 @@ Complete reference of all parameters and UI controls.
 | lfo[N]_sync_division | Div | 0-13 | 2 | Sync division |
 | lfo[N]_sync_source | Src | -1 to 2 | -1 | Cross-mod source |
 | lfo[N]_phase_mod | PhMod | 0.0-1.0 | 0.0 | Phase mod amount |
-| lfo[N]_dest1 | Dst1 | 0-21 | 0 | First destination |
+| lfo[N]_dest1 | Dst1 | 0-25 | 0 | First destination |
 | lfo[N]_amount1 | Amt1 | -1.0 to +1.0 | 0.0 | First mod amount |
-| lfo[N]_dest2 | Dst2 | 0-21 | 0 | Second destination |
+| lfo[N]_dest2 | Dst2 | 0-25 | 0 | Second destination |
 | lfo[N]_amount2 | Amt2 | -1.0 to +1.0 | 0.0 | Second mod amount |
 
 **Waveforms:** 0=Sine, 1=Triangle, 2=Saw, 3=Square, 4=Sample&Hold
@@ -232,7 +237,7 @@ Complete reference of all parameters and UI controls.
 0=None |
 PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult (discrete), 21=Mult D (continuous) |
 Sub: 19=Vol |
-VPS: 8=D, 9=V, 18=Vol |
+VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol |
 Filter: 10=Cut, 11=Res, 12=Drv |
 Coloration: 13=Drift, 14=Tube |
 Reverb: 15=Mix, 16=Decay
@@ -247,9 +252,9 @@ Reverb: 15=Mix, 16=Decay
 | mseq_ties | Ties | 0-65535 | 0 | Bitmask: bit N = step N tied to N+1 |
 | mseq_division | Rate | 0-13 | 3 (1/8) | Step rate division (same as LFO) |
 | mseq_slew | Slew | 0-200 ms | 5.0 | Transition smoothing for non-tied steps |
-| mseq_dest1 | Dst1 | 0-21 | 0 | First destination |
+| mseq_dest1 | Dst1 | 0-25 | 0 | First destination |
 | mseq_amount1 | Amt1 | -1.0 to +1.0 | 0.0 | First mod amount |
-| mseq_dest2 | Dst2 | 0-21 | 0 | Second destination |
+| mseq_dest2 | Dst2 | 0-25 | 0 | Second destination |
 | mseq_amount2 | Amt2 | -1.0 to +1.0 | 0.0 | Second mod amount |
 
 **Tie behavior:** When a step's tie flag is set, the output linearly interpolates from the current step value to the next step value over the step duration (303-style glide). Non-tied steps use the slew parameter for smooth transitions.

@@ -209,8 +209,15 @@ impl Plugin for Device {
             synth.set_osc_fold(self.params.synth_osc_fold.modulated_plain_value());
 
             synth.set_vps_stereo_v_offset(self.params.synth_osc_stereo_v_offset.modulated_plain_value());
+            synth.set_vps_stereo_d_offset(self.params.synth_osc_stereo_d_offset.modulated_plain_value());
+            synth.set_vps_shape(
+                self.params.synth_vps_shape_type.value(),
+                self.params.synth_vps_shape_amount.modulated_plain_value(),
+            );
+            synth.set_vps_phase_mode(self.params.synth_vps_phase_mode.value());
 
             synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
+            synth.set_sub_source(self.params.synth_sub_source.value());
 
             synth.set_pll_fm_params(
                 self.params.synth_pll_fm_amount.modulated_plain_value(),
