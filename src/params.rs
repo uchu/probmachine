@@ -424,6 +424,8 @@ pub struct DeviceParams {
     pub synth_pll_colored: BoolParam,
     #[id = "synth_pll_mode"]
     pub synth_pll_mode: BoolParam,
+    #[id = "synth_pll_mult_slew"]
+    pub synth_pll_mult_slew: BoolParam,
     #[id = "synth_pll_ref_octave"]
     pub synth_pll_ref_octave: IntParam,
     #[id = "synth_pll_ref_tune"]
@@ -640,6 +642,54 @@ pub struct DeviceParams {
     pub lfo3_dest2: IntParam,
     #[id = "lfo3_amount2"]
     pub lfo3_amount2: FloatParam,
+
+    // ===== Mod Sequencer =====
+    #[id = "mseq_step_1"]
+    pub mseq_step_1: FloatParam,
+    #[id = "mseq_step_2"]
+    pub mseq_step_2: FloatParam,
+    #[id = "mseq_step_3"]
+    pub mseq_step_3: FloatParam,
+    #[id = "mseq_step_4"]
+    pub mseq_step_4: FloatParam,
+    #[id = "mseq_step_5"]
+    pub mseq_step_5: FloatParam,
+    #[id = "mseq_step_6"]
+    pub mseq_step_6: FloatParam,
+    #[id = "mseq_step_7"]
+    pub mseq_step_7: FloatParam,
+    #[id = "mseq_step_8"]
+    pub mseq_step_8: FloatParam,
+    #[id = "mseq_step_9"]
+    pub mseq_step_9: FloatParam,
+    #[id = "mseq_step_10"]
+    pub mseq_step_10: FloatParam,
+    #[id = "mseq_step_11"]
+    pub mseq_step_11: FloatParam,
+    #[id = "mseq_step_12"]
+    pub mseq_step_12: FloatParam,
+    #[id = "mseq_step_13"]
+    pub mseq_step_13: FloatParam,
+    #[id = "mseq_step_14"]
+    pub mseq_step_14: FloatParam,
+    #[id = "mseq_step_15"]
+    pub mseq_step_15: FloatParam,
+    #[id = "mseq_step_16"]
+    pub mseq_step_16: FloatParam,
+    #[id = "mseq_ties"]
+    pub mseq_ties: IntParam,
+    #[id = "mseq_division"]
+    pub mseq_division: IntParam,
+    #[id = "mseq_slew"]
+    pub mseq_slew: FloatParam,
+    #[id = "mseq_dest1"]
+    pub mseq_dest1: IntParam,
+    #[id = "mseq_amount1"]
+    pub mseq_amount1: FloatParam,
+    #[id = "mseq_dest2"]
+    pub mseq_dest2: IntParam,
+    #[id = "mseq_amount2"]
+    pub mseq_amount2: FloatParam,
 
     #[id = "note_length_percent"]
     pub note_length_percent: FloatParam,
@@ -1552,6 +1602,10 @@ impl Default for DeviceParams {
                 "PLL Edge Mode".to_string(),
                 true
             ),
+            synth_pll_mult_slew: BoolParam::new(
+                "PLL Mult Slew".to_string(),
+                true
+            ),
             synth_pll_ref_octave: IntParam::new(
                 "PLL Ref Octave".to_string(),
                 0,
@@ -1897,20 +1951,20 @@ impl Default for DeviceParams {
             ).with_smoother(SmoothingStyle::Linear(20.0)),
             lfo1_waveform: IntParam::new("LFO 1 Waveform".to_string(), 0, IntRange::Linear { min: 0, max: 4 }),
             lfo1_tempo_sync: BoolParam::new("LFO 1 Tempo Sync".to_string(), false),
-            lfo1_sync_division: IntParam::new("LFO 1 Division".to_string(), 2, IntRange::Linear { min: 0, max: 13 }),
+            lfo1_sync_division: IntParam::new("LFO 1 Division".to_string(), 2, IntRange::Linear { min: 0, max: 15 }),
             lfo1_sync_source: IntParam::new("LFO 1 Sync Source".to_string(), -1, IntRange::Linear { min: -1, max: 2 }),
             lfo1_phase_mod: FloatParam::new(
                 "LFO 1 Phase Mod".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo1_dest1: IntParam::new("LFO 1 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
+            lfo1_dest1: IntParam::new("LFO 1 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 30 }),
             lfo1_amount1: FloatParam::new(
                 "LFO 1 Amount 1".to_string(),
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo1_dest2: IntParam::new("LFO 1 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
+            lfo1_dest2: IntParam::new("LFO 1 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 30 }),
             lfo1_amount2: FloatParam::new(
                 "LFO 1 Amount 2".to_string(),
                 0.0,
@@ -1920,25 +1974,25 @@ impl Default for DeviceParams {
             // LFO 2
             lfo2_rate: FloatParam::new(
                 "LFO 2 Rate".to_string(),
-                2.0,
+                1.0,
                 FloatRange::Skewed { min: 0.01, max: 50.0, factor: 0.3 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
             lfo2_waveform: IntParam::new("LFO 2 Waveform".to_string(), 0, IntRange::Linear { min: 0, max: 4 }),
             lfo2_tempo_sync: BoolParam::new("LFO 2 Tempo Sync".to_string(), false),
-            lfo2_sync_division: IntParam::new("LFO 2 Division".to_string(), 3, IntRange::Linear { min: 0, max: 13 }),
+            lfo2_sync_division: IntParam::new("LFO 2 Division".to_string(), 3, IntRange::Linear { min: 0, max: 15 }),
             lfo2_sync_source: IntParam::new("LFO 2 Sync Source".to_string(), -1, IntRange::Linear { min: -1, max: 2 }),
             lfo2_phase_mod: FloatParam::new(
                 "LFO 2 Phase Mod".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo2_dest1: IntParam::new("LFO 2 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
+            lfo2_dest1: IntParam::new("LFO 2 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 30 }),
             lfo2_amount1: FloatParam::new(
                 "LFO 2 Amount 1".to_string(),
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo2_dest2: IntParam::new("LFO 2 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
+            lfo2_dest2: IntParam::new("LFO 2 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 30 }),
             lfo2_amount2: FloatParam::new(
                 "LFO 2 Amount 2".to_string(),
                 0.0,
@@ -1948,29 +2002,59 @@ impl Default for DeviceParams {
             // LFO 3
             lfo3_rate: FloatParam::new(
                 "LFO 3 Rate".to_string(),
-                0.5,
+                1.0,
                 FloatRange::Skewed { min: 0.01, max: 50.0, factor: 0.3 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
             lfo3_waveform: IntParam::new("LFO 3 Waveform".to_string(), 0, IntRange::Linear { min: 0, max: 4 }),
             lfo3_tempo_sync: BoolParam::new("LFO 3 Tempo Sync".to_string(), false),
-            lfo3_sync_division: IntParam::new("LFO 3 Division".to_string(), 0, IntRange::Linear { min: 0, max: 13 }),
+            lfo3_sync_division: IntParam::new("LFO 3 Division".to_string(), 0, IntRange::Linear { min: 0, max: 15 }),
             lfo3_sync_source: IntParam::new("LFO 3 Sync Source".to_string(), -1, IntRange::Linear { min: -1, max: 2 }),
             lfo3_phase_mod: FloatParam::new(
                 "LFO 3 Phase Mod".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo3_dest1: IntParam::new("LFO 3 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
+            lfo3_dest1: IntParam::new("LFO 3 Dest 1".to_string(), 0, IntRange::Linear { min: 0, max: 30 }),
             lfo3_amount1: FloatParam::new(
                 "LFO 3 Amount 1".to_string(),
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
-            lfo3_dest2: IntParam::new("LFO 3 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 26 }),
+            lfo3_dest2: IntParam::new("LFO 3 Dest 2".to_string(), 0, IntRange::Linear { min: 0, max: 30 }),
             lfo3_amount2: FloatParam::new(
                 "LFO 3 Amount 2".to_string(),
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+
+            mseq_step_1: FloatParam::new("MSeq Step 1", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_2: FloatParam::new("MSeq Step 2", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_3: FloatParam::new("MSeq Step 3", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_4: FloatParam::new("MSeq Step 4", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_5: FloatParam::new("MSeq Step 5", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_6: FloatParam::new("MSeq Step 6", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_7: FloatParam::new("MSeq Step 7", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_8: FloatParam::new("MSeq Step 8", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_9: FloatParam::new("MSeq Step 9", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_10: FloatParam::new("MSeq Step 10", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_11: FloatParam::new("MSeq Step 11", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_12: FloatParam::new("MSeq Step 12", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_13: FloatParam::new("MSeq Step 13", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_14: FloatParam::new("MSeq Step 14", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_15: FloatParam::new("MSeq Step 15", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_step_16: FloatParam::new("MSeq Step 16", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }),
+            mseq_ties: IntParam::new("MSeq Ties", 0, IntRange::Linear { min: 0, max: 65535 }),
+            mseq_division: IntParam::new("MSeq Division", 3, IntRange::Linear { min: 0, max: 15 }),
+            mseq_slew: FloatParam::new(
+                "MSeq Slew", 5.0, FloatRange::Linear { min: 0.0, max: 200.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            mseq_dest1: IntParam::new("MSeq Dest 1", 0, IntRange::Linear { min: 0, max: 30 }),
+            mseq_amount1: FloatParam::new(
+                "MSeq Amount 1", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
+            mseq_dest2: IntParam::new("MSeq Dest 2", 0, IntRange::Linear { min: 0, max: 30 }),
+            mseq_amount2: FloatParam::new(
+                "MSeq Amount 2", 0.0, FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
 
             note_length_percent: FloatParam::new(

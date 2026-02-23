@@ -8,18 +8,21 @@ mod reverb;
 mod voice;
 pub mod lfo;
 mod limiter;
+pub mod mod_sequencer;
 
 pub use voice::Voice;
 pub use lfo::LfoBank;
 pub use limiter::MasterLimiter;
 use crate::sequencer::Sequencer;
 use crate::params::DeviceParams;
+use mod_sequencer::ModSequencer;
 
 pub struct SynthEngine {
     voice: Voice,
     sequencer: Sequencer,
     pll_feedback: f64,
     pub lfo_bank: LfoBank,
+    pub mod_sequencer: ModSequencer,
 }
 
 impl SynthEngine {
@@ -33,6 +36,7 @@ impl SynthEngine {
             sequencer: Sequencer::new(sample_rate_f64, 120.0),
             pll_feedback: 0.0,
             lfo_bank: LfoBank::new(sample_rate_f64),
+            mod_sequencer: ModSequencer::new(sample_rate_f64),
         }
     }
 
@@ -41,6 +45,12 @@ impl SynthEngine {
         self.voice.set_sample_rate(sample_rate);
         self.sequencer.set_sample_rate(sample_rate as f64);
         self.lfo_bank.set_sample_rate(sample_rate as f64);
+        self.mod_sequencer.set_sample_rate(sample_rate as f64);
+    }
+
+    pub fn set_bpm(&mut self, bpm: f64) {
+        self.sequencer.set_bpm(bpm);
+        self.voice.set_bpm(bpm);
     }
 
     pub fn set_osc_params(&mut self, d: f32, v: f32) {
@@ -77,6 +87,10 @@ impl SynthEngine {
 
     pub fn set_pll_params(&mut self, track: f32, damp: f32, mult: f32, influence: f32, colored: bool, edge_mode: bool) {
         self.voice.set_pll_params(track as f64, damp as f64, mult as f64, influence as f64, colored, edge_mode);
+    }
+
+    pub fn set_pll_mult_slew(&mut self, enabled: bool) {
+        self.voice.set_pll_mult_slew(enabled);
     }
 
     pub fn set_pll_volume(&mut self, volume: f32) {
@@ -270,6 +284,20 @@ impl SynthEngine {
         self.lfo_bank.set_modulation(lfo_idx, slot, destination, amount as f64);
     }
 
+    pub fn set_mod_seq_step(&mut self, index: usize, value: f32) {
+        self.mod_sequencer.set_step(index, value as f64);
+    }
+
+    pub fn set_mod_seq_params(&mut self, ties: i32, division: i32, slew: f32) {
+        self.mod_sequencer.set_ties(ties as u16);
+        self.mod_sequencer.set_division(division);
+        self.mod_sequencer.set_slew(slew as f64);
+    }
+
+    pub fn set_mod_seq_modulation(&mut self, slot: usize, destination: i32, amount: f32) {
+        self.mod_sequencer.set_modulation(slot, destination, amount as f64);
+    }
+
     #[allow(dead_code)]
     pub fn get_lfo_output(&self, idx: usize) -> f32 {
         self.lfo_bank.get_lfo_output(idx) as f32
@@ -286,6 +314,7 @@ impl SynthEngine {
         seq_playing: bool,
     ) {
         let bpm = self.sequencer.get_bpm();
+        self.voice.set_bpm(bpm);
         midi_events.clear();
 
         for (sample_idx, (l, r)) in output_l.iter_mut().zip(output_r.iter_mut()).enumerate() {
@@ -305,7 +334,9 @@ impl SynthEngine {
                 }
             }
 
-            let mod_values = self.lfo_bank.process(bpm);
+            let mut mod_values = self.lfo_bank.process(bpm);
+            let seq_mod = self.mod_sequencer.process(bpm);
+            mod_values.accumulate(&seq_mod);
             self.voice.apply_modulation(&mod_values);
 
             let (left_sample, right_sample) = self.voice.process(self.pll_feedback);

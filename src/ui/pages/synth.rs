@@ -41,11 +41,11 @@ pub fn render(
             height: percent(1.0),
         },
         overflow: Point {
-            x: Overflow::Hidden,
-            y: Overflow::Hidden,
+            x: Overflow::Visible,
+            y: Overflow::Visible,
         },
         margin: egui_taffy::taffy::Rect {
-            left: length(-24.0),
+            left: length(-29.0),
             right: length(0.0),
             top: length(0.0),
             bottom: length(0.0),
@@ -74,7 +74,7 @@ pub fn render(
             },
             overflow: Point {
                 x: Overflow::Hidden,
-                y: Overflow::Hidden,
+                y: Overflow::Visible,
             },
             padding: egui_taffy::taffy::Rect {
                 left: length(8.0),
@@ -88,24 +88,25 @@ pub fn render(
             match current_tab {
                 0 => render_sound_tab(ui, params, setter),
                 1 => render_envelopes_tab(ui, params, setter, ui_state),
-                _ => super::modulation::render_ui(ui, params, setter),
+                2 => super::modulation::render_ui(ui, params, setter),
+                _ => super::modulation::render_step_mod_ui(ui, params, setter),
             }
         });
     });
 }
 
+const TAB_HEIGHT: f32 = 158.0;
+const TAB_GAP: f32 = 4.0;
+
 fn render_tab_bar(ui: &mut egui::Ui, current_tab: u8) {
     let rect = ui.max_rect();
-    let tab_names = ["SOUND", "ENV & FX", "MOD"];
-    let gap = 4.0;
-    let total_gaps = gap * (tab_names.len() as f32 - 1.0);
-    let tab_height = (rect.height() - total_gaps) / tab_names.len() as f32;
+    let tab_names = ["SOUND", "ENV & FX", "LFO", "STEP MOD"];
 
     for (i, name) in tab_names.iter().enumerate() {
-        let y = rect.min.y + i as f32 * (tab_height + gap);
+        let y = rect.min.y + i as f32 * (TAB_HEIGHT + TAB_GAP);
         let button_rect = egui::Rect::from_min_size(
             egui::pos2(rect.min.x, y),
-            egui::vec2(TAB_BAR_WIDTH, tab_height),
+            egui::vec2(TAB_BAR_WIDTH, TAB_HEIGHT),
         );
 
         let response = ui.interact(
@@ -128,7 +129,7 @@ fn render_tab_bar(ui: &mut egui::Ui, current_tab: u8) {
         if is_selected {
             let accent_rect = egui::Rect::from_min_size(
                 button_rect.left_top(),
-                egui::vec2(3.0, tab_height),
+                egui::vec2(3.0, TAB_HEIGHT),
             );
             ui.painter()
                 .rect_filled(accent_rect, 1.5, Color32::from_rgb(100, 140, 200));
@@ -177,17 +178,23 @@ fn render_sound_tab(
                         .size(HEADER_FONT)
                         .strong(),
                 );
-                ui.add_space(700.0);
+                ui.add_space(460.0);
                 let mut colored = params.synth_pll_colored.value();
-                render_toggle(ui, &mut colored, "Color");
+                render_toggle(ui, &mut colored, "COLOR");
                 if colored != params.synth_pll_colored.value() {
                     setter.set_parameter(&params.synth_pll_colored, colored);
                 }
-                ui.add_space(80.0);
+                ui.add_space(120.0);
                 let mut edge_mode = params.synth_pll_mode.value();
-                render_toggle(ui, &mut edge_mode, "Edge");
+                render_toggle(ui, &mut edge_mode, "EDGE");
                 if edge_mode != params.synth_pll_mode.value() {
                     setter.set_parameter(&params.synth_pll_mode, edge_mode);
+                }
+                ui.add_space(100.0);
+                let mut mult_slew_fast = params.synth_pll_mult_slew.value();
+                render_labeled_toggle(ui, &mut mult_slew_fast, "SLOW", "FAST");
+                if mult_slew_fast != params.synth_pll_mult_slew.value() {
+                    setter.set_parameter(&params.synth_pll_mult_slew, mult_slew_fast);
                 }
             });
             ui.add_space(10.0);
@@ -196,13 +203,13 @@ fn render_sound_tab(
                     ui, params, setter,
                     &params.synth_pll_ref_octave, "OCT",
                     Some(Color32::from_rgb(80, 80, 40)),
-                    None,
+                    None, None,
                 );
                 render_int_vertical_slider(
                     ui, params, setter,
                     &params.synth_pll_ref_tune, "TUNE",
                     Some(Color32::from_rgb(80, 80, 40)),
-                    Some(&[-12, 0, 12]),
+                    Some(&[-12, 0, 12]), None,
                 );
                 render_vertical_slider(
                     ui, params, setter,
@@ -233,6 +240,7 @@ fn render_sound_tab(
                     &params.synth_pll_mult, "MULT",
                     Some(Color32::from_rgb(40, 40, 80)),
                     None,
+                    Some(&["1", "2", "4", "8", "16", "32", "64"]),
                 );
                 render_vertical_slider(
                     ui, params, setter,
@@ -268,7 +276,7 @@ fn render_sound_tab(
                     ui, params, setter,
                     &params.synth_pll_fm_ratio, "RAT",
                     Some(Color32::from_rgb(100, 60, 100)),
-                    None,
+                    None, None,
                 );
                 render_vertical_slider(
                     ui, params, setter,
@@ -340,17 +348,18 @@ fn render_sound_tab(
                     );
                     ui.add_space(10.0);
                     ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x -= 10.0;
                         render_int_vertical_slider(
                             ui, params, setter,
                             &params.synth_osc_octave, "OCT",
                             Some(Color32::from_rgb(80, 80, 40)),
-                            None,
+                            None, None,
                         );
                         render_int_vertical_slider(
                             ui, params, setter,
                             &params.synth_osc_tune, "TUNE",
                             Some(Color32::from_rgb(80, 80, 40)),
-                            Some(&[-12, 0, 12]),
+                            Some(&[-12, 0, 12]), None,
                         );
                         render_vertical_slider(
                             ui, params, setter,
@@ -386,11 +395,6 @@ fn render_sound_tab(
                 });
             });
 
-        let line2_rect = ui.available_rect_before_wrap();
-        ui.painter().line_segment(
-            [egui::pos2(line2_rect.left(), sep_rect.top()), egui::pos2(line2_rect.left(), line2_rect.bottom() - 5.0)],
-            egui::Stroke::new(1.0, Color32::BLACK),
-        );
     });
 }
 
@@ -718,6 +722,7 @@ fn render_int_vertical_slider(
     label: &str,
     color: Option<Color32>,
     tick_labels: Option<&[i32]>,
+    value_display: Option<&[&str]>,
 ) {
     ui.vertical(|ui| {
         ui.set_width(SLIDER_COL_WIDTH);
@@ -769,7 +774,16 @@ fn render_int_vertical_slider(
                 if val < min || val > max { continue; }
                 let t = (val - min) as f32 / steps as f32;
                 let y = rail_bottom - t * rail_height;
-                let text = format!("{}", val);
+                let text = if let Some(displays) = value_display {
+                    let idx = (val - min) as usize;
+                    if idx < displays.len() {
+                        displays[idx].to_string()
+                    } else {
+                        format!("{}", val)
+                    }
+                } else {
+                    format!("{}", val)
+                };
                 let galley = ui.painter().layout_no_wrap(text, label_font.clone(), label_color);
                 let text_height = galley.size().y;
                 ui.painter().galley(egui::pos2(label_x, y - text_height / 2.0), galley, label_color);
@@ -870,3 +884,44 @@ fn render_toggle(ui: &mut egui::Ui, value: &mut bool, label: &str) {
         text_color,
     );
 }
+
+fn render_labeled_toggle(ui: &mut egui::Ui, value: &mut bool, left_label: &str, right_label: &str) {
+    let font = egui::FontId::proportional(HEADER_FONT);
+    let left_color = if !*value { egui::Color32::WHITE } else { egui::Color32::from_gray(100) };
+    let right_color = if *value { egui::Color32::WHITE } else { egui::Color32::from_gray(100) };
+
+    ui.painter().text(
+        egui::pos2(ui.cursor().left(), ui.cursor().top() + 7.0),
+        egui::Align2::LEFT_CENTER,
+        left_label,
+        font.clone(),
+        left_color,
+    );
+    let left_text_width = ui.fonts(|f| f.layout_no_wrap(left_label.to_string(), font.clone(), left_color).size().x);
+    ui.add_space(left_text_width + 6.0);
+
+    let desired_size = egui::vec2(48.0, 24.0);
+    let (alloc_rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if response.clicked() {
+        *value = !*value;
+    }
+
+    let rect = alloc_rect.translate(egui::vec2(0.0, -5.0));
+    let anim_t = ui.ctx().animate_bool_with_time(response.id, *value, 0.15);
+
+    let bg_color = egui::Color32::from_gray(50).lerp_to_gamma(egui::Color32::from_rgb(80, 130, 190), anim_t);
+    let circle_x = egui::lerp(rect.left() + 12.0..=rect.right() - 12.0, anim_t);
+    let circle_color = egui::Color32::from_gray(220).lerp_to_gamma(egui::Color32::WHITE, anim_t);
+
+    ui.painter().rect_filled(rect, rect.height() / 2.0, bg_color);
+    ui.painter().circle_filled(egui::pos2(circle_x, rect.center().y), 9.0, circle_color);
+
+    ui.painter().text(
+        egui::pos2(rect.right() + 8.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        right_label,
+        font,
+        right_color,
+    );
+}
+

@@ -773,6 +773,9 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_reverb_hpf, data.synth_reverb_hpf);
     setter.set_parameter(&params.synth_reverb_lpf, data.synth_reverb_lpf);
     setter.set_parameter(&params.synth_reverb_ducking, data.synth_reverb_ducking);
+    setter.set_parameter(&params.synth_reverb_input_hpf, data.synth_reverb_input_hpf);
+    setter.set_parameter(&params.synth_reverb_input_lpf, data.synth_reverb_input_lpf);
+    setter.set_parameter(&params.synth_reverb_mod_shape, data.synth_reverb_mod_shape);
 
     setter.set_parameter(&params.lfo1_rate, data.lfo1_rate);
     setter.set_parameter(&params.lfo1_waveform, data.lfo1_waveform);
@@ -842,6 +845,30 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_drift_rate, data.synth_drift_rate);
     setter.set_parameter(&params.synth_tube_drive, data.synth_tube_drive);
     setter.set_parameter(&params.synth_vps_enable, data.synth_vps_enable);
+    setter.set_parameter(&params.synth_coloration_enable, data.synth_coloration_enable);
+    setter.set_parameter(&params.synth_reverb_enable, data.synth_reverb_enable);
+    setter.set_parameter(&params.synth_pll_mult_slew, data.synth_pll_mult_slew);
+    setter.set_parameter(&params.synth_noise_amount, data.synth_noise_amount);
+    setter.set_parameter(&params.synth_color_distortion_amount, data.synth_color_distortion_amount);
+    setter.set_parameter(&params.synth_color_distortion_threshold, data.synth_color_distortion_threshold);
+
+    let mseq_steps = [
+        &params.mseq_step_1, &params.mseq_step_2, &params.mseq_step_3, &params.mseq_step_4,
+        &params.mseq_step_5, &params.mseq_step_6, &params.mseq_step_7, &params.mseq_step_8,
+        &params.mseq_step_9, &params.mseq_step_10, &params.mseq_step_11, &params.mseq_step_12,
+        &params.mseq_step_13, &params.mseq_step_14, &params.mseq_step_15, &params.mseq_step_16,
+    ];
+    for (i, step_param) in mseq_steps.iter().enumerate() {
+        let value = data.mseq_steps.get(i).copied().unwrap_or(0.0);
+        setter.set_parameter(*step_param, value);
+    }
+    setter.set_parameter(&params.mseq_ties, data.mseq_ties);
+    setter.set_parameter(&params.mseq_division, data.mseq_division);
+    setter.set_parameter(&params.mseq_slew, data.mseq_slew);
+    setter.set_parameter(&params.mseq_dest1, data.mseq_dest1);
+    setter.set_parameter(&params.mseq_amount1, data.mseq_amount1);
+    setter.set_parameter(&params.mseq_dest2, data.mseq_dest2);
+    setter.set_parameter(&params.mseq_amount2, data.mseq_amount2);
 
     if let Ok(mut strength_values) = ui_state.strength_values.lock() {
         for i in 0..96 {
@@ -1149,6 +1176,9 @@ fn save_params_to_preset_data(
     data.synth_reverb_hpf = params.synth_reverb_hpf.modulated_plain_value();
     data.synth_reverb_lpf = params.synth_reverb_lpf.modulated_plain_value();
     data.synth_reverb_ducking = params.synth_reverb_ducking.modulated_plain_value();
+    data.synth_reverb_input_hpf = params.synth_reverb_input_hpf.modulated_plain_value();
+    data.synth_reverb_input_lpf = params.synth_reverb_input_lpf.modulated_plain_value();
+    data.synth_reverb_mod_shape = params.synth_reverb_mod_shape.modulated_plain_value();
 
     data.lfo1_rate = params.lfo1_rate.modulated_plain_value();
     data.lfo1_waveform = params.lfo1_waveform.value();
@@ -1221,6 +1251,38 @@ fn save_params_to_preset_data(
     data.synth_color_distortion_amount = 0.0;
     data.synth_color_distortion_threshold = 0.7;
     data.synth_vps_enable = params.synth_vps_enable.value();
+    data.synth_coloration_enable = params.synth_coloration_enable.value();
+    data.synth_reverb_enable = params.synth_reverb_enable.value();
+    data.synth_pll_mult_slew = params.synth_pll_mult_slew.value();
+    data.synth_noise_amount = params.synth_noise_amount.modulated_plain_value();
+    data.synth_color_distortion_amount = params.synth_color_distortion_amount.modulated_plain_value();
+    data.synth_color_distortion_threshold = params.synth_color_distortion_threshold.modulated_plain_value();
+
+    data.mseq_steps = vec![
+        params.mseq_step_1.modulated_plain_value(),
+        params.mseq_step_2.modulated_plain_value(),
+        params.mseq_step_3.modulated_plain_value(),
+        params.mseq_step_4.modulated_plain_value(),
+        params.mseq_step_5.modulated_plain_value(),
+        params.mseq_step_6.modulated_plain_value(),
+        params.mseq_step_7.modulated_plain_value(),
+        params.mseq_step_8.modulated_plain_value(),
+        params.mseq_step_9.modulated_plain_value(),
+        params.mseq_step_10.modulated_plain_value(),
+        params.mseq_step_11.modulated_plain_value(),
+        params.mseq_step_12.modulated_plain_value(),
+        params.mseq_step_13.modulated_plain_value(),
+        params.mseq_step_14.modulated_plain_value(),
+        params.mseq_step_15.modulated_plain_value(),
+        params.mseq_step_16.modulated_plain_value(),
+    ];
+    data.mseq_ties = params.mseq_ties.value();
+    data.mseq_division = params.mseq_division.value();
+    data.mseq_slew = params.mseq_slew.modulated_plain_value();
+    data.mseq_dest1 = params.mseq_dest1.value();
+    data.mseq_amount1 = params.mseq_amount1.modulated_plain_value();
+    data.mseq_dest2 = params.mseq_dest2.value();
+    data.mseq_amount2 = params.mseq_amount2.modulated_plain_value();
 
     if let Ok(strength_values) = ui_state.strength_values.lock() {
         for (i, &v) in strength_values.iter().enumerate() {

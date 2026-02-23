@@ -115,7 +115,7 @@ impl Plugin for Device {
                         .show(|tui| {
                             let mut current_page = tui.ui(|ui| {
                                 ui.memory_mut(|mem| {
-                                    *mem.data.get_temp_mut_or(egui::Id::new("current_page"), Page::BeatProbability)
+                                    *mem.data.get_temp_mut_or(egui::Id::new("current_page"), Page::Synth)
                                 })
                             });
 
@@ -182,6 +182,8 @@ impl Plugin for Device {
         }
 
         if let Some(synth) = &mut self.synth_engine {
+            synth.set_bpm(tempo);
+
             if let Ok(note_pool) = self.ui_state.note_pool.lock() {
                 synth.update_note_pool(note_pool.clone());
             }
@@ -276,6 +278,7 @@ impl Plugin for Device {
                 self.params.synth_pll_colored.value(),
                 self.params.synth_pll_mode.value(),
             );
+            synth.set_pll_mult_slew(self.params.synth_pll_mult_slew.value());
 
             synth.set_pll_volume(self.params.synth_pll_volume.modulated_plain_value());
 
@@ -370,6 +373,30 @@ impl Plugin for Device {
             );
             synth.set_lfo_modulation(2, 0, self.params.lfo3_dest1.value(), self.params.lfo3_amount1.modulated_plain_value());
             synth.set_lfo_modulation(2, 1, self.params.lfo3_dest2.value(), self.params.lfo3_amount2.modulated_plain_value());
+
+            synth.set_mod_seq_step(0, self.params.mseq_step_1.value());
+            synth.set_mod_seq_step(1, self.params.mseq_step_2.value());
+            synth.set_mod_seq_step(2, self.params.mseq_step_3.value());
+            synth.set_mod_seq_step(3, self.params.mseq_step_4.value());
+            synth.set_mod_seq_step(4, self.params.mseq_step_5.value());
+            synth.set_mod_seq_step(5, self.params.mseq_step_6.value());
+            synth.set_mod_seq_step(6, self.params.mseq_step_7.value());
+            synth.set_mod_seq_step(7, self.params.mseq_step_8.value());
+            synth.set_mod_seq_step(8, self.params.mseq_step_9.value());
+            synth.set_mod_seq_step(9, self.params.mseq_step_10.value());
+            synth.set_mod_seq_step(10, self.params.mseq_step_11.value());
+            synth.set_mod_seq_step(11, self.params.mseq_step_12.value());
+            synth.set_mod_seq_step(12, self.params.mseq_step_13.value());
+            synth.set_mod_seq_step(13, self.params.mseq_step_14.value());
+            synth.set_mod_seq_step(14, self.params.mseq_step_15.value());
+            synth.set_mod_seq_step(15, self.params.mseq_step_16.value());
+            synth.set_mod_seq_params(
+                self.params.mseq_ties.value(),
+                self.params.mseq_division.value(),
+                self.params.mseq_slew.modulated_plain_value(),
+            );
+            synth.set_mod_seq_modulation(0, self.params.mseq_dest1.value(), self.params.mseq_amount1.modulated_plain_value());
+            synth.set_mod_seq_modulation(1, self.params.mseq_dest2.value(), self.params.mseq_amount2.modulated_plain_value());
 
             let mut output_l = vec![0.0; buffer.samples()];
             let mut output_r = vec![0.0; buffer.samples()];

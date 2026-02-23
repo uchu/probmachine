@@ -2,7 +2,7 @@
 
 ## Oscillator Types
 
-Device features three distinct oscillator types plus a sub oscillator, each with unique character.
+Device features two distinct oscillator types plus a sub oscillator, each with unique character.
 
 ### VPS Oscillator (Variable Phase Shaping)
 
@@ -105,6 +105,9 @@ The PLL oscillator excels at:
 - Range at 0: Very slow lock, creates characteristic analog PLL "hunting" behavior
 - Range at 1: Fast lock, tight frequency tracking
 - Low Range + any Multiplier: Creates musical portamento-like transitions between pitches
+- FAST/SLOW toggle: Tempo-synced multiplier slew (FAST=1/16 note, SLOW=1/1 note duration)
+- LFO to PLL Mult: Discrete modulation steps between multiplier values (1,2,4,8,16,32,64) with slew
+- LFO to PLL Mult D: Direct continuous modulation of the frequency multiplier for evolving timbres
 
 ### Sub Oscillator
 
@@ -274,12 +277,41 @@ Three independent LFOs with flexible routing.
 **Modulation Slots:** Each LFO has 2 destination slots.
 
 **Available Destinations:**
-- PLL: Damping, Influence, Track Speed, FM Amount, Cross Feedback, Overtone (Burst), Range
+- PLL: Damping, Influence, Track Speed, FM Amount, Cross Feedback, Overtone (Burst), Range, Multiplier (discrete), Multiplier Direct (continuous)
 - VPS: D parameter, V parameter
 - Filter: Cutoff, Resonance, Drive
-- Coloration: Drift, Noise, Tube Drive
+- Coloration: Drift, Tube Drive
 - Reverb: Mix, Decay
 - Volumes: PLL, VPS, Sub
+
+## Modulation Step Sequencer
+
+A tempo-synced 16-step modulation sequencer with 303-style tie/glide and controllable slew. Provides rhythmic modulation alongside the LFOs.
+
+**Parameters:**
+| Param | Range | Default | Description |
+|-------|-------|---------|-------------|
+| Steps 1-16 | -1.0 to +1.0 | 0.0 | Bipolar step values |
+| Ties | bitmask (u16) | 0 | Tie flags per step |
+| Division | 1/1 to 1/16T | 1/8 | Step rate (same divisions as LFOs) |
+| Slew | 0-200 ms | 5.0 | Transition smoothing for non-tied steps |
+
+**Modulation Slots:** 2 destination slots (same as LFOs), each with destination and bipolar amount.
+
+**Processing:**
+1. Step frequency derived from BPM and selected division
+2. Phase advances 0.0 to 16.0, wrapping at 16
+3. Current step index = floor(phase) % 16
+4. If current step has tie flag: linearly interpolate to next step value based on fractional phase
+5. If no tie: target is current step value, smoothed by slew
+6. Output (-1.0 to 1.0) feeds into ModulationValues, accumulated with LFO modulation
+
+**Sound Design Tips:**
+- Use with filter cutoff for rhythmic filter patterns
+- Tie adjacent steps for smooth glide transitions (303-style)
+- High slew values create smooth, wavering modulation from step patterns
+- Combine with LFO modulation for complex rhythmic textures
+- Route to PLL parameters for evolving timbral sequences
 
 ## Oversampling
 
@@ -308,13 +340,13 @@ Configurable oversampling to reduce aliasing at the cost of CPU.
 │  │   VPS   │  │   PLL   │←──FM──┐                          │
 │  │ Osc L/R │  │ Osc L/R │       │                          │
 │  └────┬────┘  └────┬────┘   ┌───┴───┐                      │
-│       │            │        │FM Osc │                      │
-│       └────┬───────┘        └───────┘                      │
-│            ▼                                               │
-│      ┌──────────┐                                          │
-│      │ Mix + Vol│                                          │
-│      │ Envelope │                                          │
-│      └────┬─────┘                                          │
+│       │             │        │FM Osc │                      │
+│       └──────┬──────┘        └───────┘                      │
+│              ▼                                               │
+│        ┌──────────┐                                          │
+│        │ Mix + Vol│                                          │
+│        │ Envelope │                                          │
+│        └────┬─────┘                                          │
 │           ▼                                                │
 │   ┌────────────────┐                                       │
 │   │  Coloration    │                                       │

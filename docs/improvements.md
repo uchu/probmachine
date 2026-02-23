@@ -165,7 +165,6 @@ Many parameters only need updates on change:
 **Delay Effects**
 - Tempo-synced stereo delay
 - Ping-pong with feedback filtering
-- Granular delay with pitch shifting
 - Tape delay with wow/flutter
 
 **Distortion Variety**

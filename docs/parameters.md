@@ -10,8 +10,7 @@ Complete reference of all parameters and UI controls.
 | Length | Note duration and modifiers |
 | Notes | Piano roll note selection |
 | Strength | 96-position beat strength grid |
-| Synth | Sound design controls (Tab A/B) |
-| Mod | LFO configuration and routing |
+| Synth | Sound design controls (SOUND / ENV & FX / MOD / STEP MOD tabs) |
 | Presets | Save/load presets |
 
 ## Synth Page - Tab A
@@ -77,6 +76,7 @@ Complete reference of all parameters and UI controls.
 |----|------|-------------|
 | synth_pll_colored | Color | Enable harmonic coloration |
 | synth_pll_mode | Mode | false=AnalogLikePD, true=EdgePFD |
+| synth_pll_mult_slew | FAST/SLOW | Tempo-synced multiplier slew: FAST=1/16 note, SLOW=1/1 note |
 | synth_pll_enable | Enable | Bypass PLL oscillator |
 
 ### VPS Oscillator
@@ -204,7 +204,7 @@ Complete reference of all parameters and UI controls.
 - DAW at 192k, OS=1x → processes at 192k (recommended for high sample rates)
 - DAW at 192k, OS=2x → processes at 384k (very CPU intensive)
 
-## Modulation Page
+## Synth Page - MOD Tab
 
 ### LFO 1/2/3 (identical structure)
 
@@ -216,9 +216,9 @@ Complete reference of all parameters and UI controls.
 | lfo[N]_sync_division | Div | 0-13 | 2 | Sync division |
 | lfo[N]_sync_source | Src | -1 to 2 | -1 | Cross-mod source |
 | lfo[N]_phase_mod | PhMod | 0.0-1.0 | 0.0 | Phase mod amount |
-| lfo[N]_dest1 | Dst1 | 0-26 | 0 | First destination |
+| lfo[N]_dest1 | Dst1 | 0-21 | 0 | First destination |
 | lfo[N]_amount1 | Amt1 | -1.0 to +1.0 | 0.0 | First mod amount |
-| lfo[N]_dest2 | Dst2 | 0-26 | 0 | Second destination |
+| lfo[N]_dest2 | Dst2 | 0-21 | 0 | Second destination |
 | lfo[N]_amount2 | Amt2 | -1.0 to +1.0 | 0.0 | Second mod amount |
 
 **Waveforms:** 0=Sine, 1=Triangle, 2=Saw, 3=Square, 4=Sample&Hold
@@ -228,11 +228,31 @@ Complete reference of all parameters and UI controls.
 6=1/2D, 7=1/4D, 8=1/8D, 9=1/16D,
 10=1/2T, 11=1/4T, 12=1/8T, 13=1/16T
 
-**Mod Destinations:**
-0=None, 1=PLL Damp, 2=PLL Infl, 3=PLL Track, 4=PLL FM, 5=PLL XFB,
-6=PLL OT, 7=PLL Rng, 8=VPS D, 9=VPS V, 10=Filt Cut, 11=Filt Res,
-12=Filt Drv, 13=Drift, 14=Noise, 15=Tube, 16=Rev Mix, 17=Rev Decay,
-18=PLL Vol, 19=VPS Vol, 20=Sub Vol
+**Mod Destinations** (indices preserved for preset compatibility, UI sorted by group):
+0=None |
+PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult (discrete), 21=Mult D (continuous) |
+Sub: 19=Vol |
+VPS: 8=D, 9=V, 18=Vol |
+Filter: 10=Cut, 11=Res, 12=Drv |
+Coloration: 13=Drift, 14=Tube |
+Reverb: 15=Mix, 16=Decay
+
+## Synth Page - STEP MOD Tab
+
+### Modulation Step Sequencer
+
+| ID | Name | Range | Default | Description |
+|----|------|-------|---------|-------------|
+| mseq_step_[1-16] | Step N | -1.0 to +1.0 | 0.0 | Bipolar step value |
+| mseq_ties | Ties | 0-65535 | 0 | Bitmask: bit N = step N tied to N+1 |
+| mseq_division | Rate | 0-13 | 3 (1/8) | Step rate division (same as LFO) |
+| mseq_slew | Slew | 0-200 ms | 5.0 | Transition smoothing for non-tied steps |
+| mseq_dest1 | Dst1 | 0-21 | 0 | First destination |
+| mseq_amount1 | Amt1 | -1.0 to +1.0 | 0.0 | First mod amount |
+| mseq_dest2 | Dst2 | 0-21 | 0 | Second destination |
+| mseq_amount2 | Amt2 | -1.0 to +1.0 | 0.0 | Second mod amount |
+
+**Tie behavior:** When a step's tie flag is set, the output linearly interpolates from the current step value to the next step value over the step duration (303-style glide). Non-tied steps use the slew parameter for smooth transitions.
 
 ## Length Page
 

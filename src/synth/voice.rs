@@ -184,6 +184,7 @@ pub struct Voice {
     ring_mod_slew: SlewValue<f64>,
     wavefold_slew: SlewValue<f64>,
     drift_amount_slew: SlewValue<f64>,
+    drift_rate_slew: SlewValue<f64>,
     tube_drive_slew: SlewValue<f64>,
 
     // VPS slew limiters
@@ -203,12 +204,9 @@ pub struct Voice {
     master_volume_slew: SlewValue<f64>,
     target_master_volume: f64,
 
-    // Filter slew - not used since nih_plug parameters have built-in smoothing
-    #[allow(dead_code)]
+    // Filter slews
     filter_cutoff_slew: SlewValue<f64>,
-    #[allow(dead_code)]
     filter_resonance_slew: SlewValue<f64>,
-    #[allow(dead_code)]
     filter_drive_slew: SlewValue<f64>,
 
     // ===== Target Values =====
@@ -272,6 +270,8 @@ pub struct Voice {
     mod_pll_volume: f64,
     mod_vps_volume: f64,
     mod_sub_volume: f64,
+    mod_pll_mult: f64,
+    mod_pll_mult_direct: f64,
 
     // Slews for modulation (critical for smooth, crackle-free modulation)
     mod_slew_pll_damping: SlewValue<f64>,
@@ -299,6 +299,13 @@ pub struct Voice {
     mod_slew_pll_vol: SlewValue<f64>,
     mod_slew_vps_vol: SlewValue<f64>,
     mod_slew_sub_vol: SlewValue<f64>,
+    mod_slew_pll_mult: SlewValue<f64>,
+    mod_slew_pll_mult_direct: SlewValue<f64>,
+
+    pll_mult_slew_fast: bool,
+    bpm: f64,
+    target_pll_multiplier: f64,
+    pll_mult_slew_state: SlewValue<f64>,
 }
 
 impl Voice {
@@ -469,6 +476,7 @@ impl Voice {
             ring_mod_slew: make_slew(),
             wavefold_slew: make_slew(),
             drift_amount_slew: make_slew(),
+            drift_rate_slew: make_slew(),
             tube_drive_slew: make_slew(),
             vps_d_slew: make_slew(),
             vps_v_slew: make_slew(),
@@ -542,6 +550,8 @@ impl Voice {
             mod_pll_volume: 0.0,
             mod_vps_volume: 0.0,
             mod_sub_volume: 0.0,
+            mod_pll_mult: 0.0,
+            mod_pll_mult_direct: 0.0,
 
             mod_slew_pll_damping: make_slew(),
             mod_slew_pll_influence: make_slew(),
@@ -568,6 +578,13 @@ impl Voice {
             mod_slew_pll_vol: make_slew(),
             mod_slew_vps_vol: make_slew(),
             mod_slew_sub_vol: make_slew(),
+            mod_slew_pll_mult: make_slew(),
+            mod_slew_pll_mult_direct: make_slew(),
+
+            pll_mult_slew_fast: true,
+            bpm: 120.0,
+            target_pll_multiplier: 1.0,
+            pll_mult_slew_state: make_slew(),
         }
     }
 
@@ -641,7 +658,9 @@ impl Voice {
             update_slew(&mut self.ring_mod_slew);
             update_slew(&mut self.wavefold_slew);
             update_slew(&mut self.drift_amount_slew);
+            update_slew(&mut self.drift_rate_slew);
             update_slew(&mut self.tube_drive_slew);
+            update_slew(&mut self.pll_range_slew);
             update_slew(&mut self.vps_d_slew);
             update_slew(&mut self.vps_v_slew);
             update_slew(&mut self.vps_volume_slew);
@@ -650,6 +669,9 @@ impl Voice {
             update_slew(&mut self.sub_volume_slew);
             update_slew(&mut self.velocity_slew);
             update_slew(&mut self.master_volume_slew);
+            update_slew(&mut self.filter_cutoff_slew);
+            update_slew(&mut self.filter_resonance_slew);
+            update_slew(&mut self.filter_drive_slew);
             update_slew(&mut self.mod_slew_pll_damping);
             update_slew(&mut self.mod_slew_pll_influence);
             update_slew(&mut self.mod_slew_pll_track);
@@ -675,6 +697,9 @@ impl Voice {
             update_slew(&mut self.mod_slew_pll_vol);
             update_slew(&mut self.mod_slew_vps_vol);
             update_slew(&mut self.mod_slew_sub_vol);
+            update_slew(&mut self.mod_slew_pll_mult);
+            update_slew(&mut self.mod_slew_pll_mult_direct);
+            self.pll_mult_slew_state.set_sample_rate(new_rate);
 
             // Now update processing sample rate (oscillators, filters, etc.)
             self.update_processing_sample_rate();
@@ -777,6 +802,10 @@ impl Voice {
         self.target_sub_volume = volume;
     }
 
+    pub fn set_bpm(&mut self, bpm: f64) {
+        self.bpm = bpm.max(1.0);
+    }
+
     pub fn set_pll_ref_params(&mut self, octave: i32, pulse_width: f64) {
         self.pll_ref_octave = octave;
         self.target_pll_pulse_width = pulse_width;
@@ -790,10 +819,14 @@ impl Voice {
     pub fn set_pll_params(&mut self, track: f64, damp: f64, mult: f64, influence: f64, colored: bool, edge_mode: bool) {
         self.target_pll_track = track;
         self.target_pll_damping = damp;
-        self.pll_multiplier = mult;
+        self.target_pll_multiplier = mult;
         self.target_pll_influence = influence;
         self.pll_mode_is_edge = edge_mode;
         self.pll_colored = colored;
+    }
+
+    pub fn set_pll_mult_slew(&mut self, fast: bool) {
+        self.pll_mult_slew_fast = fast;
     }
 
     pub fn set_pll_volume(&mut self, volume: f64) {
@@ -920,6 +953,8 @@ impl Voice {
         self.mod_pll_volume = self.mod_slew_pll_vol.next(mod_values.pll_volume, MOD_SLEW_MS);
         self.mod_vps_volume = self.mod_slew_vps_vol.next(mod_values.vps_volume, MOD_SLEW_MS);
         self.mod_sub_volume = self.mod_slew_sub_vol.next(mod_values.sub_volume, MOD_SLEW_MS);
+        self.mod_pll_mult = self.mod_slew_pll_mult.next(mod_values.pll_mult, MOD_SLEW_MS);
+        self.mod_pll_mult_direct = self.mod_slew_pll_mult_direct.next(mod_values.pll_mult_direct, MOD_SLEW_MS);
     }
 
     pub fn set_volume(&mut self, volume: f64) {
@@ -1039,7 +1074,7 @@ impl Voice {
         self.ring_mod_amount = (self.ring_mod_slew.next(self.target_ring_mod, 20.0) + self.mod_ring_mod).clamp(0.0, 1.0);
         self.wavefold_amount = (self.wavefold_slew.next(self.target_wavefold, 20.0) + self.mod_wavefold).clamp(0.0, 1.0);
         self.drift_amount = (self.drift_amount_slew.next(self.target_drift_amount, 50.0) + self.mod_drift_amount).clamp(0.0, 1.0);
-        self.drift_rate = self.target_drift_rate;
+        self.drift_rate = self.drift_rate_slew.next(self.target_drift_rate, 20.0);
         self.tube_drive = (self.tube_drive_slew.next(self.target_tube_drive, 20.0) + self.mod_tube_drive).clamp(0.0, 1.0);
 
         // VPS slews + modulation
@@ -1052,18 +1087,38 @@ impl Voice {
         // Sub slew + modulation
         self.sub_volume = (self.sub_volume_slew.next(self.target_sub_volume, 20.0) + self.mod_sub_volume).clamp(0.0, 1.0);
 
+        // PLL multiplier: discrete modulation shifts the step, then quantize
+        let mult_steps: [f64; 7] = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0];
+        let base_index = match self.target_pll_multiplier as i32 {
+            1 => 0, 2 => 1, 4 => 2, 8 => 3, 16 => 4, 32 => 5, 64 => 6, _ => 0,
+        };
+        let mod_offset = (self.mod_pll_mult * 6.0).round() as i32;
+        let target_index = (base_index + mod_offset).clamp(0, 6) as usize;
+        let target_discrete_mult = mult_steps[target_index];
+
+        // Tempo-synced slew: fast = 1/16 note, slow = 1/1 note
+        let beat_ms = 60000.0 / self.bpm;
+        let slew_ms = if self.pll_mult_slew_fast {
+            beat_ms * 0.125  // 1/16 note
+        } else {
+            beat_ms * 2.0    // 1/1 note (1000ms at 120bpm)
+        };
+        self.pll_multiplier = self.pll_mult_slew_state.next(target_discrete_mult, slew_ms);
+
+        // Direct modulation: continuous offset from LFOs
+        self.pll_multiplier = (self.pll_multiplier + self.mod_pll_mult_direct * 63.0).clamp(1.0, 64.0);
+
         // Velocity slew for click-free note transitions (5ms is fast but smooth)
         self.velocity = self.velocity_slew.next(self.target_velocity, 5.0);
 
         // Master volume slew for click-free volume changes (20ms)
         self.master_volume = self.master_volume_slew.next(self.target_master_volume, 20.0);
 
-        // Filter parameters - cutoff already smoothed by nih_plug parameter smoother
-        // Using target values directly to avoid double-smoothing issues
-        let cutoff_mod_hz = self.mod_filter_cutoff * 10000.0; // Scale modulation to ±10kHz
-        self.filter_cutoff = self.target_filter_cutoff;
-        self.filter_resonance = (self.target_filter_resonance + self.mod_filter_resonance).clamp(0.0, 0.99);
-        self.filter_drive = (self.target_filter_drive + self.mod_filter_drive * 14.0).clamp(1.0, 15.0); // Range 1-15, scale by 14
+        // Filter slews + modulation
+        let cutoff_mod_hz = self.mod_filter_cutoff * 10000.0;
+        self.filter_cutoff = self.filter_cutoff_slew.next(self.target_filter_cutoff, 20.0);
+        self.filter_resonance = (self.filter_resonance_slew.next(self.target_filter_resonance, 20.0) + self.mod_filter_resonance).clamp(0.0, 0.99);
+        self.filter_drive = (self.filter_drive_slew.next(self.target_filter_drive, 20.0) + self.mod_filter_drive * 14.0).clamp(1.0, 15.0);
 
         let cutoff = (self.filter_cutoff + filter_env * self.filter_envelope_amount + cutoff_mod_hz)
             .clamp(20.0, 20000.0);
@@ -1095,8 +1150,9 @@ impl Voice {
             let mut pll_out_final_l = 0.0_f64;
             let mut pll_out_final_r = 0.0_f64;
 
-            // VPS Oscillators (no FM or formant applied)
-            if self.vps_enabled && self.vps_volume > 0.001 {
+            // VPS Oscillators
+            let vps_should_process = self.vps_enabled && self.vps_volume > 0.001;
+            if vps_should_process {
                 let tune_mult = 2.0_f64.powf((self.vps_tune as f64 + self.vps_fine) / 12.0);
                 let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave) * tune_mult;
 
@@ -1123,7 +1179,6 @@ impl Voice {
                     raw_l
                 };
 
-                // Apply fold if enabled
                 let (folded_l, folded_r) = if self.vps_fold > 0.001 {
                     let folded = stereo_wavefold(stereo(raw_l, raw_r), self.vps_fold);
                     (stereo_left(folded), stereo_right(folded))
@@ -1137,8 +1192,9 @@ impl Voice {
                 mixed_oscillators_r += vps_out_r;
             }
 
-            // PLL Oscillators with FM and Formant (both applied only to PLL)
-            if self.pll_enabled && self.pll_volume > 0.001 {
+            // PLL Oscillators with FM and Formant
+            let pll_should_process = self.pll_enabled && self.pll_volume > 0.001;
+            if pll_should_process {
                 // Drift - slow random frequency modulation for organic sound
                 let drift_mod_l = if self.drift_amount > 0.001 {
                     self.drift_phase_l += self.drift_rate * 0.00001;

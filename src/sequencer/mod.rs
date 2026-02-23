@@ -26,7 +26,6 @@ pub struct Sequencer {
     bar_length_samples: usize,
     current_note: Option<(usize, usize)>,
     params_hash: u64,
-    #[allow(dead_code)]
     tempo_bpm: f64,
     pub note_pool: NotePool,
     pub strength_values: Vec<f32>,
@@ -66,7 +65,6 @@ impl Sequencer {
         self.tempo_bpm
     }
 
-    #[allow(dead_code)]
     pub fn set_bpm(&mut self, bpm: f64) {
         if (bpm - self.tempo_bpm).abs() > 0.01 {
             self.tempo_bpm = bpm;

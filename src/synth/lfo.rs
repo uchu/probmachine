@@ -30,6 +30,9 @@ pub enum LfoSyncDivision {
     QuarterTriplet,
     EighthTriplet,
     SixteenthTriplet,
+    // Long divisions
+    TwoBars,    // 2/1
+    FourBars,   // 4/1
 }
 
 impl LfoSyncDivision {
@@ -51,6 +54,8 @@ impl LfoSyncDivision {
             LfoSyncDivision::QuarterTriplet => 2.0 / 3.0,
             LfoSyncDivision::EighthTriplet => 1.0 / 3.0,
             LfoSyncDivision::SixteenthTriplet => 1.0 / 6.0,
+            LfoSyncDivision::TwoBars => 8.0,
+            LfoSyncDivision::FourBars => 16.0,
         }
     }
 
@@ -70,6 +75,8 @@ impl LfoSyncDivision {
             11 => LfoSyncDivision::QuarterTriplet,
             12 => LfoSyncDivision::EighthTriplet,
             13 => LfoSyncDivision::SixteenthTriplet,
+            14 => LfoSyncDivision::TwoBars,
+            15 => LfoSyncDivision::FourBars,
             _ => LfoSyncDivision::Quarter,
         }
     }
@@ -90,6 +97,8 @@ impl LfoSyncDivision {
             LfoSyncDivision::QuarterTriplet => "1/4T",
             LfoSyncDivision::EighthTriplet => "1/8T",
             LfoSyncDivision::SixteenthTriplet => "1/16T",
+            LfoSyncDivision::TwoBars => "2/1",
+            LfoSyncDivision::FourBars => "4/1",
         }
     }
 }
@@ -312,6 +321,9 @@ pub enum ModDestination {
     PllVolume,
     VpsVolume,
     SubVolume,
+    // PLL discrete
+    PllMult,
+    PllMultDirect,
 }
 
 impl ModDestination {
@@ -337,6 +349,8 @@ impl ModDestination {
             17 => ModDestination::PllVolume,
             18 => ModDestination::VpsVolume,
             19 => ModDestination::SubVolume,
+            20 => ModDestination::PllMult,
+            21 => ModDestination::PllMultDirect,
             _ => ModDestination::None,
         }
     }
@@ -363,6 +377,8 @@ impl ModDestination {
             ModDestination::PllVolume => "PLL Vol",
             ModDestination::VpsVolume => "VPS Vol",
             ModDestination::SubVolume => "Sub Vol",
+            ModDestination::PllMult => "PLL Mult",
+            ModDestination::PllMultDirect => "PLL Mult D",
         }
     }
 }
@@ -389,9 +405,35 @@ pub struct ModulationValues {
     pub pll_volume: f64,
     pub vps_volume: f64,
     pub sub_volume: f64,
+    pub pll_mult: f64,
+    pub pll_mult_direct: f64,
 }
 
 impl ModulationValues {
+    pub fn accumulate(&mut self, other: &ModulationValues) {
+        self.pll_damping += other.pll_damping;
+        self.pll_influence += other.pll_influence;
+        self.pll_track_speed += other.pll_track_speed;
+        self.pll_fm_amount += other.pll_fm_amount;
+        self.pll_cross_feedback += other.pll_cross_feedback;
+        self.pll_burst_amount += other.pll_burst_amount;
+        self.pll_range += other.pll_range;
+        self.vps_d += other.vps_d;
+        self.vps_v += other.vps_v;
+        self.filter_cutoff += other.filter_cutoff;
+        self.filter_resonance += other.filter_resonance;
+        self.filter_drive += other.filter_drive;
+        self.drift_amount += other.drift_amount;
+        self.tube_drive += other.tube_drive;
+        self.reverb_mix += other.reverb_mix;
+        self.reverb_decay += other.reverb_decay;
+        self.pll_volume += other.pll_volume;
+        self.vps_volume += other.vps_volume;
+        self.sub_volume += other.sub_volume;
+        self.pll_mult += other.pll_mult;
+        self.pll_mult_direct += other.pll_mult_direct;
+    }
+
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
         let mod_value = lfo_value * amount;
         match dest {
@@ -415,6 +457,8 @@ impl ModulationValues {
             ModDestination::PllVolume => self.pll_volume += mod_value,
             ModDestination::VpsVolume => self.vps_volume += mod_value,
             ModDestination::SubVolume => self.sub_volume += mod_value,
+            ModDestination::PllMult => self.pll_mult += mod_value,
+            ModDestination::PllMultDirect => self.pll_mult_direct += mod_value,
         }
     }
 }

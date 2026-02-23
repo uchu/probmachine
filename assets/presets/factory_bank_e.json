@@ -3979,7 +3979,7 @@
                 "lfo1_sync_division": 2,
                 "lfo1_sync_source": -1,
                 "lfo1_phase_mod": 0.0,
-                "lfo1_dest1": 21,
+                "lfo1_dest1": 0,
                 "lfo1_amount1": 0.18,
                 "lfo1_dest2": 0,
                 "lfo1_amount2": 0.0,

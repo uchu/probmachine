@@ -110,6 +110,8 @@ pub struct PresetData {
     pub synth_pll_fm_env_amount: f32,
     #[serde(default = "default_true")]
     pub synth_pll_enable: bool,
+    #[serde(default = "default_true")]
+    pub synth_pll_mult_slew: bool,
 
     pub synth_osc_octave: i32,
     #[serde(default)]
@@ -150,6 +152,12 @@ pub struct PresetData {
     pub synth_reverb_hpf: f32,
     pub synth_reverb_lpf: f32,
     pub synth_reverb_ducking: f32,
+    #[serde(default = "default_reverb_input_hpf")]
+    pub synth_reverb_input_hpf: f32,
+    #[serde(default = "default_reverb_input_lpf")]
+    pub synth_reverb_input_lpf: f32,
+    #[serde(default = "default_reverb_mod_shape")]
+    pub synth_reverb_mod_shape: f32,
 
     #[serde(default)]
     pub lfo1_rate: f32,
@@ -284,6 +292,27 @@ pub struct PresetData {
     pub synth_color_distortion_threshold: f32,
     #[serde(default = "default_true")]
     pub synth_vps_enable: bool,
+    #[serde(default = "default_true")]
+    pub synth_coloration_enable: bool,
+    #[serde(default = "default_true")]
+    pub synth_reverb_enable: bool,
+
+    #[serde(default)]
+    pub mseq_steps: Vec<f32>,
+    #[serde(default)]
+    pub mseq_ties: i32,
+    #[serde(default = "default_mseq_division")]
+    pub mseq_division: i32,
+    #[serde(default = "default_mseq_slew")]
+    pub mseq_slew: f32,
+    #[serde(default)]
+    pub mseq_dest1: i32,
+    #[serde(default)]
+    pub mseq_amount1: f32,
+    #[serde(default)]
+    pub mseq_dest2: i32,
+    #[serde(default)]
+    pub mseq_amount2: f32,
 }
 
 fn default_swing() -> f32 { 50.0 }
@@ -295,9 +324,14 @@ fn default_true() -> bool { true }
 fn default_note_length() -> f32 { 95.0 }
 fn default_mod_amount() -> f32 { 100.0 }
 fn default_burst_threshold() -> f32 { 0.7 }
-fn default_loop_saturation() -> f32 { 1.0 }
-fn default_edge_sensitivity() -> f32 { 0.5 }
+fn default_loop_saturation() -> f32 { 100.0 }
+fn default_edge_sensitivity() -> f32 { 0.02 }
 fn default_pll_range() -> f32 { 1.0 }
+fn default_reverb_input_hpf() -> f32 { 20.0 }
+fn default_reverb_input_lpf() -> f32 { 18000.0 }
+fn default_reverb_mod_shape() -> f32 { 0.5 }
+fn default_mseq_division() -> i32 { 3 }
+fn default_mseq_slew() -> f32 { 5.0 }
 
 impl Default for PresetData {
     fn default() -> Self {
@@ -405,6 +439,9 @@ impl Default for PresetData {
             synth_reverb_hpf: 100.0,
             synth_reverb_lpf: 8000.0,
             synth_reverb_ducking: 0.0,
+            synth_reverb_input_hpf: 20.0,
+            synth_reverb_input_lpf: 18000.0,
+            synth_reverb_mod_shape: 0.5,
 
             lfo1_rate: 1.0,
             lfo1_waveform: 0,
@@ -478,6 +515,18 @@ impl Default for PresetData {
             synth_color_distortion_amount: 0.0,
             synth_color_distortion_threshold: 0.7,
             synth_vps_enable: true,
+            synth_coloration_enable: true,
+            synth_reverb_enable: true,
+            synth_pll_mult_slew: true,
+
+            mseq_steps: vec![0.0; 16],
+            mseq_ties: 0,
+            mseq_division: 3,
+            mseq_slew: 5.0,
+            mseq_dest1: 0,
+            mseq_amount1: 0.0,
+            mseq_dest2: 0,
+            mseq_amount2: 0.0,
         }
     }
 }

@@ -280,15 +280,24 @@ Same structure as Beat Probability grid (1220 × 420, 1184 inner width).
 
 ### 5. Synth (`src/ui/pages/synth.rs`)
 
-#### Header
-- No page heading (removed for touch UI)
-- Tab buttons: "Sound" 80 × 28, "Envelopes & FX" 140 × 28, "Mod" 80 × 28
-- Tab corner_radius: top-left/right 6.0, bottom 0
-- Selected tab color: RGB(60, 100, 160)
+#### Layout
+- Outer container: flex row, margin left -29px, overflow visible
+- Tab bar: fixed width 52px, left side
+- Content area: flex grow, padding left 8, top 8, overflow x hidden / y visible
+
+#### Sub-Tab Bar (vertical, left side)
+- Tab names: SOUND, ENV & FX, MOD, STEP MOD
+- Tab height: 158px (fixed constant `TAB_HEIGHT`)
+- Tab gap: 4px (fixed constant `TAB_GAP`)
+- Tab bar width: 52px (`TAB_BAR_WIDTH`)
+- Text: rotated -90°, font 16px (`TAB_FONT`)
+- Selected: bg RGB(55, 55, 65), text white, left accent 3px RGB(100, 140, 200)
+- Hovered: bg RGB(45, 45, 55)
+- Normal: bg RGB(30, 30, 38), text gray(150)
 
 #### Tab 0: Sound
 
-**PLL Oscillator Frame** — standard frame + sliders
+**PLL Oscillator** — header "Phase Locked Loop OSC", toggles: COLOR, EDGE, SLOW/FAST (spacing 540px from header, 80px between toggles)
 
 | Slider | Color |
 |--------|-------|
@@ -325,9 +334,9 @@ Same structure as Beat Probability grid (1220 × 420, 1184 inner width).
 
 #### Tab 2: Mod (`src/ui/pages/modulation.rs`)
 
-Rendered via `modulation::render(tui, params, setter)` when tab 2 is selected.
+Rendered via `modulation::render_ui(ui, params, setter)` when tab 2 is selected. No scroll — content renders directly.
 
-**LFO Panel (×3)** — Standard page frame. Spacing between panels: 12.0
+**LFO Panel (×3)** — No frame. Spacing between panels: separator (10px + line + 14px)
 
 **Controls per LFO**:
 - Title: "LFO X" size 18.0, bold
