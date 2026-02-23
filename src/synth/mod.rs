@@ -152,6 +152,10 @@ impl SynthEngine {
         self.voice.set_pll_fm_env_amount(amount as f64);
     }
 
+    pub fn set_pll_precision(&mut self, precision: bool) {
+        self.voice.set_pll_precision(precision);
+    }
+
     pub fn set_coloration_params(
         &mut self,
         ring_mod: f32,

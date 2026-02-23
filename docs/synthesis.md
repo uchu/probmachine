@@ -58,7 +58,6 @@ A novel synthesis method modeling analog PLL circuits. The VCO attempts to track
 |-------|-------|-------------|
 | Oct | -3 to +3 | Reference octave |
 | Tune | -12 to +12 | Semitone offset |
-| Fine | -1.0 to +1.0 | Fine tune (cents) |
 | PW | 0.01-0.99 | Reference pulse width |
 
 **PLL Loop (Blue):**
@@ -73,6 +72,10 @@ A novel synthesis method modeling analog PLL circuits. The VCO attempts to track
 **PLL Modes:**
 - **AnalogLikePD**: XOR-style phase detector, smooth character
 - **EdgePFD**: Edge-triggered phase-frequency detector, more aggressive
+
+**Precision Toggle (PREC):**
+- **ON (default)**: New PLL-theory loop — cubic speed curve, ωn/ζ-based Kp/Ki, sub-sample edge detection, clamped phase error. More predictable, musically tuned response.
+- **OFF**: Legacy loop — linear speed, ad-hoc damp_factor Kp/Ki, sample-level edges, tanh phase error. Looser, more chaotic character.
 
 **Advanced PLL Parameters:**
 | Param | Description |
@@ -107,15 +110,29 @@ The PLL oscillator excels at:
 - Chaotic, textured sounds with high feedback
 - Rich stereo imaging with offset parameters
 - FM-like timbres through the FM section
-- DC blocking filter on output handles colored mode saturation artifacts
 - Click-free operation: VCO phase continues smoothly on retrigger
+- Precision toggle for switching between tight PLL-theory loop and looser legacy behavior
+
+**Loop Coefficient Theory (Precision ON):**
+- Track speed is cubed before the error filter sigmoid, giving much more resolution at low values
+- Kp (proportional) and Ki (integral) derived from ωn (natural frequency) and ζ (damping ratio)
+- Bandwidth maps [3..150 Hz] from the curved track speed
+- Damping maps to ζ: low damping → underdamped/ringing, high damping → overdamped/smooth
+- AnalogLikePD uses linear phase detector for wider capture range
+- EdgePFD uses sub-sample interpolation for cleaner high-frequency tracking
+
+**Loop Coefficient Theory (Precision OFF / Legacy):**
+- Linear track speed fed through sigmoid
+- Ad-hoc Kp/Ki derived from damp_factor (1 - damping * 0.95)
+- Sample-level edge detection with integer counters
+- Phase error normalized via tanh for softer saturation
 
 **Sound Design Tips:**
-- Track < 0.3: Slow, gliding portamento character
+- Track < 0.3: Slow, gliding portamento character (cubic curve gives fine control here)
 - Track 0.3-0.7: Stable tracking, predictable pitch
 - Track > 0.7: "Overtrack" mode - frequency bursts, instability
-- High Damping: Faster settling, cleaner sound
-- Low Damping: Ringy, resonant behavior
+- High Damping: ζ≈1.5, overdamped — fast settling, clean sound, proportional-dominant
+- Low Damping: ζ≈0.15, underdamped — ringy, resonant, integral-dominant
 - Use stereo offsets for massive width without losing mono compatibility
 - Range at 0: Very slow lock, creates characteristic analog PLL "hunting" behavior
 - Range at 1: Fast lock, tight frequency tracking

@@ -127,6 +127,7 @@ pub struct Voice {
     pll_stereo_phase: f64,
     pll_cross_feedback: f64,
     pll_fm_env_amount: f64,
+    pll_precision: bool,
     pll_prev_out_l: f64,
     pll_prev_out_r: f64,
 
@@ -445,6 +446,7 @@ impl Voice {
             pll_stereo_phase: 0.0,
             pll_cross_feedback: 0.0,
             pll_fm_env_amount: 0.0,
+            pll_precision: true,
             pll_prev_out_l: 0.0,
             pll_prev_out_r: 0.0,
 
@@ -936,6 +938,10 @@ impl Voice {
         self.target_pll_fm_env_amount = amount;
     }
 
+    pub fn set_pll_precision(&mut self, precision: bool) {
+        self.pll_precision = precision;
+    }
+
     pub fn set_coloration_params(
         &mut self,
         ring_mod: f64,
@@ -1381,6 +1387,7 @@ impl Voice {
                     self.pll_edge_sensitivity,
                     self.pll_range,
                 );
+                self.pll_oscillator_left.set_precision(self.pll_precision);
                 self.pll_oscillator_left.set_params(track_left, damp_left, self.pll_multiplier, slewed_influence, self.pll_colored, mode);
                 let pll_raw_l = self.pll_oscillator_left.next(ref_phase, ref_mod_l, ref_pulse);
 
@@ -1394,6 +1401,7 @@ impl Voice {
                         self.pll_edge_sensitivity,
                         self.pll_range,
                     );
+                    self.pll_oscillator_right.set_precision(self.pll_precision);
                     self.pll_oscillator_right.set_params(track_right, damp_right, self.pll_multiplier, slewed_influence, self.pll_colored, mode);
                     self.pll_oscillator_right.next(ref_phase_r, ref_mod_r, ref_pulse)
                 } else {

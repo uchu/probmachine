@@ -77,6 +77,7 @@ Complete reference of all parameters and UI controls.
 | synth_pll_colored | Color | Enable harmonic coloration |
 | synth_pll_mode | Mode | false=AnalogLikePD, true=EdgePFD |
 | synth_pll_mult_slew | FAST/SLOW | Tempo-synced multiplier slew: FAST=1/16 note, SLOW=1/1 note |
+| synth_pll_precision | PREC | Precision mode: ON=ωn/ζ-based loop coefficients with cubic speed curve, OFF=legacy ad-hoc loop |
 | synth_pll_enable | Enable | Bypass PLL oscillator |
 
 ### VPS Oscillator

@@ -143,12 +143,26 @@ pub struct PLLOscillator {
     sample_rate: f64,
 
     mode: PllMode,
+    precision: bool,
+
+    // New (precision) EdgePFD state
+    prev_ref_sig: f64,
+    prev_pll_sig: f64,
+    ref_was_high: bool,
+    pll_was_high: bool,
+    last_ref_rising_time: f64,
+    last_pll_rising_time: f64,
+    last_ref_falling_time: f64,
+    last_pll_falling_time: f64,
+
+    // Legacy EdgePFD state
     last_ref_phase: f64,
     last_pll_phase: f64,
     last_ref_rising_smpl: i64,
     last_pll_rising_smpl: i64,
     last_ref_falling_smpl: i64,
     last_pll_falling_smpl: i64,
+
     sample_counter: i64,
     pfd_state: f64,
 
@@ -189,12 +203,24 @@ impl PLLOscillator {
             sample_rate,
 
             mode: PllMode::AnalogLikePD,
+            precision: true,
+
+            prev_ref_sig: 0.0,
+            prev_pll_sig: 0.0,
+            ref_was_high: false,
+            pll_was_high: false,
+            last_ref_rising_time: 0.0,
+            last_pll_rising_time: 0.0,
+            last_ref_falling_time: 0.0,
+            last_pll_falling_time: 0.0,
+
             last_ref_phase: 0.0,
             last_pll_phase: 0.0,
             last_ref_rising_smpl: 0,
             last_pll_rising_smpl: 0,
             last_ref_falling_smpl: 0,
             last_pll_falling_smpl: 0,
+
             sample_counter: 0,
             pfd_state: 0.0,
 
@@ -235,6 +261,10 @@ impl PLLOscillator {
         self.mode = mode;
     }
 
+    pub fn set_precision(&mut self, precision: bool) {
+        self.precision = precision;
+    }
+
     pub fn set_experimental_params(
         &mut self,
         retrigger: f64,
@@ -270,16 +300,31 @@ impl PLLOscillator {
             self.mult_crossfade = (self.mult_crossfade + 0.02).min(1.0);
         }
 
-        let track_exp = (self.track_speed * 6.0 - 3.0).exp();
-        self.cached_alpha = (track_exp / (1.0 + track_exp)).clamp(0.001, 0.995);
-
         let range_scale = (self.range * self.range * self.range).max(0.0001);
         let mult_penalty = 1.0 / self.mult.sqrt().max(1.0);
-        let influence_scaled = 0.1 + self.influence * 9.9;
 
-        let damp_factor = 1.0 - self.damping * 0.95;
-        self.cached_kp = influence_scaled * 50.0 * damp_factor * mult_penalty * range_scale;
-        self.cached_ki = influence_scaled * 5000.0 * damp_factor * mult_penalty * range_scale;
+        if self.precision {
+            let speed_curved = self.track_speed * self.track_speed * self.track_speed;
+            let track_exp = (speed_curved * 6.0 - 3.0).exp();
+            self.cached_alpha = (track_exp / (1.0 + track_exp)).clamp(0.001, 0.995);
+
+            let influence_gain = 0.1 + self.influence * 9.9;
+            let bw_hz = 3.0 + speed_curved * 147.0;
+            let omega_n = std::f64::consts::TAU * bw_hz;
+            let zeta = 0.15 + self.damping * 1.35;
+
+            self.cached_kp = 2.0 * zeta * omega_n * influence_gain * mult_penalty * range_scale;
+            self.cached_ki = omega_n * omega_n * influence_gain * mult_penalty * range_scale;
+        } else {
+            let track_exp = (self.track_speed * 6.0 - 3.0).exp();
+            self.cached_alpha = (track_exp / (1.0 + track_exp)).clamp(0.001, 0.995);
+
+            let influence_scaled = 0.1 + self.influence * 9.9;
+            let damp_factor = 1.0 - self.damping * 0.95;
+
+            self.cached_kp = influence_scaled * 50.0 * damp_factor * mult_penalty * range_scale;
+            self.cached_ki = influence_scaled * 5000.0 * damp_factor * mult_penalty * range_scale;
+        }
 
         self.cached_alpha *= range_scale.sqrt();
 
@@ -295,8 +340,6 @@ impl PLLOscillator {
         self.filtered_error = 0.0;
         self.pfd_state = 0.0;
         self.overtrack_state = 0.0;
-        // Phase continues naturally - resetting would cause output discontinuity (click)
-        // PLL loop will handle syncing VCO to reference
     }
 
     fn wrap_pi(x: f64) -> f64 {
@@ -306,8 +349,26 @@ impl PLLOscillator {
         if y > PI { y - two_pi } else { y }
     }
 
+    #[inline]
+    fn detect_edge_subsample(prev: f64, cur: f64, up_th: f64, dn_th: f64, was_high: bool)
+        -> (bool, bool, bool, f64) {
+        if !was_high && cur >= up_th {
+            let frac = if (cur - prev).abs() > 1e-12 {
+                ((up_th - prev) / (cur - prev)).clamp(0.0, 1.0)
+            } else { 0.5 };
+            (true, false, true, frac)
+        } else if was_high && cur <= dn_th {
+            let frac = if (cur - prev).abs() > 1e-12 {
+                ((dn_th - prev) / (cur - prev)).clamp(0.0, 1.0)
+            } else { 0.5 };
+            (false, true, false, frac)
+        } else {
+            (false, false, was_high, 0.0)
+        }
+    }
+
     fn detect_edges(_prev: f64, cur: f64, up_th: f64, dn_th: f64, was_high: bool)
-        -> (bool /*rising*/, bool /*falling*/, bool /*is_high now*/) {
+        -> (bool, bool, bool) {
         if !was_high && cur >= up_th {
             (true, false, true)
         } else if was_high && cur <= dn_th {
@@ -319,35 +380,69 @@ impl PLLOscillator {
 
     fn next_pfd(&mut self, ref_sig: f64) -> f64 {
         self.sample_counter += 1;
-        let pll_sig = ((self.phase * 2.0 * std::f64::consts::PI).sin()).signum();
 
-        let rising_threshold = self.edge_sensitivity;
-        let falling_threshold = -self.edge_sensitivity;
+        if self.precision {
+            let pll_sin = (self.phase * std::f64::consts::TAU).sin();
+            let rising_threshold = self.edge_sensitivity;
+            let falling_threshold = -self.edge_sensitivity;
 
-        let (ref_rising, ref_falling, ref_high) = Self::detect_edges(
-            self.last_ref_phase, ref_sig, rising_threshold, falling_threshold, self.last_ref_phase > 0.0
-        );
-        let (pll_rising, pll_falling, pll_high) = Self::detect_edges(
-            self.last_pll_phase, pll_sig, rising_threshold, falling_threshold, self.last_pll_phase > 0.0
-        );
+            let (ref_rising, ref_falling, ref_high, ref_frac) = Self::detect_edge_subsample(
+                self.prev_ref_sig, ref_sig, rising_threshold, falling_threshold, self.ref_was_high
+            );
+            let (pll_rising, pll_falling, pll_high, pll_frac) = Self::detect_edge_subsample(
+                self.prev_pll_sig, pll_sin, rising_threshold, falling_threshold, self.pll_was_high
+            );
 
-        if ref_rising { self.last_ref_rising_smpl = self.sample_counter; }
-        if ref_falling { self.last_ref_falling_smpl = self.sample_counter; }
-        if pll_rising { self.last_pll_rising_smpl = self.sample_counter; }
-        if pll_falling { self.last_pll_falling_smpl = self.sample_counter; }
+            let t = self.sample_counter as f64;
+            if ref_rising { self.last_ref_rising_time = t - 1.0 + ref_frac; }
+            if ref_falling { self.last_ref_falling_time = t - 1.0 + ref_frac; }
+            if pll_rising { self.last_pll_rising_time = t - 1.0 + pll_frac; }
+            if pll_falling { self.last_pll_falling_time = t - 1.0 + pll_frac; }
 
-        self.last_ref_phase = if ref_high { 1.0 } else { -1.0 };
-        self.last_pll_phase = if pll_high { 1.0 } else { -1.0 };
+            self.ref_was_high = ref_high;
+            self.pll_was_high = pll_high;
+            self.prev_ref_sig = ref_sig;
+            self.prev_pll_sig = pll_sin;
 
-        let dt_rising = (self.last_ref_rising_smpl - self.last_pll_rising_smpl) as f64;
-        let dt_falling = (self.last_ref_falling_smpl - self.last_pll_falling_smpl) as f64;
-        let dt = (dt_rising + dt_falling) * 0.5;
+            let dt_rising = self.last_ref_rising_time - self.last_pll_rising_time;
+            let dt_falling = self.last_ref_falling_time - self.last_pll_falling_time;
+            let dt = (dt_rising + dt_falling) * 0.5;
 
-        let effective_freq = (self.base_freq * self.mult).max(1.0);
-        let base_period = (self.sample_rate / effective_freq).max(1.0);
-        let new_pfd_value = (dt / base_period).tanh();
-        self.pfd_state = self.pfd_state * 0.85 + new_pfd_value * 0.15;
-        self.pfd_state
+            let effective_freq = (self.base_freq * self.mult).max(1.0);
+            let base_period = (self.sample_rate / effective_freq).max(1.0);
+            let new_pfd_value = (dt / base_period).clamp(-1.0, 1.0);
+            self.pfd_state = self.pfd_state * 0.85 + new_pfd_value * 0.15;
+            self.pfd_state
+        } else {
+            let pll_sig = ((self.phase * 2.0 * std::f64::consts::PI).sin()).signum();
+            let rising_threshold = self.edge_sensitivity;
+            let falling_threshold = -self.edge_sensitivity;
+
+            let (ref_rising, ref_falling, ref_high) = Self::detect_edges(
+                self.last_ref_phase, ref_sig, rising_threshold, falling_threshold, self.last_ref_phase > 0.0
+            );
+            let (pll_rising, pll_falling, pll_high) = Self::detect_edges(
+                self.last_pll_phase, pll_sig, rising_threshold, falling_threshold, self.last_pll_phase > 0.0
+            );
+
+            if ref_rising { self.last_ref_rising_smpl = self.sample_counter; }
+            if ref_falling { self.last_ref_falling_smpl = self.sample_counter; }
+            if pll_rising { self.last_pll_rising_smpl = self.sample_counter; }
+            if pll_falling { self.last_pll_falling_smpl = self.sample_counter; }
+
+            self.last_ref_phase = if ref_high { 1.0 } else { -1.0 };
+            self.last_pll_phase = if pll_high { 1.0 } else { -1.0 };
+
+            let dt_rising = (self.last_ref_rising_smpl - self.last_pll_rising_smpl) as f64;
+            let dt_falling = (self.last_ref_falling_smpl - self.last_pll_falling_smpl) as f64;
+            let dt = (dt_rising + dt_falling) * 0.5;
+
+            let effective_freq = (self.base_freq * self.mult).max(1.0);
+            let base_period = (self.sample_rate / effective_freq).max(1.0);
+            let new_pfd_value = (dt / base_period).tanh();
+            self.pfd_state = self.pfd_state * 0.85 + new_pfd_value * 0.15;
+            self.pfd_state
+        }
     }
 
     pub fn next(&mut self, input_phase: f64, input_freq: f64, ref_pulse: f64) -> f64 {
@@ -358,7 +453,11 @@ impl PLLOscillator {
         let phase_error = match self.mode {
             PllMode::AnalogLikePD => {
                 let diff = Self::wrap_pi(input_phase * 2.0 * PI - self.phase * 2.0 * PI);
-                (diff / PI).tanh()
+                if self.precision {
+                    (diff / PI).clamp(-1.0, 1.0)
+                } else {
+                    (diff / PI).tanh()
+                }
             }
             PllMode::EdgePFD => {
                 self.next_pfd(ref_pulse)

@@ -286,6 +286,7 @@ impl Plugin for Device {
                 self.params.synth_pll_mode.value(),
             );
             synth.set_pll_mult_slew(self.params.synth_pll_mult_slew.value());
+            synth.set_pll_precision(self.params.synth_pll_precision.value());
 
             synth.set_pll_volume(self.params.synth_pll_volume.modulated_plain_value());
 

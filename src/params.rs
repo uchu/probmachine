@@ -476,6 +476,9 @@ pub struct DeviceParams {
     pub synth_pll_stereo_phase: FloatParam,
     #[id = "synth_pll_cross_feedback"]
     pub synth_pll_cross_feedback: FloatParam,
+    #[id = "synth_pll_precision"]
+    pub synth_pll_precision: BoolParam,
+
     #[id = "synth_pll_fm_env_amount"]
     pub synth_pll_fm_env_amount: FloatParam,
 
@@ -1738,6 +1741,7 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_precision: BoolParam::new("PLL Precision".to_string(), true),
             synth_pll_fm_env_amount: FloatParam::new(
                 "PLL FM Env Amount".to_string(),
                 0.0,

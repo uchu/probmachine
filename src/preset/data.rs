@@ -109,6 +109,8 @@ pub struct PresetData {
     #[serde(default)]
     pub synth_pll_fm_env_amount: f32,
     #[serde(default = "default_true")]
+    pub synth_pll_precision: bool,
+    #[serde(default = "default_true")]
     pub synth_pll_enable: bool,
     #[serde(default = "default_true")]
     pub synth_pll_mult_slew: bool,
@@ -411,6 +413,7 @@ impl Default for PresetData {
             synth_pll_stereo_phase: 0.0,
             synth_pll_cross_feedback: 0.0,
             synth_pll_fm_env_amount: 0.0,
+            synth_pll_precision: true,
             synth_pll_enable: true,
 
             synth_osc_octave: 0,

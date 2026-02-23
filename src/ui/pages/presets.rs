@@ -735,6 +735,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_stereo_phase, data.synth_pll_stereo_phase);
     setter.set_parameter(&params.synth_pll_cross_feedback, data.synth_pll_cross_feedback);
     setter.set_parameter(&params.synth_pll_fm_env_amount, data.synth_pll_fm_env_amount);
+    setter.set_parameter(&params.synth_pll_precision, data.synth_pll_precision);
     setter.set_parameter(&params.synth_pll_enable, data.synth_pll_enable);
 
     setter.set_parameter(&params.synth_osc_octave, data.synth_osc_octave);
@@ -1143,6 +1144,7 @@ fn save_params_to_preset_data(
     data.synth_pll_stereo_phase = params.synth_pll_stereo_phase.modulated_plain_value();
     data.synth_pll_cross_feedback = params.synth_pll_cross_feedback.modulated_plain_value();
     data.synth_pll_fm_env_amount = params.synth_pll_fm_env_amount.modulated_plain_value();
+    data.synth_pll_precision = params.synth_pll_precision.value();
     data.synth_pll_enable = params.synth_pll_enable.value();
 
     data.synth_osc_octave = params.synth_osc_octave.value();

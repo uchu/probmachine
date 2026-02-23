@@ -202,6 +202,12 @@ fn render_sound_tab(
                             if mult_slew_fast != params.synth_pll_mult_slew.value() {
                                 setter.set_parameter(&params.synth_pll_mult_slew, mult_slew_fast);
                             }
+                            ui.add_space(80.0);
+                            let mut precision = params.synth_pll_precision.value();
+                            render_toggle(ui, &mut precision, "PREC");
+                            if precision != params.synth_pll_precision.value() {
+                                setter.set_parameter(&params.synth_pll_precision, precision);
+                            }
                         });
                     });
             });
