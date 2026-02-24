@@ -59,6 +59,7 @@ impl SynthEngine {
         self.pll_feedback = 0.0;
     }
 
+    #[allow(dead_code)]
     pub fn get_current_sequencer_note(&self) -> bool {
         self.sequencer.has_active_note()
     }

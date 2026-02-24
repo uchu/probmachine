@@ -92,6 +92,7 @@ impl Sequencer {
         self.current_note = None;
     }
 
+    #[allow(dead_code)]
     pub fn has_active_note(&self) -> bool {
         self.current_note.is_some()
     }

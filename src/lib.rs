@@ -31,11 +31,10 @@ pub struct Device {
     output_level_smoothed: f32,
     limiter: MasterLimiter,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
-    host_transport_detected: bool,
+    transport_has_played: bool,
     was_playing: bool,
     output_buffer_l: Vec<f32>,
     output_buffer_r: Vec<f32>,
-    last_preset_version: u64,
     cpu_measure_counter: u32,
 }
 
@@ -52,11 +51,10 @@ impl Default for Device {
             output_level_smoothed: 0.0,
             limiter: MasterLimiter::new(44100.0),
             midi_events_buffer: Vec::with_capacity(64),
-            host_transport_detected: false,
+            transport_has_played: false,
             was_playing: false,
             output_buffer_l: Vec::new(),
             output_buffer_r: Vec::new(),
-            last_preset_version: 0,
             cpu_measure_counter: 0,
         }
     }
@@ -196,8 +194,8 @@ impl Plugin for Device {
         let tempo = transport.tempo.unwrap_or(120.0);
         let is_playing = transport.playing;
 
-        if !is_playing {
-            self.host_transport_detected = true;
+        if is_playing {
+            self.transport_has_played = true;
         }
 
         // Detect transport stop transition: release voice and send MIDI note-off
@@ -458,8 +456,8 @@ impl Plugin for Device {
             let pll_feedback_amt = self.params.synth_pll_feedback.modulated_plain_value();
             let base_freq = 220.0;
 
-            let seq_playing = if self.host_transport_detected {
-                self.params.sequencer_enable.value() || is_playing
+            let seq_playing = if self.transport_has_played {
+                self.params.sequencer_enable.value() && is_playing
             } else {
                 self.params.sequencer_enable.value()
             };
