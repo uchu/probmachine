@@ -131,6 +131,12 @@ impl StereoReverb {
         self.decay_slew.set_sample_rate(sample_rate);
     }
 
+    pub fn reset(&mut self) {
+        self.reverb.reset();
+        self.ducking_envelope = 0.0;
+        self.decay_mod = 0.0;
+    }
+
     pub fn set_params(
         &mut self,
         mix: f64,

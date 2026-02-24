@@ -82,7 +82,8 @@ pub struct ExternalNoteEvent {
 pub struct MidiState {
     pub cc_state: MidiCCState,
     pub external_notes: Vec<ExternalNoteEvent>,
-    pub active_note: Option<u8>,
+    active_notes: [bool; 128],
+    active_note_count: u8,
     pub midi_input_enabled: bool,
 }
 
@@ -97,7 +98,8 @@ impl MidiState {
         Self {
             cc_state: MidiCCState::new(),
             external_notes: Vec::with_capacity(16),
-            active_note: None,
+            active_notes: [false; 128],
+            active_note_count: 0,
             midi_input_enabled: true,
         }
     }
@@ -118,11 +120,14 @@ impl MidiState {
                         is_note_on: true,
                         timing,
                     });
-                    self.active_note = Some(note);
+                    if !self.active_notes[note as usize] {
+                        self.active_notes[note as usize] = true;
+                        self.active_note_count = self.active_note_count.saturating_add(1);
+                    }
                 }
             }
             NoteEvent::NoteOff { note, timing, .. } => {
-                if self.midi_input_enabled && self.active_note == Some(note) {
+                if self.midi_input_enabled && self.active_notes[note as usize] {
                     self.external_notes.push(ExternalNoteEvent {
                         note,
                         velocity: 0,
@@ -130,7 +135,8 @@ impl MidiState {
                         is_note_on: false,
                         timing,
                     });
-                    self.active_note = None;
+                    self.active_notes[note as usize] = false;
+                    self.active_note_count = self.active_note_count.saturating_sub(1);
                 }
             }
             NoteEvent::MidiCC { cc, value, .. } => {
@@ -145,7 +151,7 @@ impl MidiState {
     }
 
     pub fn has_active_note(&self) -> bool {
-        self.active_note.is_some()
+        self.active_note_count > 0
     }
 }
 
@@ -341,5 +347,18 @@ impl MidiProcessor {
 
     pub fn set_output_channel(&mut self, channel: u8) {
         self.output.set_output_channel(channel);
+    }
+
+    pub fn stop_all_notes(&mut self, sample_offset: u32) {
+        if let Some(note) = self.current_sequencer_note.take() {
+            self.output.queue_note_off(note, sample_offset);
+        }
+    }
+
+    pub fn clear_all(&mut self) {
+        if let Some(note) = self.current_sequencer_note.take() {
+            self.output.queue_note_off(note, 0);
+        }
+        self.output.clear();
     }
 }

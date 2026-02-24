@@ -30,6 +30,10 @@ pub struct Sequencer {
     pub note_pool: NotePool,
     pub strength_values: Vec<f32>,
     pub octave_randomization: OctaveRandomization,
+    scratch_start_times: Vec<f32>,
+    scratch_lost_beats: Vec<(f32, f32)>,
+    scratch_candidates: Vec<(BeatMode, usize, usize, f32)>,
+    scratch_events: Vec<NoteEvent>,
 }
 
 impl Sequencer {
@@ -42,8 +46,8 @@ impl Sequencer {
 
         Self {
             sample_rate,
-            current_bar: Vec::new(),
-            next_bar: Vec::new(),
+            current_bar: Vec::with_capacity(64),
+            next_bar: Vec::with_capacity(64),
             bar_position_samples: 0,
             bar_length_samples,
             current_note: None,
@@ -52,6 +56,10 @@ impl Sequencer {
             note_pool: NotePool::new(),
             strength_values,
             octave_randomization: OctaveRandomization::default(),
+            scratch_start_times: Vec::with_capacity(128),
+            scratch_lost_beats: Vec::with_capacity(64),
+            scratch_candidates: Vec::with_capacity(16),
+            scratch_events: Vec::with_capacity(64),
         }
     }
 
@@ -78,6 +86,22 @@ impl Sequencer {
             self.sample_rate = sample_rate;
             self.bar_length_samples = Self::calculate_bar_length_samples(sample_rate, self.tempo_bpm);
         }
+    }
+
+    pub fn release_current_note(&mut self) {
+        self.current_note = None;
+    }
+
+    pub fn has_active_note(&self) -> bool {
+        self.current_note.is_some()
+    }
+
+    pub fn reset(&mut self) {
+        self.current_note = None;
+        self.bar_position_samples = 0;
+        self.current_bar.clear();
+        self.next_bar.clear();
+        self.params_hash = 0;
     }
 
     fn hash_params(params: &DeviceParams) -> u64 {
@@ -174,44 +198,41 @@ impl Sequencer {
         }
     }
 
-    fn generate_bar(&self, params: &DeviceParams) -> Vec<NoteEvent> {
-        let mut events = Vec::new();
+    fn generate_bar_into(&mut self, params: &DeviceParams) {
+        self.scratch_events.clear();
+        self.scratch_start_times.clear();
+        self.scratch_lost_beats.clear();
         let mut rng = rand::thread_rng();
 
         let total_samples = self.bar_length_samples;
 
-        // Compute ranges for relative normalization
         let strength_range = self.get_strength_range();
         let length_range = self.get_enabled_length_range(params);
-
-        use std::collections::HashSet;
-        let mut unique_start_times: HashSet<(u32, u32)> = HashSet::new();
 
         for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
             for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
                 for index in 0..*count {
                     let (start, _) = DeviceParams::get_beat_time_span(mode, *count, index);
                     let start_fixed = (start * 1000000.0) as u32;
-                    unique_start_times.insert((start_fixed, 1000000));
+                    let start_f = start_fixed as f32 / 1000000.0;
+                    if !self.scratch_start_times.iter().any(|t| (*t - start_f).abs() < 0.000001) {
+                        self.scratch_start_times.push(start_f);
+                    }
                 }
             }
         }
 
-        let mut start_times: Vec<f32> = unique_start_times
-            .iter()
-            .map(|(num, denom)| *num as f32 / *denom as f32)
-            .collect();
-        start_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        self.scratch_start_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let mut occupied_until: f32 = 0.0;
-        let mut lost_beats: Vec<(f32, f32)> = Vec::new();
 
-        for &start_time in &start_times {
+        for st_idx in 0..self.scratch_start_times.len() {
+            let start_time = self.scratch_start_times[st_idx];
             if start_time < occupied_until - 0.0001 {
                 continue;
             }
 
-            let mut candidates: Vec<(BeatMode, usize, usize, f32)> = Vec::new();
+            self.scratch_candidates.clear();
 
             for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
                 for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
@@ -223,21 +244,21 @@ impl Sequencer {
                             let probability = param.modulated_plain_value();
 
                             if probability > 0.0 {
-                                candidates.push((mode, *count, index, probability));
+                                self.scratch_candidates.push((mode, *count, index, probability));
                             }
                         }
                     }
                 }
             }
 
-            if candidates.is_empty() {
+            if self.scratch_candidates.is_empty() {
                 continue;
             }
 
-            let total_probability: f32 = candidates.iter().map(|(_, _, _, p)| p).sum();
+            let total_probability: f32 = self.scratch_candidates.iter().map(|(_, _, _, p)| p).sum();
 
             if total_probability > 0.0 {
-                let lost_probability: f32 = lost_beats
+                let lost_probability: f32 = self.scratch_lost_beats
                     .iter()
                     .filter(|(end_time, _)| *end_time > start_time + 0.0001)
                     .map(|(_, prob)| prob)
@@ -250,10 +271,11 @@ impl Sequencer {
                     let mut cumulative = 0.0;
                     let mut winner_idx: Option<usize> = None;
 
-                    for (idx, (mode, count, index, probability)) in candidates.iter().enumerate() {
+                    for idx in 0..self.scratch_candidates.len() {
+                        let (mode, count, index, probability) = self.scratch_candidates[idx];
                         cumulative += probability;
                         if random_value < cumulative {
-                            let (start, end) = DeviceParams::get_beat_time_span(*mode, *count, *index);
+                            let (start, end) = DeviceParams::get_beat_time_span(mode, count, index);
                             let duration_normalized = end - start;
 
                             let strength = self.get_strength_at_position(start_time);
@@ -274,7 +296,6 @@ impl Sequencer {
                             let swung_start_time = DeviceParams::apply_swing(shifted_time, swing_amount);
                             let sample_position = (swung_start_time * total_samples as f32) as usize;
 
-                            // length_value for note selection (based on gate time multiplier)
                             let length_value = (capped_multiplier / 2.0).clamp(0.0, 1.0);
 
                             let midi_note = self.note_pool.select_midi_note_with_length(strength, length_value, &mut rng)
@@ -289,10 +310,8 @@ impl Sequencer {
 
                             let frequency = midi_to_frequency(final_midi_note) as f64;
 
-                            // Normalize beat duration using log scale
                             let abs_beat_length = ((duration_normalized.log2() + 5.0) / 5.0).clamp(0.0, 1.0);
 
-                            // Normalize strength and length relative to actual ranges for velocity targeting
                             let relative_strength = Self::normalize_to_range(strength, strength_range.0, strength_range.1);
                             let relative_length = Self::normalize_to_range(abs_beat_length, length_range.0, length_range.1);
 
@@ -302,7 +321,7 @@ impl Sequencer {
                                 &mut rng
                             );
 
-                            events.push(NoteEvent {
+                            self.scratch_events.push(NoteEvent {
                                 sample_position,
                                 frequency,
                                 duration_samples,
@@ -316,22 +335,22 @@ impl Sequencer {
                         }
                     }
 
-                    for (idx, (mode, count, index, probability)) in candidates.iter().enumerate() {
+                    for idx in 0..self.scratch_candidates.len() {
                         if Some(idx) != winner_idx {
-                            let (_, end) = DeviceParams::get_beat_time_span(*mode, *count, *index);
-                            lost_beats.push((end, *probability));
+                            let (mode, count, index, probability) = self.scratch_candidates[idx];
+                            let (_, end) = DeviceParams::get_beat_time_span(mode, count, index);
+                            self.scratch_lost_beats.push((end, probability));
                         }
                     }
                 } else {
-                    for (mode, count, index, probability) in &candidates {
-                        let (_, end) = DeviceParams::get_beat_time_span(*mode, *count, *index);
-                        lost_beats.push((end, *probability));
+                    for idx in 0..self.scratch_candidates.len() {
+                        let (mode, count, index, probability) = self.scratch_candidates[idx];
+                        let (_, end) = DeviceParams::get_beat_time_span(mode, count, index);
+                        self.scratch_lost_beats.push((end, probability));
                     }
                 }
             }
         }
-
-        events
     }
 
     pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64, u8, u8) {
@@ -340,7 +359,8 @@ impl Sequencer {
 
         if params_changed {
             self.params_hash = new_hash;
-            self.next_bar = self.generate_bar(params);
+            self.generate_bar_into(params);
+            std::mem::swap(&mut self.next_bar, &mut self.scratch_events);
         }
 
         let mut should_trigger = false;
@@ -375,9 +395,13 @@ impl Sequencer {
         self.bar_position_samples += 1;
 
         if self.bar_position_samples >= self.bar_length_samples {
+            if self.current_note.is_some() {
+                should_release = true;
+            }
             self.bar_position_samples = 0;
-            self.current_bar = self.next_bar.clone();
-            self.next_bar = self.generate_bar(params);
+            std::mem::swap(&mut self.current_bar, &mut self.next_bar);
+            self.generate_bar_into(params);
+            std::mem::swap(&mut self.next_bar, &mut self.scratch_events);
             self.current_note = None;
         }
 

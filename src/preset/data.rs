@@ -87,6 +87,12 @@ pub struct PresetData {
     pub synth_pll_fm_amount: f32,
     pub synth_pll_fm_ratio: i32,
     #[serde(default)]
+    pub synth_pll_fm_ratio_free: bool,
+    #[serde(default = "default_fm_ratio_float")]
+    pub synth_pll_fm_ratio_float: f32,
+    #[serde(default)]
+    pub synth_pll_fm_expand: bool,
+    #[serde(default)]
     pub synth_pll_retrigger: f32,
     #[serde(default = "default_burst_threshold")]
     pub synth_pll_burst_threshold: f32,
@@ -114,6 +120,26 @@ pub struct PresetData {
     pub synth_pll_enable: bool,
     #[serde(default = "default_true")]
     pub synth_pll_mult_slew: bool,
+
+    #[serde(default = "default_mult_slew_time")]
+    pub synth_pll_mult_slew_time: f32,
+
+    #[serde(default = "default_true")]
+    pub synth_pll_anti_alias: bool,
+    #[serde(default)]
+    pub synth_pll_second_order: bool,
+    #[serde(default)]
+    pub synth_pll_burst_decouple: bool,
+    #[serde(default)]
+    pub synth_pll_injection_lock: bool,
+    #[serde(default)]
+    pub synth_pll_injection_amount: f32,
+    #[serde(default)]
+    pub synth_pll_injection_x4: bool,
+    #[serde(default)]
+    pub synth_pll_chaos_delay: i32,
+    #[serde(default)]
+    pub synth_pll_feedback_div: i32,
 
     pub synth_osc_octave: i32,
     #[serde(default)]
@@ -343,7 +369,9 @@ fn default_reverb_input_hpf() -> f32 { 20.0 }
 fn default_reverb_input_lpf() -> f32 { 18000.0 }
 fn default_reverb_mod_shape() -> f32 { 0.5 }
 fn default_mseq_division() -> i32 { 3 }
+fn default_fm_ratio_float() -> f32 { 1.0 }
 fn default_mseq_slew() -> f32 { 5.0 }
+fn default_mult_slew_time() -> f32 { 0.15 }
 
 impl Default for PresetData {
     fn default() -> Self {
@@ -402,6 +430,9 @@ impl Default for PresetData {
             synth_pll_glide: 0.0,
             synth_pll_fm_amount: 0.0,
             synth_pll_fm_ratio: 1,
+            synth_pll_fm_ratio_free: false,
+            synth_pll_fm_ratio_float: 1.0,
+            synth_pll_fm_expand: false,
             synth_pll_retrigger: 1.0,
             synth_pll_burst_threshold: 0.7,
             synth_pll_burst_amount: 0.0,
@@ -415,6 +446,17 @@ impl Default for PresetData {
             synth_pll_fm_env_amount: 0.0,
             synth_pll_precision: true,
             synth_pll_enable: true,
+
+            synth_pll_mult_slew_time: 0.15,
+
+            synth_pll_anti_alias: true,
+            synth_pll_second_order: false,
+            synth_pll_burst_decouple: false,
+            synth_pll_injection_lock: false,
+            synth_pll_injection_amount: 0.0,
+            synth_pll_injection_x4: false,
+            synth_pll_chaos_delay: 0,
+            synth_pll_feedback_div: 0,
 
             synth_osc_octave: 0,
             synth_osc_tune: 0,

@@ -64,7 +64,6 @@ impl Oscillator {
         let israte = 1.0 / self.sample_rate;
         let d_f32 = d as f32;
         let v_f32 = v as f32;
-        // limit_v() prevents DC offset by blending out problematic d/v combinations
         let v_limited = VPSOscillator::limit_v(d_f32, v_f32);
 
         self.phase += self.freq * israte;
@@ -128,6 +127,16 @@ impl PolyBlepWrapper {
     }
 }
 
+const COEFF_UPDATE_INTERVAL: u32 = 32;
+const PFD_COUNTER_RESET: i64 = 1 << 30;
+
+#[inline(always)]
+fn fast_sin_unit(phase: f64) -> f64 {
+    let p = phase - (phase + 0.5).floor();
+    let y = p * (8.0 - 16.0 * p.abs());
+    0.225 * y * (y.abs() - 1.0) + y
+}
+
 pub struct PLLOscillator {
     phase: f64,
     integrator: f64,
@@ -145,7 +154,6 @@ pub struct PLLOscillator {
     mode: PllMode,
     precision: bool,
 
-    // New (precision) EdgePFD state
     prev_ref_sig: f64,
     prev_pll_sig: f64,
     ref_was_high: bool,
@@ -155,7 +163,6 @@ pub struct PLLOscillator {
     last_ref_falling_time: f64,
     last_pll_falling_time: f64,
 
-    // Legacy EdgePFD state
     last_ref_phase: f64,
     last_pll_phase: f64,
     last_ref_rising_smpl: i64,
@@ -184,10 +191,33 @@ pub struct PLLOscillator {
     range: f64,
     mult_crossfade: f64,
     prev_mult_phase: f64,
+
+    // J1: Anti-aliasing output filter (2-pole SVF lowpass)
+    anti_alias_enabled: bool,
+    aa_ic1eq: f64,
+    aa_ic2eq: f64,
+    aa_g: f64,
+    aa_k: f64,
+    aa_a1: f64,
+    aa_a2: f64,
+    aa_a3: f64,
+
+    // H1: Injection-locked mode
+    injection_amount: f64,
+    injection_mult: f64,
+
+    // Cached computed values
+    cached_israte: f64,
+    cached_nyquist: f64,
+    cached_integrator_decay: f64,
+    cached_pfd_alpha: f64,
+    coeff_counter: u32,
 }
 
 impl PLLOscillator {
     pub fn new(sample_rate: f64) -> Self {
+        let israte = 1.0 / sample_rate;
+        let pfd_tau_seconds = 5.67 / 44100.0;
         let mut pll = Self {
             phase: 0.0,
             integrator: 0.0,
@@ -242,14 +272,47 @@ impl PLLOscillator {
             range: 1.0,
             mult_crossfade: 1.0,
             prev_mult_phase: 0.0,
+
+            anti_alias_enabled: true,
+            aa_ic1eq: 0.0,
+            aa_ic2eq: 0.0,
+            aa_g: 0.0,
+            aa_k: 0.0,
+            aa_a1: 0.0,
+            aa_a2: 0.0,
+            aa_a3: 0.0,
+
+            injection_amount: 0.0,
+            injection_mult: 2.0,
+
+            cached_israte: israte,
+            cached_nyquist: 0.48 * sample_rate,
+            cached_integrator_decay: 0.0,
+            cached_pfd_alpha: 1.0 / (1.0 + pfd_tau_seconds * sample_rate),
+            coeff_counter: COEFF_UPDATE_INTERVAL,
         };
-        pll.prepare_block();
+        pll.compute_aa_coefficients();
+        pll.update_coefficients();
         pll
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: f64) {
         self.sample_rate = sample_rate;
-        self.prepare_block();
+        self.cached_israte = 1.0 / sample_rate;
+        self.cached_nyquist = 0.48 * sample_rate;
+        let pfd_tau_seconds = 5.67 / 44100.0;
+        self.cached_pfd_alpha = 1.0 / (1.0 + pfd_tau_seconds * sample_rate);
+        self.compute_aa_coefficients();
+        self.update_coefficients();
+    }
+
+    fn compute_aa_coefficients(&mut self) {
+        let cutoff = self.sample_rate * 0.4;
+        self.aa_g = (std::f64::consts::PI * cutoff / self.sample_rate).tan();
+        self.aa_k = 1.0; // Q=0.707 (Butterworth)
+        self.aa_a1 = 1.0 / (1.0 + self.aa_g * (self.aa_g + self.aa_k));
+        self.aa_a2 = self.aa_g * self.aa_a1;
+        self.aa_a3 = self.aa_g * self.aa_a2;
     }
 
     pub fn set_params(&mut self, track: f64, damp: f64, mult: f64, influence: f64, colored: bool, mode: PllMode) {
@@ -284,22 +347,24 @@ impl PLLOscillator {
         self.range = range.clamp(0.0, 1.0);
     }
 
+    pub fn set_anti_alias(&mut self, enabled: bool) {
+        self.anti_alias_enabled = enabled;
+    }
+
+    pub fn set_injection_amount(&mut self, amount: f64) {
+        self.injection_amount = amount.clamp(0.0, 1.0);
+    }
+
+    pub fn set_injection_mult(&mut self, x4: bool) {
+        self.injection_mult = if x4 { 4.0 } else { 2.0 };
+    }
+
     #[allow(dead_code)]
     pub fn get_phase_delta(&self) -> f64 {
         self.phase_delta
     }
 
-    pub fn prepare_block(&mut self) {
-        let old_mult = self.mult;
-        self.mult += (self.desired_mult - self.mult) * 0.02;
-        if (self.mult - old_mult).abs() > 0.01 {
-            self.prev_mult_phase = self.phase * old_mult;
-            self.mult_crossfade = 0.0;
-        }
-        if self.mult_crossfade < 1.0 {
-            self.mult_crossfade = (self.mult_crossfade + 0.02).min(1.0);
-        }
-
+    fn update_coefficients(&mut self) {
         let range_scale = (self.range * self.range * self.range).max(0.0001);
         let mult_penalty = 1.0 / self.mult.sqrt().max(1.0);
 
@@ -328,11 +393,34 @@ impl PLLOscillator {
 
         self.cached_alpha *= range_scale.sqrt();
 
+        // Sample-rate compensated integrator decay
+        // Preserves original time constants: ~227ms at damping=0, ~2.3ms at damping=1
+        let base_decay_inv = 0.0001 + self.damping * 0.0098;
+        self.cached_integrator_decay = 1.0 - base_decay_inv * (44100.0 / self.sample_rate);
+    }
+
+    pub fn prepare_block(&mut self) {
+        let old_mult = self.mult;
+        self.mult += (self.desired_mult - self.mult) * 0.02;
+        if (self.mult - old_mult).abs() > 0.01 {
+            self.prev_mult_phase = self.phase * old_mult;
+            self.mult_crossfade = 0.0;
+        }
+        if self.mult_crossfade < 1.0 {
+            self.mult_crossfade = (self.mult_crossfade + 0.02).min(1.0);
+        }
+
         self.color_x = if self.colored {
             (self.color_x + 0.02).min(1.0)
         } else {
             (self.color_x - 0.02).max(0.0)
         };
+
+        self.coeff_counter += 1;
+        if self.coeff_counter >= COEFF_UPDATE_INTERVAL {
+            self.coeff_counter = 0;
+            self.update_coefficients();
+        }
     }
 
     pub fn trigger(&mut self) {
@@ -340,13 +428,16 @@ impl PLLOscillator {
         self.filtered_error = 0.0;
         self.pfd_state = 0.0;
         self.overtrack_state = 0.0;
+        self.aa_ic1eq = 0.0;
+        self.aa_ic2eq = 0.0;
     }
 
+    #[inline(always)]
     fn wrap_pi(x: f64) -> f64 {
-        use std::f64::consts::PI;
-        let two_pi = PI * 2.0;
-        let y = x - two_pi * (x / two_pi).floor();
-        if y > PI { y - two_pi } else { y }
+        use std::f64::consts::{PI, TAU};
+        if x > PI { x - TAU }
+        else if x < -PI { x + TAU }
+        else { x }
     }
 
     #[inline]
@@ -381,83 +472,68 @@ impl PLLOscillator {
     fn next_pfd(&mut self, ref_sig: f64) -> f64 {
         self.sample_counter += 1;
 
-        if self.precision {
-            let pll_sin = (self.phase * std::f64::consts::TAU).sin();
-            let rising_threshold = self.edge_sensitivity;
-            let falling_threshold = -self.edge_sensitivity;
-
-            let (ref_rising, ref_falling, ref_high, ref_frac) = Self::detect_edge_subsample(
-                self.prev_ref_sig, ref_sig, rising_threshold, falling_threshold, self.ref_was_high
-            );
-            let (pll_rising, pll_falling, pll_high, pll_frac) = Self::detect_edge_subsample(
-                self.prev_pll_sig, pll_sin, rising_threshold, falling_threshold, self.pll_was_high
-            );
-
-            let t = self.sample_counter as f64;
-            if ref_rising { self.last_ref_rising_time = t - 1.0 + ref_frac; }
-            if ref_falling { self.last_ref_falling_time = t - 1.0 + ref_frac; }
-            if pll_rising { self.last_pll_rising_time = t - 1.0 + pll_frac; }
-            if pll_falling { self.last_pll_falling_time = t - 1.0 + pll_frac; }
-
-            self.ref_was_high = ref_high;
-            self.pll_was_high = pll_high;
-            self.prev_ref_sig = ref_sig;
-            self.prev_pll_sig = pll_sin;
-
-            let dt_rising = self.last_ref_rising_time - self.last_pll_rising_time;
-            let dt_falling = self.last_ref_falling_time - self.last_pll_falling_time;
-            let dt = (dt_rising + dt_falling) * 0.5;
-
-            let effective_freq = (self.base_freq * self.mult).max(1.0);
-            let base_period = (self.sample_rate / effective_freq).max(1.0);
-            let new_pfd_value = (dt / base_period).clamp(-1.0, 1.0);
-            self.pfd_state = self.pfd_state * 0.85 + new_pfd_value * 0.15;
-            self.pfd_state
-        } else {
-            let pll_sig = ((self.phase * 2.0 * std::f64::consts::PI).sin()).signum();
-            let rising_threshold = self.edge_sensitivity;
-            let falling_threshold = -self.edge_sensitivity;
-
-            let (ref_rising, ref_falling, ref_high) = Self::detect_edges(
-                self.last_ref_phase, ref_sig, rising_threshold, falling_threshold, self.last_ref_phase > 0.0
-            );
-            let (pll_rising, pll_falling, pll_high) = Self::detect_edges(
-                self.last_pll_phase, pll_sig, rising_threshold, falling_threshold, self.last_pll_phase > 0.0
-            );
-
-            if ref_rising { self.last_ref_rising_smpl = self.sample_counter; }
-            if ref_falling { self.last_ref_falling_smpl = self.sample_counter; }
-            if pll_rising { self.last_pll_rising_smpl = self.sample_counter; }
-            if pll_falling { self.last_pll_falling_smpl = self.sample_counter; }
-
-            self.last_ref_phase = if ref_high { 1.0 } else { -1.0 };
-            self.last_pll_phase = if pll_high { 1.0 } else { -1.0 };
-
-            let dt_rising = (self.last_ref_rising_smpl - self.last_pll_rising_smpl) as f64;
-            let dt_falling = (self.last_ref_falling_smpl - self.last_pll_falling_smpl) as f64;
-            let dt = (dt_rising + dt_falling) * 0.5;
-
-            let effective_freq = (self.base_freq * self.mult).max(1.0);
-            let base_period = (self.sample_rate / effective_freq).max(1.0);
-            let new_pfd_value = (dt / base_period).tanh();
-            self.pfd_state = self.pfd_state * 0.85 + new_pfd_value * 0.15;
-            self.pfd_state
+        if self.sample_counter > PFD_COUNTER_RESET {
+            let offset = self.sample_counter as f64;
+            self.sample_counter = 0;
+            self.last_ref_rising_time -= offset;
+            self.last_pll_rising_time -= offset;
+            self.last_ref_falling_time -= offset;
+            self.last_pll_falling_time -= offset;
         }
+
+        // Triangle wave from phase — same zero crossings as sin(phase*TAU),
+        // but linear segments give exact subsample interpolation
+        let pll_sig = if self.phase < 0.25 {
+            self.phase * 4.0
+        } else if self.phase < 0.75 {
+            2.0 - self.phase * 4.0
+        } else {
+            self.phase * 4.0 - 4.0
+        };
+
+        let rising_threshold = self.edge_sensitivity;
+        let falling_threshold = -self.edge_sensitivity;
+
+        let (ref_rising, ref_falling, ref_high, ref_frac) = Self::detect_edge_subsample(
+            self.prev_ref_sig, ref_sig, rising_threshold, falling_threshold, self.ref_was_high
+        );
+        let (pll_rising, pll_falling, pll_high, pll_frac) = Self::detect_edge_subsample(
+            self.prev_pll_sig, pll_sig, rising_threshold, falling_threshold, self.pll_was_high
+        );
+
+        let t = self.sample_counter as f64;
+        if ref_rising { self.last_ref_rising_time = t - 1.0 + ref_frac; }
+        if ref_falling { self.last_ref_falling_time = t - 1.0 + ref_frac; }
+        if pll_rising { self.last_pll_rising_time = t - 1.0 + pll_frac; }
+        if pll_falling { self.last_pll_falling_time = t - 1.0 + pll_frac; }
+
+        self.ref_was_high = ref_high;
+        self.pll_was_high = pll_high;
+        self.prev_ref_sig = ref_sig;
+        self.prev_pll_sig = pll_sig;
+
+        let dt_rising = self.last_ref_rising_time - self.last_pll_rising_time;
+        let dt_falling = self.last_ref_falling_time - self.last_pll_falling_time;
+        let dt = (dt_rising + dt_falling) * 0.5;
+
+        let effective_freq = (self.base_freq * self.mult).max(1.0);
+        let base_period = (self.sample_rate / effective_freq).max(1.0);
+        let new_pfd_value = (dt / base_period).clamp(-1.0, 1.0);
+
+        let alpha = self.cached_pfd_alpha;
+        self.pfd_state = self.pfd_state * (1.0 - alpha) + new_pfd_value * alpha;
+        self.pfd_state
     }
 
     pub fn next(&mut self, input_phase: f64, input_freq: f64, ref_pulse: f64) -> f64 {
-        use std::f64::consts::PI;
+        use std::f64::consts::TAU;
 
         self.base_freq = input_freq;
 
         let phase_error = match self.mode {
             PllMode::AnalogLikePD => {
-                let diff = Self::wrap_pi(input_phase * 2.0 * PI - self.phase * 2.0 * PI);
-                if self.precision {
-                    (diff / PI).clamp(-1.0, 1.0)
-                } else {
-                    (diff / PI).tanh()
-                }
+                let diff = Self::wrap_pi((input_phase - self.phase) * TAU);
+                (diff * std::f64::consts::FRAC_1_PI).clamp(-1.0, 1.0)
             }
             PllMode::EdgePFD => {
                 self.next_pfd(ref_pulse)
@@ -467,29 +543,32 @@ impl PLLOscillator {
         self.phase_delta = phase_error;
 
         self.filtered_error = self.filtered_error * (1.0 - self.cached_alpha) + phase_error * self.cached_alpha;
+        let loop_error = self.filtered_error;
 
-        let integrator_decay = 0.9999 - self.damping * 0.0098;
-        self.integrator = self.integrator * integrator_decay + self.filtered_error * (self.cached_ki / self.sample_rate);
+        self.integrator = self.integrator * self.cached_integrator_decay
+            + loop_error * (self.cached_ki * self.cached_israte);
         self.integrator = self.integrator.clamp(-self.loop_saturation, self.loop_saturation);
 
         let overtrack_amount = (self.track_speed - self.burst_threshold).max(0.0) * self.burst_amount;
-        let overtrack_resonance = 1.0 + overtrack_amount * (1.0 - self.damping);
-        let correction = (self.cached_kp * self.filtered_error + self.integrator) * overtrack_resonance;
+        let damp_factor = 1.0 - self.damping;
+        let overtrack_resonance = 1.0 + overtrack_amount * damp_factor;
+        let correction = (self.cached_kp * loop_error + self.integrator) * overtrack_resonance;
 
         let target_freq = self.base_freq * self.mult;
-        let corrected_freq = target_freq + correction;
+        let mut corrected_freq = target_freq + correction;
+
+        if self.injection_amount > 0.001 {
+            corrected_freq += self.injection_amount * ref_pulse * self.base_freq * self.injection_mult;
+        }
 
         if overtrack_amount > 0.01 {
             let overshoot = (correction / self.base_freq.max(20.0)).abs();
             self.overtrack_state = self.overtrack_state * 0.99 + overshoot * 0.01;
-            let burst = self.overtrack_state * overtrack_amount * 100.0 * (1.0 - self.damping);
-            let burst_freq = corrected_freq + burst * (if self.filtered_error > 0.0 { 1.0 } else { -1.0 });
-            let nyquist = 0.48 * self.sample_rate;
-            self.phase += burst_freq.clamp(20.0, nyquist) / self.sample_rate;
-        } else {
-            let nyquist = 0.48 * self.sample_rate;
-            self.phase += corrected_freq.clamp(20.0, nyquist) / self.sample_rate;
+            let burst = self.overtrack_state * overtrack_amount * 100.0 * damp_factor;
+            corrected_freq += burst * (if loop_error > 0.0 { 1.0 } else { -1.0 });
         }
+
+        self.phase += corrected_freq.clamp(20.0, self.cached_nyquist) * self.cached_israte;
 
         if self.phase >= 1.0 {
             self.phase -= 1.0;
@@ -497,22 +576,37 @@ impl PLLOscillator {
             self.phase += 1.0;
         }
 
-        let clean = (self.phase * 2.0 * PI).sin();
+        let clean = fast_sin_unit(self.phase);
 
-        let colored_phase = self.phase * self.mult;
-        let prev_colored = (self.prev_mult_phase * 2.0 * PI).sin();
-        let curr_colored = (colored_phase * 2.0 * PI).sin();
-        let colored = prev_colored * (1.0 - self.mult_crossfade) + curr_colored * self.mult_crossfade;
+        let clamped = if self.color_x > 0.0 {
+            let colored_phase = self.phase * self.mult;
+            let prev_colored = fast_sin_unit(self.prev_mult_phase);
+            let curr_colored = fast_sin_unit(colored_phase);
+            let colored = prev_colored * (1.0 - self.mult_crossfade) + curr_colored * self.mult_crossfade;
 
-        let saturated = colored + self.color_amount * colored.powi(3);
-        let colored_out = saturated.clamp(-1.0, 1.0);
+            let saturated = colored + self.color_amount * colored * colored * colored;
+            let colored_out = saturated.clamp(-1.0, 1.0);
 
-        self.prev_mult_phase += self.base_freq * self.desired_mult / self.sample_rate;
-        if self.prev_mult_phase >= 1.0 {
-            self.prev_mult_phase -= 1.0;
+            self.prev_mult_phase += self.base_freq * self.desired_mult * self.cached_israte;
+            if self.prev_mult_phase >= 1.0 {
+                self.prev_mult_phase -= 1.0;
+            }
+
+            let raw_output = clean * (1.0 - self.color_x) + colored_out * self.color_x;
+            raw_output.clamp(-1.0, 1.0)
+        } else {
+            clean
+        };
+
+        if self.anti_alias_enabled {
+            let v3 = clamped - self.aa_ic2eq;
+            let v1 = self.aa_a1 * self.aa_ic1eq + self.aa_a2 * v3;
+            let v2 = self.aa_ic2eq + self.aa_a2 * self.aa_ic1eq + self.aa_a3 * v3;
+            self.aa_ic1eq = 2.0 * v1 - self.aa_ic1eq;
+            self.aa_ic2eq = 2.0 * v2 - self.aa_ic2eq;
+            v2
+        } else {
+            clamped
         }
-
-        let raw_output = clean * (1.0 - self.color_x) + colored_out * self.color_x;
-        raw_output.clamp(-1.0, 1.0)
     }
 }

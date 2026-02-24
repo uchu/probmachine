@@ -423,6 +423,12 @@ pub struct DeviceParams {
     pub synth_pll_fm_amount: FloatParam,
     #[id = "synth_pll_fm_ratio"]
     pub synth_pll_fm_ratio: IntParam,
+    #[id = "synth_pll_fm_ratio_free"]
+    pub synth_pll_fm_ratio_free: BoolParam,
+    #[id = "synth_pll_fm_ratio_float"]
+    pub synth_pll_fm_ratio_float: FloatParam,
+    #[id = "synth_pll_fm_expand"]
+    pub synth_pll_fm_expand: BoolParam,
 
     #[id = "synth_pll_track_speed"]
     pub synth_pll_track_speed: FloatParam,
@@ -436,6 +442,8 @@ pub struct DeviceParams {
     pub synth_pll_mode: BoolParam,
     #[id = "synth_pll_mult_slew"]
     pub synth_pll_mult_slew: BoolParam,
+    #[id = "synth_pll_mult_slew_time"]
+    pub synth_pll_mult_slew_time: FloatParam,
     #[id = "synth_pll_ref_octave"]
     pub synth_pll_ref_octave: IntParam,
     #[id = "synth_pll_ref_tune"]
@@ -481,6 +489,15 @@ pub struct DeviceParams {
 
     #[id = "synth_pll_fm_env_amount"]
     pub synth_pll_fm_env_amount: FloatParam,
+
+    #[id = "synth_pll_anti_alias"]
+    pub synth_pll_anti_alias: BoolParam,
+    #[id = "synth_pll_injection_amount"]
+    pub synth_pll_injection_amount: FloatParam,
+    #[id = "synth_pll_injection_x4"]
+    pub synth_pll_injection_x4: BoolParam,
+    #[id = "synth_pll_feedback_div"]
+    pub synth_pll_feedback_div: IntParam,
 
     #[id = "synth_ring_mod"]
     pub synth_ring_mod: FloatParam,
@@ -1609,13 +1626,20 @@ impl Default for DeviceParams {
             synth_pll_fm_amount: FloatParam::new(
                 "PLL FM Amount".to_string(),
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 0.2 }
+                FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_fm_ratio: IntParam::new(
                 "PLL FM Ratio".to_string(),
                 1,
                 IntRange::Linear { min: 1, max: 8 }
             ),
+            synth_pll_fm_ratio_free: BoolParam::new("PLL FM Ratio Free".to_string(), false),
+            synth_pll_fm_ratio_float: FloatParam::new(
+                "PLL FM Ratio Float".to_string(),
+                1.0,
+                FloatRange::Linear { min: 0.5, max: 16.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_fm_expand: BoolParam::new("PLL FM Expand".to_string(), false),
 
             synth_pll_track_speed: FloatParam::new(
                 "PLL Track Speed".to_string(),
@@ -1644,6 +1668,11 @@ impl Default for DeviceParams {
                 "PLL Mult Slew".to_string(),
                 true
             ),
+            synth_pll_mult_slew_time: FloatParam::new(
+                "PLL Mult Slew Time".to_string(),
+                0.15,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_pll_ref_octave: IntParam::new(
                 "PLL Ref Octave".to_string(),
                 0,
@@ -1747,6 +1776,19 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_pll_anti_alias: BoolParam::new("PLL Anti-Alias".to_string(), true),
+            synth_pll_injection_amount: FloatParam::new(
+                "PLL Injection Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_injection_x4: BoolParam::new("PLL Injection X4".to_string(), false),
+            synth_pll_feedback_div: IntParam::new(
+                "PLL Feedback Div".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 7 }
+            ),
 
             synth_ring_mod: FloatParam::new(
                 "Ring Mod".to_string(),

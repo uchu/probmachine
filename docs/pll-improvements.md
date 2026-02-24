@@ -22,7 +22,7 @@ Classic analog PLL technique (frequency dividers). Produces thick sub-bass and o
 **Files:** `params.rs` (mult enum range), `voice.rs` (mult step table), `ui/pages/synth.rs` (slider labels)
 
 ### A2. Extend FM Amount Range
-`[ ]` **Priority: High | Effort: Trivial**
+`[x]` **Priority: High | Effort: Trivial**
 
 Current: `0.0–0.2`. Proposed: `0.0–1.0` (or `0.0–2.0`).
 At 0.2 it's limited to subtle detuning. Higher indices unlock metallic, bell-like, and harsh FM timbres.
@@ -30,7 +30,7 @@ At 0.2 it's limited to subtle detuning. Higher indices unlock metallic, bell-lik
 **Files:** `params.rs` (`synth_pll_fm_amount` range)
 
 ### A3. Extend FM Ratio to Non-Integer
-`[ ]` **Priority: Medium | Effort: Low-Medium**
+`[x]` **Priority: Medium | Effort: Low-Medium**
 
 Current: integer `1–8`. Proposed: float `0.5–16.0` with fine resolution.
 Non-integer ratios (1.5, 2.5, golden ratio 1.618, π) produce inharmonic/bell spectra. Keep integer snapping as default behavior with a "free ratio" toggle.
@@ -144,7 +144,7 @@ Instead of full reset, blend current phase toward 0: `phase = phase * (1.0 - syn
 ## Group E — Feedback & Chaos
 
 ### E1. Feedback Path Frequency Divider
-`[ ]` **Priority: Medium | Effort: Medium**
+`[x]` **Priority: Medium | Effort: Medium**
 
 Classic analog PLL: divide VCO frequency by N before feeding back to phase detector. Divider values: 1, 2, 3, 4, 5, 6, 7, 8.
 
@@ -153,7 +153,7 @@ Different from the existing multiplier — the phase error detection itself oper
 **Files:** `oscillator.rs` (divide phase in detector input), `params.rs`, `voice.rs`, `ui/pages/synth.rs`
 
 ### E2. Chaos / Instability Control
-`[ ]` **Priority: Medium | Effort: Medium**
+`[x]` **Priority: Medium | Effort: Medium**
 
 Dedicated chaos parameter combining:
 - Noise injection into loop filter integrator
@@ -180,7 +180,7 @@ phase_error = phase_error + dc_offset;
 ## Group F — Loop Filter Enhancements
 
 ### F1. Second-Order Loop Filter
-`[ ]` **Priority: Medium | Effort: Medium**
+`[x]` **Priority: Medium | Effort: Medium**
 
 Current: 1-pole lowpass + PI. Add optional 2nd-order filter: steeper rolloff, tighter lock, less jitter, slower acquisition. Toggle between 1st and 2nd order.
 
@@ -220,7 +220,7 @@ Let VPS oscillator output feed the PLL reference input. Complex interaction betw
 ## Group H — Topology Modes (Advanced)
 
 ### H1. Injection-Locked Mode
-`[ ]` **Priority: Medium | Effort: Medium**
+`[x]` **Priority: Medium | Effort: Medium**
 
 Instead of full feedback loop, inject reference signal directly into VCO (additive). VCO "pulls" toward reference frequency. Different character — smoother, less aggressive than PLL tracking.
 
@@ -273,7 +273,7 @@ Selectable noise injection: reference, loop filter, or VCO phase. Each creates d
 ## Group J — Quality & Precision
 
 ### J1. Anti-Aliasing for High Multipliers
-`[ ]` **Priority: High | Effort: Medium**
+`[x]` **Priority: High | Effort: Medium**
 
 At 44.1kHz with 440Hz × 64 = 28.16kHz — right at Nyquist. Options:
 - **2× oversampling** specifically in PLL processing loop
@@ -303,7 +303,7 @@ Current mapping uses sigmoid: `exp(speed * 6 - 3) / (1 + exp(...))`. Verify this
 **Files:** `oscillator.rs` (`prepare_block`)
 
 ### J4. Decouple Burst from Damping
-`[ ]` **Priority: Low | Effort: Trivial**
+`[x]` **Priority: Low | Effort: Trivial**
 
 Currently `burst * (1.0 - damping)` — high damping kills burst entirely. Add option for independent burst that ignores damping, or a partial coupling control.
 
@@ -339,3 +339,42 @@ Coefficients now use proper PLL theory:
 - Kp/Ki ratio now varies with ζ and ωn (was fixed 1:100)
 - AnalogLikePD uses linear clamp instead of tanh for wider capture range
 - EdgePFD uses sub-sample interpolation for cleaner high-frequency tracking
+
+## Selective PLL Oversampling — IMPLEMENTED
+
+Restructured `voice.rs::process()` so only PLL (+ reference/FM oscillators) runs at the oversampled rate. VPS, sub, filter, reverb, and coloration all run at DAW rate. This significantly reduces CPU usage since filter/reverb/VPS don't benefit from oversampling.
+
+- PLL loop runs `effective_oversample_ratio` iterations, writes raw PLL output to oversampling buffers, then downsamples to a single sample
+- VPS sync detection (`ref_phase_wrapped`) is tracked during PLL loop and applied once before VPS processing
+- All mixing (ring mod, wavefold, tube) happens at DAW rate on the downsampled PLL + DAW-rate VPS
+- Filter uses `process_sample()` directly instead of `process_buffers()` for single-sample processing
+- Reverb and sub oscillator process single samples at DAW rate
+
+## CPU Optimization Pass — IMPLEMENTED
+
+Systematic optimization of PLLOscillator hot path (~40-50% CPU reduction):
+
+### sin() elimination
+- VCO output uses `fast_sin_unit()` — refined parabolic approximation (<0.06% error, inaudible)
+- PFD edge detection uses triangle wave instead of sin — same zero crossings, exact subsample interpolation
+- Colored output path uses `fast_sin_unit()`, cubic saturation uses `x*x*x` instead of `powi(3)`
+- Eliminates 1-4 `sin()` calls per sample per PLL oscillator (×2 for stereo)
+
+### Rate-limited coefficient computation
+- `prepare_block()` split: cheap smoothing (mult, color_x) runs every call, expensive coefficients (exp, sqrt, omega_n) run every 32 calls
+- AA filter coefficients moved to `set_sample_rate()` since they only depend on sample rate
+
+### Sample-rate compensated parameters
+- Integrator decay: preserves original time constants (~227ms at damping=0, ~2.3ms at damping=1) regardless of sample rate
+- PFD smoothing alpha: preserves ~0.13ms time constant regardless of sample rate
+- Both previously had fixed per-sample coefficients that behaved differently at 96kHz/192kHz vs 44.1kHz
+
+### Cached computed values
+- `cached_israte` (1/sample_rate), `cached_nyquist` (0.48*sr) avoid per-sample recomputation
+- `cached_integrator_decay`, `cached_pfd_alpha` precomputed in coefficient update
+
+### Other optimizations
+- `wrap_pi()` simplified from floor-division to conditional branches (input always in (-TAU, TAU))
+- Overtrack burst path merged — single phase advancement instead of duplicated code
+- AnalogLikePD phase diff uses `FRAC_1_PI` multiply instead of PI divide
+- PFD sample counter resets at 2^30 to prevent f64 precision loss in long sessions

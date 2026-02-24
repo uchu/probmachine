@@ -1,6 +1,6 @@
 /// Shared state for UI communication with the audio engine
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use crate::sequencer::NotePool;
 use crate::sequencer::scales::{Scale, StabilityPattern, OctaveRandomization};
 use crate::preset::PresetManager;
@@ -16,6 +16,7 @@ pub struct SharedUiState {
     pub scale: Arc<Mutex<Scale>>,
     pub stability_pattern: Arc<Mutex<StabilityPattern>>,
     pub octave_randomization: Arc<Mutex<OctaveRandomization>>,
+    pub request_dsp_reset: Arc<AtomicBool>,
 }
 
 impl SharedUiState {
@@ -34,6 +35,7 @@ impl SharedUiState {
             scale: Arc::new(Mutex::new(Scale::default())),
             stability_pattern: Arc::new(Mutex::new(StabilityPattern::default())),
             octave_randomization: Arc::new(Mutex::new(OctaveRandomization::default())),
+            request_dsp_reset: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -61,6 +63,14 @@ impl SharedUiState {
 
     pub fn get_output_level(&self) -> f32 {
         self.output_level.load(Ordering::Relaxed) as f32 / 1000.0
+    }
+
+    pub fn request_dsp_reset(&self) {
+        self.request_dsp_reset.store(true, Ordering::SeqCst);
+    }
+
+    pub fn take_dsp_reset_request(&self) -> bool {
+        self.request_dsp_reset.swap(false, Ordering::SeqCst)
     }
 }
 

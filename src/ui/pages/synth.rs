@@ -10,7 +10,7 @@ use nih_plug_egui::egui::Color32;
 use std::f32::consts::FRAC_PI_2;
 use std::sync::Arc;
 
-const SLIDER_COL_WIDTH: f32 = 62.0;
+const SLIDER_COL_WIDTH: f32 = 52.0;
 const SLIDER_RAIL_LENGTH: f32 = 215.0;
 const SLIDER_RAIL_THICKNESS: f32 = 18.0;
 const LABEL_FONT: f32 = 19.0;
@@ -181,32 +181,45 @@ fn render_sound_tab(
                                 .strong(),
                         );
                     });
-                ui.add_space(625.0);
+                ui.add_space(175.0);
                 egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
+                            let mut pll_on = params.synth_pll_enable.value();
+                            render_toggle(ui, &mut pll_on, "ON");
+                            if pll_on != params.synth_pll_enable.value() {
+                                setter.set_parameter(&params.synth_pll_enable, pll_on);
+                            }
+                            ui.add_space(60.0);
                             let mut colored = params.synth_pll_colored.value();
                             render_toggle(ui, &mut colored, "COLOR");
                             if colored != params.synth_pll_colored.value() {
                                 setter.set_parameter(&params.synth_pll_colored, colored);
                             }
-                            ui.add_space(100.0);
+                            ui.add_space(60.0);
                             let mut edge_mode = params.synth_pll_mode.value();
                             render_toggle(ui, &mut edge_mode, "EDGE");
                             if edge_mode != params.synth_pll_mode.value() {
                                 setter.set_parameter(&params.synth_pll_mode, edge_mode);
                             }
-                            ui.add_space(80.0);
-                            let mut mult_slew_fast = params.synth_pll_mult_slew.value();
-                            render_labeled_toggle(ui, &mut mult_slew_fast, "SLOW", "FAST");
-                            if mult_slew_fast != params.synth_pll_mult_slew.value() {
-                                setter.set_parameter(&params.synth_pll_mult_slew, mult_slew_fast);
-                            }
-                            ui.add_space(80.0);
+                            ui.add_space(60.0);
                             let mut precision = params.synth_pll_precision.value();
-                            render_toggle(ui, &mut precision, "PREC");
+                            render_toggle(ui, &mut precision, "TIGHT");
                             if precision != params.synth_pll_precision.value() {
                                 setter.set_parameter(&params.synth_pll_precision, precision);
+                            }
+                            ui.add_space(60.0);
+                            let mut injection_x4 = params.synth_pll_injection_x4.value();
+                            let inj_label = if injection_x4 { "INJ4" } else { "INJ2" };
+                            render_toggle(ui, &mut injection_x4, inj_label);
+                            if injection_x4 != params.synth_pll_injection_x4.value() {
+                                setter.set_parameter(&params.synth_pll_injection_x4, injection_x4);
+                            }
+                            ui.add_space(60.0);
+                            let mut fm_expand = params.synth_pll_fm_expand.value();
+                            render_toggle(ui, &mut fm_expand, "EXP");
+                            if fm_expand != params.synth_pll_fm_expand.value() {
+                                setter.set_parameter(&params.synth_pll_fm_expand, fm_expand);
                             }
                         });
                     });
@@ -231,6 +244,12 @@ fn render_sound_tab(
                     Some(Color32::from_rgb(40, 40, 80)),
                     None,
                     Some(&["1", "2", "4", "8", "16", "32", "64"]),
+                );
+                render_vertical_slider(
+                    ui, params, setter,
+                    &params.synth_pll_mult_slew_time, "SLEW",
+                    0.0, 1.0, SliderScale::Linear,
+                    Some(Color32::from_rgb(40, 40, 80)),
                 );
                 render_vertical_slider(
                     ui, params, setter,
@@ -286,11 +305,17 @@ fn render_sound_tab(
                     0.0, 1.0, SliderScale::Linear,
                     Some(Color32::from_rgb(100, 60, 100)),
                 );
-                render_int_vertical_slider(
+                render_vertical_slider(
                     ui, params, setter,
-                    &params.synth_pll_fm_ratio, "RAT",
+                    &params.synth_pll_fm_ratio_float, "RAT",
+                    0.5, 16.0, SliderScale::Linear,
                     Some(Color32::from_rgb(100, 60, 100)),
-                    None, None,
+                );
+                render_vertical_slider(
+                    ui, params, setter,
+                    &params.synth_pll_injection_amount, "INJ",
+                    0.0, 1.0, SliderScale::Linear,
+                    Some(Color32::from_rgb(80, 100, 140)),
                 );
                 render_vertical_slider(
                     ui, params, setter,
@@ -364,10 +389,16 @@ fn render_sound_tab(
                                         .strong(),
                                 );
                             });
-                        ui.add_space(206.0);
+                        ui.add_space(106.0);
                         egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
+                                    let mut vps_on = params.synth_vps_enable.value();
+                                    render_toggle(ui, &mut vps_on, "ON");
+                                    if vps_on != params.synth_vps_enable.value() {
+                                        setter.set_parameter(&params.synth_vps_enable, vps_on);
+                                    }
+                                    ui.add_space(60.0);
                                     let mut phase_sync = params.synth_vps_phase_mode.value() == 1;
                                     render_labeled_toggle(ui, &mut phase_sync, "FREE", "SYNC");
                                     if (phase_sync as i32) != params.synth_vps_phase_mode.value() {
@@ -629,22 +660,6 @@ fn render_envelopes_tab(
                     ui.add_space(8.0);
                     ui.separator();
                     ui.add_space(8.0);
-
-                    let mut pll = params.synth_pll_enable.value();
-                    if ui
-                        .checkbox(&mut pll, egui::RichText::new("PLL").size(UI_FONT))
-                        .changed()
-                    {
-                        setter.set_parameter(&params.synth_pll_enable, pll);
-                    }
-
-                    let mut vps = params.synth_vps_enable.value();
-                    if ui
-                        .checkbox(&mut vps, egui::RichText::new("VPS").size(UI_FONT))
-                        .changed()
-                    {
-                        setter.set_parameter(&params.synth_vps_enable, vps);
-                    }
 
                     let mut color = params.synth_coloration_enable.value();
                     if ui

@@ -24,12 +24,12 @@ const DIVISION_DISPLAY_ORDER: [usize; 16] = [
     6, 7, 8, 9,
     10, 11, 12, 13,
 ];
-const DEST_ENTRIES: [(&str, i32); 26] = [
+const DEST_ENTRIES: [(&str, i32); 28] = [
     ("None", 0),
     // PLL
     ("PLL Damp", 1), ("PLL Infl", 2), ("PLL Track", 3), ("PLL FM", 4),
     ("PLL XFB", 5), ("PLL OT", 6), ("PLL Rng", 7), ("PLL Vol", 17),
-    ("PLL Mult", 20), ("PLL Mult D", 21),
+    ("PLL Mult", 20), ("PLL Mult D", 21), ("PLL INJ", 26), ("PLL Slew", 27),
     // Sub
     ("Sub Vol", 19),
     // VPS

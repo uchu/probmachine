@@ -59,6 +59,13 @@ impl Envelope {
         self.retrigger_countdown = 0;
     }
 
+    pub fn force_off(&mut self) {
+        self.gate = 0.0;
+        self.retrigger_countdown = 0;
+        self.last_value = 0.0;
+        self.adsr.reset();
+    }
+
     #[allow(dead_code)]
     pub fn set_sample_rate(&mut self, sample_rate: f64) {
         self.adsr.set_sample_rate(sample_rate as f32);

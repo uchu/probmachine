@@ -329,6 +329,8 @@ pub enum ModDestination {
     VpsStereoDOffset,
     VpsFold,
     VpsStereoVOffset,
+    PllInjectionAmount,
+    PllMultSlew,
 }
 
 impl ModDestination {
@@ -360,6 +362,8 @@ impl ModDestination {
             23 => ModDestination::VpsStereoDOffset,
             24 => ModDestination::VpsFold,
             25 => ModDestination::VpsStereoVOffset,
+            26 => ModDestination::PllInjectionAmount,
+            27 => ModDestination::PllMultSlew,
             _ => ModDestination::None,
         }
     }
@@ -392,6 +396,8 @@ impl ModDestination {
             ModDestination::VpsStereoDOffset => "VPS DΔ",
             ModDestination::VpsFold => "VPS Fold",
             ModDestination::VpsStereoVOffset => "VPS VΔ",
+            ModDestination::PllInjectionAmount => "PLL INJ",
+            ModDestination::PllMultSlew => "PLL Slew",
         }
     }
 }
@@ -424,6 +430,8 @@ pub struct ModulationValues {
     pub vps_stereo_d_offset: f64,
     pub vps_fold: f64,
     pub vps_stereo_v_offset: f64,
+    pub pll_injection_amount: f64,
+    pub pll_mult_slew: f64,
 }
 
 impl ModulationValues {
@@ -453,6 +461,8 @@ impl ModulationValues {
         self.vps_stereo_d_offset += other.vps_stereo_d_offset;
         self.vps_fold += other.vps_fold;
         self.vps_stereo_v_offset += other.vps_stereo_v_offset;
+        self.pll_injection_amount += other.pll_injection_amount;
+        self.pll_mult_slew += other.pll_mult_slew;
     }
 
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
@@ -484,6 +494,8 @@ impl ModulationValues {
             ModDestination::VpsStereoDOffset => self.vps_stereo_d_offset += mod_value,
             ModDestination::VpsFold => self.vps_fold += mod_value,
             ModDestination::VpsStereoVOffset => self.vps_stereo_v_offset += mod_value,
+            ModDestination::PllInjectionAmount => self.pll_injection_amount += mod_value,
+            ModDestination::PllMultSlew => self.pll_mult_slew += mod_value,
         }
     }
 }

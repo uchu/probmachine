@@ -48,6 +48,21 @@ impl SynthEngine {
         self.mod_sequencer.set_sample_rate(sample_rate as f64);
     }
 
+    pub fn stop(&mut self) {
+        self.voice.stop();
+        self.sequencer.release_current_note();
+    }
+
+    pub fn reset(&mut self) {
+        self.voice.reset();
+        self.sequencer.reset();
+        self.pll_feedback = 0.0;
+    }
+
+    pub fn get_current_sequencer_note(&self) -> bool {
+        self.sequencer.has_active_note()
+    }
+
     pub fn set_bpm(&mut self, bpm: f64) {
         self.sequencer.set_bpm(bpm);
         self.voice.set_bpm(bpm);
@@ -89,8 +104,8 @@ impl SynthEngine {
         self.voice.set_pll_params(track as f64, damp as f64, mult as f64, influence as f64, colored, edge_mode);
     }
 
-    pub fn set_pll_mult_slew(&mut self, enabled: bool) {
-        self.voice.set_pll_mult_slew(enabled);
+    pub fn set_pll_mult_slew_time(&mut self, time: f32) {
+        self.voice.set_pll_mult_slew_time(time as f64);
     }
 
     pub fn set_pll_volume(&mut self, volume: f32) {
@@ -113,8 +128,8 @@ impl SynthEngine {
         self.voice.set_glide_time(time_ms as f64);
     }
 
-    pub fn set_pll_fm_params(&mut self, amount: f32, ratio: i32) {
-        self.voice.set_pll_fm_params(amount as f64, ratio);
+    pub fn set_pll_fm_params(&mut self, amount: f32, ratio_float: f32, expand: bool) {
+        self.voice.set_pll_fm_params(amount as f64, ratio_float as f64, expand);
     }
 
     pub fn set_pll_experimental_params(
@@ -154,6 +169,19 @@ impl SynthEngine {
 
     pub fn set_pll_precision(&mut self, precision: bool) {
         self.voice.set_pll_precision(precision);
+    }
+
+    pub fn set_pll_advanced_params(
+        &mut self,
+        anti_alias: bool,
+        injection_amount: f32,
+        injection_x4: bool,
+    ) {
+        self.voice.set_pll_advanced_params(
+            anti_alias,
+            injection_amount as f64,
+            injection_x4,
+        );
     }
 
     pub fn set_coloration_params(

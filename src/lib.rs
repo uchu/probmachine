@@ -32,6 +32,11 @@ pub struct Device {
     limiter: MasterLimiter,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
     host_transport_detected: bool,
+    was_playing: bool,
+    output_buffer_l: Vec<f32>,
+    output_buffer_r: Vec<f32>,
+    last_preset_version: u64,
+    cpu_measure_counter: u32,
 }
 
 impl Default for Device {
@@ -48,6 +53,11 @@ impl Default for Device {
             limiter: MasterLimiter::new(44100.0),
             midi_events_buffer: Vec::with_capacity(64),
             host_transport_detected: false,
+            was_playing: false,
+            output_buffer_l: Vec::new(),
+            output_buffer_r: Vec::new(),
+            last_preset_version: 0,
+            cpu_measure_counter: 0,
         }
     }
 }
@@ -159,7 +169,16 @@ impl Plugin for Device {
         true
     }
 
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        if let Some(synth) = &mut self.synth_engine {
+            synth.stop();
+        }
+
+        self.midi_processor.clear_all();
+        self.was_playing = false;
+        self.volume_slew = 0.0;
+        self.output_level_smoothed = 0.0;
+    }
 
     fn process(
         &mut self,
@@ -181,16 +200,34 @@ impl Plugin for Device {
             self.host_transport_detected = true;
         }
 
+        // Detect transport stop transition: release voice and send MIDI note-off
+        let just_stopped = self.was_playing && !is_playing;
+        self.was_playing = is_playing;
+
+        if just_stopped {
+            if let Some(synth) = &mut self.synth_engine {
+                synth.stop();
+            }
+            self.midi_processor.stop_all_notes(0);
+        }
+
+        // Check for DSP reset request from preset change
+        if self.ui_state.take_dsp_reset_request() {
+            if let Some(synth) = &mut self.synth_engine {
+                synth.reset();
+            }
+        }
+
         if let Some(synth) = &mut self.synth_engine {
             synth.set_bpm(tempo);
 
-            if let Ok(note_pool) = self.ui_state.note_pool.lock() {
+            if let Ok(note_pool) = self.ui_state.note_pool.try_lock() {
                 synth.update_note_pool(note_pool.clone());
             }
-            if let Ok(strength_values) = self.ui_state.strength_values.lock() {
+            if let Ok(strength_values) = self.ui_state.strength_values.try_lock() {
                 synth.update_strength_values(strength_values.clone());
             }
-            if let Ok(octave_rand) = self.ui_state.octave_randomization.lock() {
+            if let Ok(octave_rand) = self.ui_state.octave_randomization.try_lock() {
                 synth.update_octave_randomization(octave_rand.clone());
             }
 
@@ -221,7 +258,8 @@ impl Plugin for Device {
 
             synth.set_pll_fm_params(
                 self.params.synth_pll_fm_amount.modulated_plain_value(),
-                self.params.synth_pll_fm_ratio.value(),
+                self.params.synth_pll_fm_ratio_float.modulated_plain_value(),
+                self.params.synth_pll_fm_expand.value(),
             );
 
             synth.set_pll_experimental_params(
@@ -285,8 +323,13 @@ impl Plugin for Device {
                 self.params.synth_pll_colored.value(),
                 self.params.synth_pll_mode.value(),
             );
-            synth.set_pll_mult_slew(self.params.synth_pll_mult_slew.value());
+            synth.set_pll_mult_slew_time(self.params.synth_pll_mult_slew_time.modulated_plain_value());
             synth.set_pll_precision(self.params.synth_pll_precision.value());
+            synth.set_pll_advanced_params(
+                self.params.synth_pll_anti_alias.value(),
+                self.params.synth_pll_injection_amount.modulated_plain_value(),
+                self.params.synth_pll_injection_x4.value(),
+            );
 
             synth.set_pll_volume(self.params.synth_pll_volume.modulated_plain_value());
 
@@ -406,8 +449,11 @@ impl Plugin for Device {
             synth.set_mod_seq_modulation(0, self.params.mseq_dest1.value(), self.params.mseq_amount1.modulated_plain_value());
             synth.set_mod_seq_modulation(1, self.params.mseq_dest2.value(), self.params.mseq_amount2.modulated_plain_value());
 
-            let mut output_l = vec![0.0; buffer.samples()];
-            let mut output_r = vec![0.0; buffer.samples()];
+            let num_samples = buffer.samples();
+            self.output_buffer_l.resize(num_samples, 0.0);
+            self.output_buffer_r.resize(num_samples, 0.0);
+            self.output_buffer_l.fill(0.0);
+            self.output_buffer_r.fill(0.0);
 
             let pll_feedback_amt = self.params.synth_pll_feedback.modulated_plain_value();
             let base_freq = 220.0;
@@ -418,17 +464,19 @@ impl Plugin for Device {
                 self.params.sequencer_enable.value()
             };
 
-            let start_time = std::time::Instant::now();
+            let measure_cpu = self.cpu_measure_counter == 0;
+            self.cpu_measure_counter = (self.cpu_measure_counter + 1) % 32;
+
+            let start_time = if measure_cpu { Some(std::time::Instant::now()) } else { None };
             synth.process_block(
-                &mut output_l,
-                &mut output_r,
+                &mut self.output_buffer_l,
+                &mut self.output_buffer_r,
                 &self.params,
                 pll_feedback_amt,
                 base_freq,
                 &mut self.midi_events_buffer,
                 seq_playing,
             );
-            let elapsed = start_time.elapsed();
 
             for (is_note_on, is_note_off, midi_note, velocity, sample_idx) in &self.midi_events_buffer {
                 if *is_note_on {
@@ -446,38 +494,42 @@ impl Plugin for Device {
                 tempo,
             );
 
-            let buffer_time_secs = buffer.samples() as f32 / self.sample_rate;
-            let cpu_load = (elapsed.as_secs_f32() / buffer_time_secs) * 100.0;
+            if let Some(start) = start_time {
+                let elapsed = start.elapsed();
+                let buf_time = buffer.samples() as f32 / self.sample_rate;
+                let cpu_load = (elapsed.as_secs_f32() / buf_time) * 100.0;
 
-            let smoothing_time = 1.5;
-            let alpha = 1.0 - (-buffer_time_secs / smoothing_time).exp();
-            self.cpu_load_smoothed = alpha * cpu_load + (1.0 - alpha) * self.cpu_load_smoothed;
-            self.ui_state.set_cpu_load(self.cpu_load_smoothed);
+                let smoothing_time = 1.5;
+                let alpha = 1.0 - (-buf_time / smoothing_time).exp();
+                self.cpu_load_smoothed = alpha * cpu_load + (1.0 - alpha) * self.cpu_load_smoothed;
+                self.ui_state.set_cpu_load(self.cpu_load_smoothed);
+            }
 
             let target_volume = self.params.global_volume.modulated_plain_value();
             let slew_coeff = 1.0 - (-1.0 / (self.sample_rate * 0.01)).exp();
 
-            for i in 0..output_l.len() {
+            for i in 0..num_samples {
                 self.volume_slew += (target_volume - self.volume_slew) * slew_coeff;
-                output_l[i] *= self.volume_slew;
-                output_r[i] *= self.volume_slew;
+                self.output_buffer_l[i] *= self.volume_slew;
+                self.output_buffer_r[i] *= self.volume_slew;
             }
 
-            self.limiter.process_block(&mut output_l, &mut output_r);
+            self.limiter.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
 
             let mut peak: f32 = 0.0;
             for (i, channel_samples) in buffer.iter_samples().enumerate() {
-                peak = peak.max(output_l[i].abs()).max(output_r[i].abs());
+                peak = peak.max(self.output_buffer_l[i].abs()).max(self.output_buffer_r[i].abs());
 
                 let mut iter = channel_samples.into_iter();
                 if let Some(left) = iter.next() {
-                    *left = output_l[i];
+                    *left = self.output_buffer_l[i];
                 }
                 if let Some(right) = iter.next() {
-                    *right = output_r[i];
+                    *right = self.output_buffer_r[i];
                 }
             }
 
+            let buffer_time_secs = buffer.samples() as f32 / self.sample_rate;
             let decay_time = 0.3;
             let decay_coeff = (-buffer_time_secs / decay_time).exp();
             if peak > self.output_level_smoothed {

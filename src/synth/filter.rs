@@ -47,7 +47,7 @@ impl StereoMoogFilter {
     }
 
     #[inline(always)]
-    fn process_sample(&mut self, input: Stereo, freq: f64, res: f64, drive: f64) -> Stereo {
+    pub fn process_sample(&mut self, input: Stereo, freq: f64, res: f64, drive: f64) -> Stereo {
         let driven = Self::apply_drive_simd(input, drive);
 
         let cutoff = 2.0 * freq * self.israte;
@@ -79,6 +79,7 @@ impl StereoMoogFilter {
         self.b3
     }
 
+    #[allow(dead_code)]
     pub fn process_buffers(
         &mut self,
         buffer_l: &mut [f32],

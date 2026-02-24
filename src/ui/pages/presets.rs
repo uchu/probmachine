@@ -724,6 +724,9 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_glide, data.synth_pll_glide);
     setter.set_parameter(&params.synth_pll_fm_amount, data.synth_pll_fm_amount);
     setter.set_parameter(&params.synth_pll_fm_ratio, data.synth_pll_fm_ratio);
+    setter.set_parameter(&params.synth_pll_fm_ratio_free, data.synth_pll_fm_ratio_free);
+    setter.set_parameter(&params.synth_pll_fm_ratio_float, data.synth_pll_fm_ratio_float);
+    setter.set_parameter(&params.synth_pll_fm_expand, data.synth_pll_fm_expand);
     setter.set_parameter(&params.synth_pll_retrigger, data.synth_pll_retrigger);
     setter.set_parameter(&params.synth_pll_burst_threshold, data.synth_pll_burst_threshold);
     setter.set_parameter(&params.synth_pll_burst_amount, data.synth_pll_burst_amount);
@@ -737,6 +740,11 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_fm_env_amount, data.synth_pll_fm_env_amount);
     setter.set_parameter(&params.synth_pll_precision, data.synth_pll_precision);
     setter.set_parameter(&params.synth_pll_enable, data.synth_pll_enable);
+    setter.set_parameter(&params.synth_pll_mult_slew_time, data.synth_pll_mult_slew_time);
+    setter.set_parameter(&params.synth_pll_anti_alias, data.synth_pll_anti_alias);
+    setter.set_parameter(&params.synth_pll_injection_amount, data.synth_pll_injection_amount);
+    setter.set_parameter(&params.synth_pll_injection_x4, data.synth_pll_injection_x4);
+    setter.set_parameter(&params.synth_pll_feedback_div, data.synth_pll_feedback_div);
 
     setter.set_parameter(&params.synth_osc_octave, data.synth_osc_octave);
     setter.set_parameter(&params.synth_osc_tune, data.synth_osc_tune);
@@ -914,6 +922,7 @@ fn load_preset_to_params(
     }
 
     ui_state.increment_preset_version();
+    ui_state.request_dsp_reset();
 }
 
 fn save_params_to_preset_data(
@@ -1133,6 +1142,9 @@ fn save_params_to_preset_data(
     data.synth_pll_glide = params.synth_pll_glide.modulated_plain_value();
     data.synth_pll_fm_amount = params.synth_pll_fm_amount.modulated_plain_value();
     data.synth_pll_fm_ratio = params.synth_pll_fm_ratio.value();
+    data.synth_pll_fm_ratio_free = params.synth_pll_fm_ratio_free.value();
+    data.synth_pll_fm_ratio_float = params.synth_pll_fm_ratio_float.modulated_plain_value();
+    data.synth_pll_fm_expand = params.synth_pll_fm_expand.value();
     data.synth_pll_retrigger = params.synth_pll_retrigger.modulated_plain_value();
     data.synth_pll_burst_threshold = params.synth_pll_burst_threshold.modulated_plain_value();
     data.synth_pll_burst_amount = params.synth_pll_burst_amount.modulated_plain_value();
@@ -1146,6 +1158,11 @@ fn save_params_to_preset_data(
     data.synth_pll_fm_env_amount = params.synth_pll_fm_env_amount.modulated_plain_value();
     data.synth_pll_precision = params.synth_pll_precision.value();
     data.synth_pll_enable = params.synth_pll_enable.value();
+    data.synth_pll_mult_slew_time = params.synth_pll_mult_slew_time.modulated_plain_value();
+    data.synth_pll_anti_alias = params.synth_pll_anti_alias.value();
+    data.synth_pll_injection_amount = params.synth_pll_injection_amount.modulated_plain_value();
+    data.synth_pll_injection_x4 = params.synth_pll_injection_x4.value();
+    data.synth_pll_feedback_div = params.synth_pll_feedback_div.value();
 
     data.synth_osc_octave = params.synth_osc_octave.value();
     data.synth_osc_tune = params.synth_osc_tune.value();
