@@ -6,6 +6,7 @@ mod ui;
 mod synth;
 mod sequencer;
 mod midi;
+mod midi_modes;
 
 use egui_taffy::taffy::{
     prelude::*,
@@ -19,6 +20,7 @@ use std::sync::Arc;
 use ui::{Page, SharedUiState};
 use synth::{SynthEngine, MasterLimiter};
 use midi::MidiProcessor;
+use midi_modes::{MidiInputMode, MidiModeProcessor, MidiModeResult};
 
 pub struct Device {
     params: Arc<DeviceParams>,
@@ -31,6 +33,7 @@ pub struct Device {
     output_level_smoothed: f32,
     limiter: MasterLimiter,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
+    midi_mode_processor: MidiModeProcessor,
     transport_has_played: bool,
     was_playing: bool,
     output_buffer_l: Vec<f32>,
@@ -51,6 +54,7 @@ impl Default for Device {
             output_level_smoothed: 0.0,
             limiter: MasterLimiter::new(44100.0),
             midi_events_buffer: Vec::with_capacity(64),
+            midi_mode_processor: MidiModeProcessor::new(),
             transport_has_played: false,
             was_playing: false,
             output_buffer_l: Vec::new(),
@@ -219,14 +223,31 @@ impl Plugin for Device {
         if let Some(synth) = &mut self.synth_engine {
             synth.set_bpm(tempo);
 
-            if let Ok(note_pool) = self.ui_state.note_pool.try_lock() {
-                synth.update_note_pool(note_pool.clone());
+            if self.ui_state.take_seq_dirty() {
+                if let Ok(note_pool) = self.ui_state.note_pool.try_lock() {
+                    synth.update_note_pool(note_pool.clone());
+                }
+                if let Ok(strength_values) = self.ui_state.strength_values.try_lock() {
+                    synth.update_strength_values(strength_values.clone());
+                }
+                if let Ok(octave_rand) = self.ui_state.octave_randomization.try_lock() {
+                    synth.update_octave_randomization(octave_rand.clone());
+                }
+                if let Ok(style_config) = self.ui_state.style_config.try_lock() {
+                    synth.update_style_config(style_config.clone());
+                }
+                if let Ok(multi_bar) = self.ui_state.multi_bar_config.try_lock() {
+                    synth.update_multi_bar_config(multi_bar.clone());
+                }
+                if let Ok(melodic) = self.ui_state.melodic_config.try_lock() {
+                    synth.update_melodic_config(melodic.clone());
+                }
             }
-            if let Ok(strength_values) = self.ui_state.strength_values.try_lock() {
-                synth.update_strength_values(strength_values.clone());
-            }
-            if let Ok(octave_rand) = self.ui_state.octave_randomization.try_lock() {
-                synth.update_octave_randomization(octave_rand.clone());
+
+            if self.ui_state.ml_dataset_dirty.swap(false, std::sync::atomic::Ordering::AcqRel) {
+                if let Ok(guard) = self.ui_state.ml_dataset.try_lock() {
+                    synth.update_ml_dataset(guard.clone());
+                }
             }
 
             synth.set_osc_params(
@@ -254,6 +275,15 @@ impl Plugin for Device {
             synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
             synth.set_sub_source(self.params.synth_sub_source.value());
 
+            synth.set_saw_volume(self.params.synth_saw_volume.modulated_plain_value());
+            synth.set_saw_octave(self.params.synth_saw_octave.value());
+            synth.set_saw_tune(self.params.synth_saw_tune.value());
+            synth.set_saw_fold(self.params.synth_saw_fold.modulated_plain_value());
+            synth.set_saw_shape(
+                self.params.synth_saw_shape_type.value(),
+                self.params.synth_saw_shape_amount.modulated_plain_value(),
+            );
+
             synth.set_pll_fm_params(
                 self.params.synth_pll_fm_amount.modulated_plain_value(),
                 self.params.synth_pll_fm_ratio_float.modulated_plain_value(),
@@ -272,7 +302,6 @@ impl Plugin for Device {
             );
 
             synth.set_pll_stereo_phase(self.params.synth_pll_stereo_phase.modulated_plain_value());
-            synth.set_pll_cross_feedback(self.params.synth_pll_cross_feedback.modulated_plain_value());
             synth.set_pll_fm_env_amount(self.params.synth_pll_fm_env_amount.modulated_plain_value());
 
             synth.set_coloration_params(
@@ -288,7 +317,12 @@ impl Plugin for Device {
                 self.params.synth_vps_enable.value(),
                 self.params.synth_coloration_enable.value(),
                 self.params.synth_reverb_enable.value(),
-                self.params.synth_oversampling_factor.value(),
+                self.params.synth_saw_enable.value(),
+            );
+            synth.set_oversampling(
+                self.params.synth_pll_oversampling.value(),
+                self.params.synth_saw_oversampling.value(),
+                self.params.synth_vps_oversampling.value(),
             );
 
             synth.set_base_rate(self.params.synth_base_rate.value());
@@ -346,6 +380,7 @@ impl Plugin for Device {
                 self.params.synth_filter_resonance.modulated_plain_value(),
                 self.params.synth_filter_env_amount.modulated_plain_value(),
                 self.params.synth_filter_drive.modulated_plain_value(),
+                self.params.synth_filter_stereo.modulated_plain_value(),
             );
 
             synth.set_volume(1.0);
@@ -462,6 +497,39 @@ impl Plugin for Device {
                 self.params.sequencer_enable.value()
             };
 
+            let midi_mode = MidiInputMode::from_index(
+                self.ui_state.midi_mode.load(std::sync::atomic::Ordering::Relaxed),
+            );
+            self.midi_mode_processor.set_mode(midi_mode);
+
+            if self.ui_state.midi_clear_memory.swap(false, std::sync::atomic::Ordering::Relaxed) {
+                self.midi_mode_processor.clear_accompaniment();
+            }
+
+            let pos_beats = transport.pos_beats().unwrap_or(0.0);
+            let bar_index = (pos_beats / 4.0).floor().max(0.0) as u64;
+            let bar_position = ((pos_beats % 4.0) / 4.0) as f32;
+
+            let external_notes = &self.midi_processor.input.external_notes;
+            let mode_result = self.midi_mode_processor.process_events(
+                external_notes,
+                bar_index,
+                bar_position,
+            );
+
+            let passthrough_notes: &[midi::ExternalNoteEvent] = match midi_mode {
+                MidiInputMode::Passthrough => external_notes,
+                _ => &[],
+            };
+
+            if let MidiModeResult::NotePoolUpdate(pool) = mode_result {
+                synth.update_note_pool(pool);
+            }
+
+            if let Ok(mut display) = self.ui_state.midi_mode_display.try_lock() {
+                *display = self.midi_mode_processor.get_display();
+            }
+
             let measure_cpu = self.cpu_measure_counter == 0;
             self.cpu_measure_counter = (self.cpu_measure_counter + 1) % 32;
 
@@ -474,6 +542,7 @@ impl Plugin for Device {
                 base_freq,
                 &mut self.midi_events_buffer,
                 seq_playing,
+                passthrough_notes,
             );
 
             for (is_note_on, is_note_off, midi_note, velocity, sample_idx) in &self.midi_events_buffer {

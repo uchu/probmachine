@@ -1,5 +1,19 @@
 use serde::{Deserialize, Serialize};
 
+fn interval_to_functional_degree(interval: u8) -> u8 {
+    match interval {
+        0 => 1,
+        1 | 2 => 2,
+        3 | 4 => 3,
+        5 => 4,
+        7 => 5,
+        8 | 9 => 6,
+        10 | 11 => 7,
+        6 => 8,
+        _ => 0,
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, Default)]
 pub enum Scale {
     #[default]
@@ -93,10 +107,12 @@ impl Scale {
         }
     }
 
+    #[allow(dead_code)]
     pub fn degree_for_interval(&self, interval: u8) -> Option<u8> {
         self.intervals().iter().position(|&i| i == interval).map(|p| p as u8 + 1)
     }
 
+    #[allow(dead_code)]
     pub fn base_chance_for_degree(&self, degree: u8) -> u8 {
         match self {
             Scale::PentatonicMajor | Scale::PentatonicMinor => {
@@ -112,23 +128,101 @@ impl Scale {
                     1 => 127,
                     5 => 100,
                     2 | 3 => 85,
-                    4 => 75, // Blue note
+                    4 => 75,
                     _ => 70,
                 }
             }
             Scale::Chromatic => 70,
             _ => {
                 match degree {
-                    1 => 127, // Root
-                    5 => 100, // Fifth
-                    4 => 90,  // Fourth
-                    3 => 80,  // Third
-                    6 => 60,  // Sixth
-                    2 => 45,  // Second
-                    7 => 40,  // Seventh
+                    1 => 127,
+                    5 => 100,
+                    4 => 90,
+                    3 => 80,
+                    6 => 60,
+                    2 => 45,
+                    7 => 40,
                     _ => 50,
                 }
             }
+        }
+    }
+
+    pub fn base_chance_for_interval(&self, interval: u8) -> u8 {
+        match self {
+            Scale::PentatonicMajor => match interval {
+                0 => 127,
+                7 => 105,
+                4 => 95,
+                9 => 90,
+                2 => 85,
+                _ => 80,
+            },
+            Scale::PentatonicMinor => match interval {
+                0 => 127,
+                7 => 105,
+                3 => 95,
+                5 => 90,
+                10 => 85,
+                _ => 80,
+            },
+            Scale::Blues => match interval {
+                0 => 127,
+                7 => 100,
+                3 => 90,
+                10 => 85,
+                5 => 80,
+                6 => 65,
+                _ => 70,
+            },
+            Scale::WholeTone => match interval {
+                0 => 127,
+                _ => 75,
+            },
+            Scale::Chromatic => match interval {
+                0 => 127,
+                _ => 70,
+            },
+            Scale::Japanese => match interval {
+                0 => 127,
+                7 => 100,
+                5 => 85,
+                8 => 65,
+                1 => 55,
+                _ => 50,
+            },
+            Scale::Hungarian => match interval {
+                0 => 127,
+                7 => 100,
+                3 => 80,
+                6 => 65,
+                8 => 60,
+                2 => 45,
+                11 => 40,
+                _ => 50,
+            },
+            Scale::Arabic => match interval {
+                0 => 127,
+                7 => 100,
+                5 => 90,
+                4 => 85,
+                8 => 60,
+                1 => 50,
+                10 => 45,
+                _ => 50,
+            },
+            Scale::Custom => 0,
+            _ => match interval {
+                0 => 127,
+                7 => 100,
+                5 => 90,
+                3 | 4 => 80,
+                8 | 9 => 60,
+                1 | 2 => 45,
+                10 | 11 => 40,
+                6 => 35,
+                _ => 50,
+            },
         }
     }
 }
@@ -176,7 +270,8 @@ impl StabilityPattern {
         }
     }
 
-    pub fn get_stability_settings(&self, degree: u8) -> NoteStabilitySettings {
+    pub fn get_stability_settings(&self, interval: u8) -> NoteStabilitySettings {
+        let degree = interval_to_functional_degree(interval);
         match self {
             StabilityPattern::Custom => NoteStabilitySettings::new(64, 64, vec![0]),
             StabilityPattern::Traditional => match degree {
@@ -187,6 +282,7 @@ impl StabilityPattern {
                 6 => NoteStabilitySettings::new(70, 50, vec![0, 1]),
                 2 => NoteStabilitySettings::new(30, 30, vec![0]),
                 7 => NoteStabilitySettings::new(20, 20, vec![0, 1]),
+                8 => NoteStabilitySettings::new(20, 20, vec![0]),
                 _ => NoteStabilitySettings::new(64, 64, vec![0]),
             },
             StabilityPattern::JazzMelodic => match degree {
@@ -197,6 +293,7 @@ impl StabilityPattern {
                 6 => NoteStabilitySettings::new(70, 60, vec![0]),
                 2 => NoteStabilitySettings::new(64, 40, vec![0, 1]),
                 4 => NoteStabilitySettings::new(40, 30, vec![0]),
+                8 => NoteStabilitySettings::new(75, 50, vec![0]),
                 _ => NoteStabilitySettings::new(64, 64, vec![0]),
             },
             StabilityPattern::Ambient => match degree {
@@ -220,6 +317,7 @@ impl StabilityPattern {
                 2 => NoteStabilitySettings::new(64, 60, vec![0, 1]),
                 7 => NoteStabilitySettings::new(70, 50, vec![0, 1]),
                 4 => NoteStabilitySettings::new(50, 40, vec![0]),
+                8 => NoteStabilitySettings::new(40, 30, vec![0]),
                 _ => NoteStabilitySettings::new(64, 64, vec![0]),
             },
             StabilityPattern::Tension => match degree {
@@ -230,6 +328,7 @@ impl StabilityPattern {
                 3 => NoteStabilitySettings::new(70, 60, vec![0]),
                 5 => NoteStabilitySettings::new(50, 50, vec![0]),
                 4 => NoteStabilitySettings::new(45, 40, vec![0]),
+                8 => NoteStabilitySettings::new(90, 80, vec![0, 1]),
                 _ => NoteStabilitySettings::new(64, 64, vec![0]),
             },
             StabilityPattern::Even => NoteStabilitySettings::new(64, 64, vec![0]),

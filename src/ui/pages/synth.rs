@@ -10,13 +10,12 @@ use nih_plug_egui::egui::Color32;
 use std::f32::consts::FRAC_PI_2;
 use std::sync::Arc;
 
-const SLIDER_COL_WIDTH: f32 = 52.0;
+const SLIDER_COL_WIDTH: f32 = 58.0;
 const SLIDER_RAIL_LENGTH: f32 = 215.0;
 const SLIDER_RAIL_THICKNESS: f32 = 18.0;
 const LABEL_FONT: f32 = 19.0;
 const HEADER_FONT: f32 = 18.0;
 const TAB_FONT: f32 = 16.0;
-const UI_FONT: f32 = 16.0;
 const TAB_BAR_WIDTH: f32 = 52.0;
 const FRAME_MARGIN: egui::Margin = egui::Margin { left: 32, right: 4, top: 14, bottom: 14 };
 
@@ -295,12 +294,6 @@ fn render_sound_tab(
                 );
                 render_vertical_slider(
                     ui, params, setter,
-                    &params.synth_pll_cross_feedback, "XFB",
-                    0.0, 1.0, SliderScale::Linear,
-                    Some(Color32::from_rgb(100, 60, 80)),
-                );
-                render_vertical_slider(
-                    ui, params, setter,
                     &params.synth_pll_fm_amount, "FM",
                     0.0, 1.0, SliderScale::Linear,
                     Some(Color32::from_rgb(100, 60, 100)),
@@ -377,7 +370,68 @@ fn render_sound_tab(
         );
 
         egui::Frame::NONE
-            .inner_margin(egui::Margin { left: 40, right: -10, ..FRAME_MARGIN })
+            .inner_margin(egui::Margin { left: 20, right: 0, ..FRAME_MARGIN })
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("SAW").size(HEADER_FONT).strong());
+                        ui.add_space(16.0);
+                        let mut saw_on = params.synth_saw_enable.value();
+                        render_toggle(ui, &mut saw_on, "ON");
+                        if saw_on != params.synth_saw_enable.value() {
+                            setter.set_parameter(&params.synth_saw_enable, saw_on);
+                        }
+                    });
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        render_int_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_saw_octave, "OCT",
+                            Some(Color32::from_rgb(80, 80, 40)),
+                            None, None,
+                        );
+                        render_int_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_saw_tune, "TUNE",
+                            Some(Color32::from_rgb(80, 80, 40)),
+                            Some(&[-12, 0, 12]), None,
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_saw_fold, "FOLD",
+                            0.0, 1.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(120, 80, 60)),
+                        );
+                        render_int_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_saw_shape_type, "SHPE",
+                            Some(Color32::from_rgb(100, 80, 100)),
+                            None, None,
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_saw_shape_amount, "SHP",
+                            0.0, 1.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(100, 80, 100)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_saw_volume, "VOL",
+                            0.0, 1.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(40, 80, 40)),
+                        );
+                    });
+                });
+            });
+
+        let line_rect2 = ui.available_rect_before_wrap();
+        ui.painter().line_segment(
+            [egui::pos2(line_rect2.left(), sep_rect.top()), egui::pos2(line_rect2.left(), line_rect2.bottom() - 5.0)],
+            egui::Stroke::new(1.0, Color32::BLACK),
+        );
+
+        egui::Frame::NONE
+            .inner_margin(egui::Margin { left: 20, right: -10, ..FRAME_MARGIN })
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
@@ -399,12 +453,6 @@ fn render_sound_tab(
                                         setter.set_parameter(&params.synth_vps_enable, vps_on);
                                     }
                                     ui.add_space(60.0);
-                                    let mut phase_sync = params.synth_vps_phase_mode.value() == 1;
-                                    render_labeled_toggle(ui, &mut phase_sync, "FREE", "SYNC");
-                                    if (phase_sync as i32) != params.synth_vps_phase_mode.value() {
-                                        setter.set_parameter(&params.synth_vps_phase_mode, if phase_sync { 1 } else { 0 });
-                                    }
-                                    ui.add_space(82.0);
                                     let mut shape_fold = params.synth_vps_shape_type.value() == 1;
                                     render_labeled_toggle(ui, &mut shape_fold, "SOFT", "FOLD");
                                     if (shape_fold as i32) != params.synth_vps_shape_type.value() {
@@ -473,63 +521,6 @@ fn render_sound_tab(
                 });
             });
 
-        let line_rect2 = ui.available_rect_before_wrap();
-        ui.painter().line_segment(
-            [egui::pos2(line_rect2.left(), sep_rect.top()), egui::pos2(line_rect2.left(), line_rect2.bottom() - 5.0)],
-            egui::Stroke::new(1.0, Color32::BLACK),
-        );
-
-        egui::Frame::NONE
-            .inner_margin(egui::Margin { left: 40, right: -10, ..FRAME_MARGIN })
-            .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 0, bottom: 0 })
-                            .show(ui, |ui| {
-                                ui.label(
-                                    egui::RichText::new("FILTER").size(HEADER_FONT).strong(),
-                                );
-                            });
-                        ui.add_space(16.0);
-                        egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
-                            .show(ui, |ui| {
-                                let mut enabled = params.synth_filter_enable.value();
-                                render_toggle(ui, &mut enabled, "ON");
-                                if enabled != params.synth_filter_enable.value() {
-                                    setter.set_parameter(&params.synth_filter_enable, enabled);
-                                }
-                            });
-                    });
-                    ui.add_space(10.0);
-                    ui.horizontal(|ui| {
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_cutoff, "CUT",
-                            20.0, 20000.0, SliderScale::Logarithmic,
-                            Some(Color32::from_rgb(180, 120, 60)),
-                        );
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_resonance, "RES",
-                            0.0, 0.98, SliderScale::Linear,
-                            Some(Color32::from_rgb(180, 120, 60)),
-                        );
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_env_amount, "ENV",
-                            -5000.0, 5000.0, SliderScale::Linear,
-                            Some(Color32::from_rgb(140, 100, 80)),
-                        );
-                        render_vertical_slider(
-                            ui, params, setter,
-                            &params.synth_filter_drive, "DRV",
-                            1.0, 15.0, SliderScale::Linear,
-                            Some(Color32::from_rgb(140, 100, 80)),
-                        );
-                    });
-                });
-            });
-
     });
 }
 
@@ -537,7 +528,7 @@ fn render_envelopes_tab(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
-    ui_state: &Arc<SharedUiState>,
+    _ui_state: &Arc<SharedUiState>,
 ) {
 
     ui.horizontal(|ui| {
@@ -636,71 +627,57 @@ fn render_envelopes_tab(
                 });
             });
 
+        let filter_line_rect = ui.available_rect_before_wrap();
+        ui.painter().line_segment(
+            [egui::pos2(filter_line_rect.left(), filter_line_rect.top()), egui::pos2(filter_line_rect.left(), filter_line_rect.bottom() - 5.0)],
+            egui::Stroke::new(1.0, Color32::BLACK),
+        );
+
         egui::Frame::NONE
-            .inner_margin(egui::Margin { left: 16, right: 16, top: 12, bottom: 12 })
+            .inner_margin(egui::Margin { left: 40, right: -10, ..FRAME_MARGIN })
             .show(ui, |ui| {
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("PERF").size(HEADER_FONT).strong());
-                    ui.add_space(8.0);
-
-                    let cpu_load = ui_state.get_cpu_load();
-                    let cpu_color = if cpu_load > 80.0 {
-                        Color32::from_rgb(200, 80, 80)
-                    } else if cpu_load > 50.0 {
-                        Color32::from_rgb(200, 180, 80)
-                    } else {
-                        Color32::from_rgb(80, 200, 80)
-                    };
-                    ui.label(
-                        egui::RichText::new(format!("CPU: {:02}%", cpu_load as u32))
-                            .size(UI_FONT)
-                            .color(cpu_color),
-                    );
-
-                    ui.add_space(8.0);
-                    ui.separator();
-                    ui.add_space(8.0);
-
-                    let mut color = params.synth_coloration_enable.value();
-                    if ui
-                        .checkbox(&mut color, egui::RichText::new("Color").size(UI_FONT))
-                        .changed()
-                    {
-                        setter.set_parameter(&params.synth_coloration_enable, color);
-                    }
-
-                    ui.add_space(8.0);
-
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("OS:").size(UI_FONT));
-                        let os_factor = params.synth_oversampling_factor.value();
-                        let os_label = match os_factor {
-                            0 => "1x",
-                            1 => "2x",
-                            2 => "4x",
-                            3 => "8x",
-                            _ => "16x",
-                        };
-                        egui::ComboBox::from_id_salt("os_selector")
-                            .width(70.0)
-                            .selected_text(egui::RichText::new(os_label).size(UI_FONT))
-                            .show_ui(ui, |ui| {
-                                for (val, label) in
-                                    [(0, "1x"), (1, "2x"), (2, "4x"), (3, "8x"), (4, "16x")]
-                                {
-                                    let btn =
-                                        egui::Button::new(egui::RichText::new(label).size(UI_FONT))
-                                            .min_size(egui::vec2(60.0, 36.0))
-                                            .selected(os_factor == val);
-                                    if ui.add(btn).clicked() {
-                                        setter.set_parameter(
-                                            &params.synth_oversampling_factor,
-                                            val,
-                                        );
-                                        ui.close_menu();
-                                    }
-                                }
-                            });
+                        ui.label(egui::RichText::new("FILTER").size(HEADER_FONT).strong());
+                        ui.add_space(16.0);
+                        let mut enabled = params.synth_filter_enable.value();
+                        render_toggle(ui, &mut enabled, "ON");
+                        if enabled != params.synth_filter_enable.value() {
+                            setter.set_parameter(&params.synth_filter_enable, enabled);
+                        }
+                    });
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_cutoff, "CUT",
+                            20.0, 20000.0, SliderScale::Logarithmic,
+                            Some(Color32::from_rgb(180, 120, 60)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_resonance, "RES",
+                            0.0, 0.98, SliderScale::Linear,
+                            Some(Color32::from_rgb(180, 120, 60)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_env_amount, "ENV",
+                            -5000.0, 5000.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(140, 100, 80)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_drive, "DRV",
+                            1.0, 15.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(140, 100, 80)),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_filter_stereo, "STR",
+                            0.0, 1.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(140, 100, 80)),
+                        );
                     });
                 });
             });

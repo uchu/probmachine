@@ -11,10 +11,11 @@ pub enum Page {
     Strength,
     Synth,
     Presets,
+    Settings,
 }
 
 impl Page {
-    pub fn all() -> [Page; 6] {
+    pub fn all() -> [Page; 7] {
         [
             Page::Presets,
             Page::Synth,
@@ -22,6 +23,7 @@ impl Page {
             Page::Notes,
             Page::Strength,
             Page::Length,
+            Page::Settings,
         ]
     }
 
@@ -33,6 +35,7 @@ impl Page {
             Page::Strength => "Strength",
             Page::Synth => "Synth",
             Page::Presets => "Presets",
+            Page::Settings => "Settings",
         }
     }
 
@@ -45,7 +48,7 @@ impl Page {
     ) {
         match self {
             Page::BeatProbability => {
-                super::pages::beat_probability::render(tui, params, setter)
+                super::pages::beat_probability::render(tui, params, setter, ui_state)
             },
             Page::Length => {
                 super::pages::length::render(tui, params, setter)
@@ -61,6 +64,9 @@ impl Page {
             }
             Page::Presets => {
                 super::pages::presets::render(tui, params, setter, ui_state)
+            }
+            Page::Settings => {
+                super::pages::settings::render(tui, params, setter, ui_state)
             }
         }
     }

@@ -301,7 +301,6 @@ pub enum ModDestination {
     PllInfluence,
     PllTrackSpeed,
     PllFmAmount,
-    PllCrossFeedback,
     PllBurstAmount,
     PllRange,
     // VPS parameters
@@ -331,6 +330,9 @@ pub enum ModDestination {
     VpsStereoVOffset,
     PllInjectionAmount,
     PllMultSlew,
+    SawFold,
+    SawShapeAmount,
+    SawVolume,
 }
 
 impl ModDestination {
@@ -341,7 +343,7 @@ impl ModDestination {
             2 => ModDestination::PllInfluence,
             3 => ModDestination::PllTrackSpeed,
             4 => ModDestination::PllFmAmount,
-            5 => ModDestination::PllCrossFeedback,
+            5 => ModDestination::None,
             6 => ModDestination::PllBurstAmount,
             7 => ModDestination::PllRange,
             8 => ModDestination::VpsD,
@@ -364,6 +366,9 @@ impl ModDestination {
             25 => ModDestination::VpsStereoVOffset,
             26 => ModDestination::PllInjectionAmount,
             27 => ModDestination::PllMultSlew,
+            28 => ModDestination::SawFold,
+            29 => ModDestination::SawShapeAmount,
+            30 => ModDestination::SawVolume,
             _ => ModDestination::None,
         }
     }
@@ -375,7 +380,6 @@ impl ModDestination {
             ModDestination::PllInfluence => "PLL Infl",
             ModDestination::PllTrackSpeed => "PLL Track",
             ModDestination::PllFmAmount => "PLL FM",
-            ModDestination::PllCrossFeedback => "PLL XFB",
             ModDestination::PllBurstAmount => "PLL OT",
             ModDestination::PllRange => "PLL Rng",
             ModDestination::VpsD => "VPS D",
@@ -398,6 +402,9 @@ impl ModDestination {
             ModDestination::VpsStereoVOffset => "VPS VΔ",
             ModDestination::PllInjectionAmount => "PLL INJ",
             ModDestination::PllMultSlew => "PLL Slew",
+            ModDestination::SawFold => "Saw Fold",
+            ModDestination::SawShapeAmount => "Saw SHP",
+            ModDestination::SawVolume => "Saw Vol",
         }
     }
 }
@@ -409,7 +416,6 @@ pub struct ModulationValues {
     pub pll_influence: f64,
     pub pll_track_speed: f64,
     pub pll_fm_amount: f64,
-    pub pll_cross_feedback: f64,
     pub pll_burst_amount: f64,
     pub pll_range: f64,
     pub vps_d: f64,
@@ -432,6 +438,9 @@ pub struct ModulationValues {
     pub vps_stereo_v_offset: f64,
     pub pll_injection_amount: f64,
     pub pll_mult_slew: f64,
+    pub saw_fold: f64,
+    pub saw_shape_amount: f64,
+    pub saw_volume: f64,
 }
 
 impl ModulationValues {
@@ -440,7 +449,6 @@ impl ModulationValues {
         self.pll_influence += other.pll_influence;
         self.pll_track_speed += other.pll_track_speed;
         self.pll_fm_amount += other.pll_fm_amount;
-        self.pll_cross_feedback += other.pll_cross_feedback;
         self.pll_burst_amount += other.pll_burst_amount;
         self.pll_range += other.pll_range;
         self.vps_d += other.vps_d;
@@ -463,6 +471,9 @@ impl ModulationValues {
         self.vps_stereo_v_offset += other.vps_stereo_v_offset;
         self.pll_injection_amount += other.pll_injection_amount;
         self.pll_mult_slew += other.pll_mult_slew;
+        self.saw_fold += other.saw_fold;
+        self.saw_shape_amount += other.saw_shape_amount;
+        self.saw_volume += other.saw_volume;
     }
 
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
@@ -473,7 +484,6 @@ impl ModulationValues {
             ModDestination::PllInfluence => self.pll_influence += mod_value,
             ModDestination::PllTrackSpeed => self.pll_track_speed += mod_value,
             ModDestination::PllFmAmount => self.pll_fm_amount += mod_value,
-            ModDestination::PllCrossFeedback => self.pll_cross_feedback += mod_value,
             ModDestination::PllBurstAmount => self.pll_burst_amount += mod_value,
             ModDestination::PllRange => self.pll_range += mod_value,
             ModDestination::VpsD => self.vps_d += mod_value,
@@ -496,6 +506,9 @@ impl ModulationValues {
             ModDestination::VpsStereoVOffset => self.vps_stereo_v_offset += mod_value,
             ModDestination::PllInjectionAmount => self.pll_injection_amount += mod_value,
             ModDestination::PllMultSlew => self.pll_mult_slew += mod_value,
+            ModDestination::SawFold => self.saw_fold += mod_value,
+            ModDestination::SawShapeAmount => self.saw_shape_amount += mod_value,
+            ModDestination::SawVolume => self.saw_volume += mod_value,
         }
     }
 }

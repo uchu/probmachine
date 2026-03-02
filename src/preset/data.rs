@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::sequencer::scales::{Scale, StabilityPattern, OctaveDirection};
+use crate::sequencer::styles::{StylePattern, StyleMode};
+use crate::sequencer::multi_bar::BarOrderMode;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NotePresetData {
@@ -37,6 +39,114 @@ impl Default for OctaveRandomizationPresetData {
 fn default_pref() -> u8 { 64 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StyleConfigPresetData {
+    #[serde(default)]
+    pub style: StylePattern,
+    #[serde(default)]
+    pub chance: u8,
+    #[serde(default = "default_complexity")]
+    pub complexity: u8,
+    #[serde(default = "default_max_notes")]
+    pub max_notes: u8,
+    #[serde(default)]
+    pub mode: StyleMode,
+}
+
+impl Default for StyleConfigPresetData {
+    fn default() -> Self {
+        Self {
+            style: StylePattern::None,
+            chance: 0,
+            complexity: 10,
+            max_notes: 4,
+            mode: StyleMode::Replace,
+        }
+    }
+}
+
+fn default_max_notes() -> u8 { 4 }
+
+fn default_complexity() -> u8 { 10 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoteSlotPresetData {
+    pub midi_note: u8,
+    #[serde(default)]
+    pub octave_offset: i8,
+    pub chance: f32,
+    #[serde(default)]
+    pub strength_bias: f32,
+    #[serde(default)]
+    pub length_bias: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BarSlotPresetData {
+    pub notes: Vec<NoteSlotPresetData>,
+    pub root_note: u8,
+    pub strength_values: Vec<u8>,
+    #[serde(default = "default_bar_weight")]
+    pub weight: u8,
+    #[serde(default)]
+    pub beat_values: Option<Vec<u8>>,
+    #[serde(default)]
+    pub swing: Option<f32>,
+    #[serde(default)]
+    pub melodic_fragment_index: Option<usize>,
+}
+
+fn default_bar_weight() -> u8 { 64 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MultiBarPresetData {
+    pub enabled: bool,
+    #[serde(default = "default_bar_count")]
+    pub bar_count: u8,
+    #[serde(default)]
+    pub order_mode: BarOrderMode,
+    pub bars: Vec<BarSlotPresetData>,
+}
+
+fn default_bar_count() -> u8 { 4 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MelodicConfigPresetData {
+    pub enabled: bool,
+    #[serde(default = "default_melodic_variation")]
+    pub pitch_variation: f32,
+    #[serde(default = "default_melodic_rhythm")]
+    pub rhythm_variation: f32,
+    #[serde(default = "default_melodic_drop")]
+    pub note_drop_chance: f32,
+    #[serde(default = "default_melodic_octave")]
+    pub octave_variation: f32,
+    #[serde(default = "default_melodic_blend")]
+    pub blend: f32,
+    #[serde(default)]
+    pub fragment_index: Option<usize>,
+}
+
+impl Default for MelodicConfigPresetData {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            pitch_variation: 0.2,
+            rhythm_variation: 0.1,
+            note_drop_chance: 0.1,
+            octave_variation: 0.05,
+            blend: 0.5,
+            fragment_index: None,
+        }
+    }
+}
+
+fn default_melodic_variation() -> f32 { 0.2 }
+fn default_melodic_rhythm() -> f32 { 0.1 }
+fn default_melodic_drop() -> f32 { 0.1 }
+fn default_melodic_octave() -> f32 { 0.05 }
+fn default_melodic_blend() -> f32 { 0.5 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PresetData {
     pub straight_1_1: [f32; 1],
     pub straight_1_2: [f32; 2],
@@ -67,6 +177,12 @@ pub struct PresetData {
     pub stability_pattern: StabilityPattern,
     #[serde(default)]
     pub octave_randomization: OctaveRandomizationPresetData,
+    #[serde(default)]
+    pub style_config: StyleConfigPresetData,
+    #[serde(default)]
+    pub multi_bar: Option<MultiBarPresetData>,
+    #[serde(default)]
+    pub melodic_config: Option<MelodicConfigPresetData>,
 
     pub synth_pll_track_speed: f32,
     pub synth_pll_damping: f32,
@@ -165,11 +281,28 @@ pub struct PresetData {
     #[serde(default)]
     pub synth_sub_source: i32,
 
+    #[serde(default)]
+    pub synth_saw_enable: bool,
+    #[serde(default)]
+    pub synth_saw_volume: f32,
+    #[serde(default)]
+    pub synth_saw_octave: i32,
+    #[serde(default)]
+    pub synth_saw_tune: i32,
+    #[serde(default)]
+    pub synth_saw_fold: f32,
+    #[serde(default)]
+    pub synth_saw_shape_type: i32,
+    #[serde(default)]
+    pub synth_saw_shape_amount: f32,
+
     pub synth_filter_enable: bool,
     pub synth_filter_cutoff: f32,
     pub synth_filter_resonance: f32,
     pub synth_filter_env_amount: f32,
     pub synth_filter_drive: f32,
+    #[serde(default)]
+    pub synth_filter_stereo: f32,
 
     pub synth_vol_attack: f32,
     pub synth_vol_decay: f32,
@@ -413,6 +546,9 @@ impl Default for PresetData {
             scale: Scale::default(),
             stability_pattern: StabilityPattern::default(),
             octave_randomization: OctaveRandomizationPresetData::default(),
+            style_config: StyleConfigPresetData::default(),
+            multi_bar: None,
+            melodic_config: None,
 
             synth_pll_track_speed: 0.5,
             synth_pll_damping: 0.3,
@@ -474,11 +610,20 @@ impl Default for PresetData {
             synth_sub_volume: 0.0,
             synth_sub_source: 0,
 
+            synth_saw_enable: false,
+            synth_saw_volume: 0.0,
+            synth_saw_octave: 0,
+            synth_saw_tune: 0,
+            synth_saw_fold: 0.0,
+            synth_saw_shape_type: 0,
+            synth_saw_shape_amount: 0.0,
+
             synth_filter_enable: false,
             synth_filter_cutoff: 1000.0,
             synth_filter_resonance: 0.0,
             synth_filter_env_amount: 0.0,
             synth_filter_drive: 1.0,
+            synth_filter_stereo: 0.0,
 
             synth_vol_attack: 10.0,
             synth_vol_decay: 100.0,

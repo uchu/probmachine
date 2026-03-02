@@ -4,12 +4,13 @@ The Note Stability page controls which notes play and when, based on musical the
 
 ## Overview
 
-The system consists of four interconnected components:
+The system consists of five interconnected components:
 
 1. **Scale Selection** - Which notes are available (harmonic palette)
 2. **Stability Pattern** - How notes relate to beat strength/length (melodic shaping)
 3. **Per-Note Parameters** - Fine-tuned control for each note
 4. **Global Octave Randomization** - Post-processing melodic variation
+5. **Style Patterns** - Post-processing pitch override for consecutive beats using musical idioms
 
 ## Core Concepts
 
@@ -38,6 +39,18 @@ When the sequencer processes a beat:
 4. Select note via weighted random
 5. Apply global octave randomization (post-processing)
 6. Fallback to root if no suitable match
+
+---
+
+## ML Pitch Suggestion
+
+As an alternative to manually selecting scales and patterns, the Notes page has a **Suggest** button that populates the note pool from MIDI-learned data. The Beats page has a **Both** button that applies beat and pitch suggestions together.
+
+When ML suggestion is applied, the Scale and Pattern dropdowns automatically switch to **Custom**, reflecting that the generated intervals come from learned data rather than a predefined scale. The user can re-select a scale/pattern at any time to override the suggestion.
+
+Controls: **Density** (0–1) scales interval chances, **Variation** (0–1) adds randomness to chances and biases.
+
+See `docs/ml-beat-suggestion.md` for full details on the extraction pipeline and suggestion algorithms.
 
 ---
 
@@ -70,9 +83,22 @@ Selecting a scale enables notes and sets their base chance values.
 ### Scale Selection Behavior
 
 When a scale is selected:
-- Notes IN the scale: chance > 0 (based on scale degree importance)
+- Notes IN the scale: chance > 0 (based on interval from root, not positional degree)
 - Notes OUTSIDE the scale: chance = 0 (disabled)
 - Root note: always chance = 127 (guaranteed available)
+
+**Interval-based matching:** Chance values are determined by each note's semitone interval from the root (0-11), not by its positional index in the scale array. This ensures musical correctness for all scale sizes — e.g., the 5th (interval 7) gets proper importance in pentatonic and other non-7-note scales.
+
+Scale-specific chance values:
+- **Pentatonic Major**: Root=127, 5th(7)=105, 3rd(4)=95, 6th(9)=90, 2nd(2)=85
+- **Pentatonic Minor**: Root=127, 5th(7)=105, b3(3)=95, 4th(5)=90, b7(10)=85
+- **Blues**: Root=127, 5th(7)=100, b3(3)=90, b7(10)=85, 4th(5)=80, tritone(6)=65
+- **Whole Tone**: Root=127, all others=75 (equidistant intervals)
+- **Chromatic**: Root=127, all others=70
+- **Japanese**: Root=127, 5th(7)=100, 4th(5)=85, b6(8)=65, b2(1)=55
+- **Hungarian**: Root=127, 5th(7)=100, b3(3)=80, #4(6)=65, b6(8)=60, 2nd(2)=45, 7th(11)=40
+- **Arabic**: Root=127, 5th(7)=100, 4th(5)=90, 3rd(4)=85, b6(8)=60, b2(1)=50, b7(10)=45
+- **Default 7-note**: Root=127, 5th(7)=100, 4th(5)=90, 3rd(3|4)=80, 6th(8|9)=60, 2nd(1|2)=45, 7th(10|11)=40, tritone(6)=35
 
 ### Root Note Behavior
 
@@ -80,35 +106,48 @@ The root note has special handling:
 
 | Parameter | Editable? | Value | Reason |
 |-----------|-----------|-------|--------|
-| **Chance** | No (fixed) | 127 | Root is always available as fallback |
+| **Chance** | Yes | 0-127 (default 127) | Editable; root still serves as fallback if nothing else qualifies |
 | **Strength Preference** | Yes | 0-127 | Root can prefer strong/weak beats |
 | **Length Preference** | Yes | 0-127 | Root can prefer short/long notes |
 
+**Editable root chance:** The root note's chance slider is now fully editable. Lowering it reduces the root's weight in the probability pool, making it less likely to be selected through normal weighted random selection. However, the root always serves as a **fallback** — if no other note qualifies (all weighted chances are zero), the sequencer falls back to the root note regardless of its chance value.
+
+A "(fallback)" label appears next to the chance slider when the root is selected, reminding the user of this safety net.
+
 **Why root note biases matter:**
 
-The root note competes with other notes through weighted probability. While its chance is fixed at maximum (127), its strength and length preferences affect *when* it's most likely to play:
+The root note competes with other notes through weighted probability. Its strength and length preferences affect *when* it's most likely to play:
 
 | Configuration | Musical Effect |
 |---------------|----------------|
-| Strength=127 (Strong), Length=127 (Long) | Root anchors downbeats with sustained notes |
-| Strength=0 (Weak), Length=0 (Short) | Root fills gaps as quick passing notes |
-| Strength=64 (Any), Length=64 (Any) | Root equally likely everywhere (default) |
-| Strength=127 (Strong), Length=0 (Short) | Root on punchy downbeat accents |
+| Chance=127, Strength=127, Length=127 | Root anchors downbeats with sustained notes |
+| Chance=60, Strength=0, Length=0 | Root is a soft presence, fills gaps as quick passing notes |
+| Chance=127, Strength=64, Length=64 | Root equally likely everywhere (default) |
+| Chance=30, Strength=127, Length=0 | Root rarely selected, but when it is, on punchy downbeat accents |
 
 **The math behind it:**
 
 With bias system that only *boosts* (never reduces below base chance):
-- Root at Strength=127 on a strong beat: effective chance = 127 × 2.0 = 254
-- Root at Strength=127 on a weak beat: effective chance = 127 × 1.0 = 127
-- Other notes still compete, but root is contextually boosted
+- Root at Chance=127, Strength=127 on a strong beat: effective chance = 127 × 2.0 = 254
+- Root at Chance=60, Strength=127 on a weak beat: effective chance = 60 × 1.0 = 60
+- Other notes still compete based on their own weights
 
-The fallback mechanism still ensures root plays if no other note qualifies, but with biases, root actively participates in the weighted selection rather than being a passive default.
+The fallback mechanism ensures root plays if no other note qualifies, but with adjustable chance, the root's participation in weighted selection is fully configurable.
 
 ---
 
 ## Stability Pattern Dropdown
 
 Selecting a stability pattern adjusts how notes respond to beat strength and length.
+
+Patterns use **interval-based functional degree mapping** internally: each note's semitone interval from root is converted to a functional degree (Root, 2nd, 3rd, 4th, 5th, 6th, 7th, Tritone) for pattern lookup. This ensures correct behavior across all scale sizes.
+
+Tritone (interval 6) handling varies by pattern:
+- **Traditional**: Very unstable (20/20, octave 0)
+- **Jazz Melodic**: Used in dominant chords (75/50, octave 0)
+- **Melodic**: Passing tone (40/30, octave 0)
+- **Tension**: Maximum tension creator (90/80, octaves 0,+1)
+- **Ambient/BassHeavy**: Falls into catch-all
 
 ### Available Patterns
 
@@ -241,7 +280,7 @@ Base probability weight for the note.
 | 81-126 | Common (prominent) |
 | 127 | Maximum |
 
-**Note:** Root note's chance is fixed at 127 and cannot be edited. This ensures root is always available as a fallback.
+**Note:** Root note's chance defaults to 127 but is now editable. The root always serves as a fallback if no other note qualifies, regardless of its chance value.
 
 ### Beat Strength Preference (0-127)
 
@@ -398,24 +437,24 @@ Complete algorithm for note selection:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ STEP 1: SCALE SELECTION                                          │
+│ STEP 1: NOTE POOL SETUP (choose one path)                        │
 │                                                                  │
-│ User selects scale (e.g., "Dorian")                              │
-│ → Enables notes: 1, 2, b3, 4, 5, 6, b7                          │
-│ → Sets base chance values per note                               │
+│ Path A: Scale + Pattern                                          │
+│   Select scale (e.g., "Dorian") → enables notes with chances    │
+│   Select pattern (e.g., "Jazz Melodic") → sets strength/length  │
+│                                                                  │
+│ Path B: ML Suggestion                                            │
+│   Click "Suggest" on Notes page (or "Both" on Beats page)       │
+│   → Populates notes from MIDI-learned interval distributions    │
+│   → Sets chances, strength biases, and length biases per note   │
+│   → Scale/Pattern dropdowns switch to "Custom"                  │
+│                                                                  │
+│ Either path produces a NotePool with per-note chance,            │
+│ strength bias, and length bias. Both can be fine-tuned after.    │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STEP 2: STABILITY PATTERN SELECTION                              │
-│                                                                  │
-│ User selects pattern (e.g., "Jazz Melodic")                      │
-│ → Adjusts Strength preference per note                           │
-│ → Adjusts Length preference per note                             │
-│ → Configures octave variants with individual settings            │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ STEP 3: USER FINE-TUNING (optional)                              │
+│ STEP 2: USER FINE-TUNING (optional)                              │
 │                                                                  │
 │ User can manually adjust any per-note parameter                  │
 │ → Override chance, strength pref, length pref                    │
@@ -427,6 +466,17 @@ Complete algorithm for note selection:
 │                                                                  │
 │ User sets post-processing octave shift behavior                  │
 │ → Chance, Strength pref, Length pref, Direction                  │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 4b: CONFIGURE STYLE PATTERNS (optional)                     │
+│                                                                  │
+│ User selects a musical style and configures:                     │
+│ → Style (Classical, Blues, Jazz, Rock, etc.)                     │
+│ → Chance (0-127): probability of pattern triggering per beat     │
+│ → Complexity (1-20): limits available patterns (simple→complex)  │
+│ → Max Notes (1-10): max consecutive beats covered (loops)        │
+│ → Mode (Replace/Finish): pattern interruption behavior           │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -472,10 +522,27 @@ Complete algorithm for note selection:
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STEP 7: OUTPUT                                                   │
+│ STEP 7: STYLE PATTERN APPLICATION (post-processing)              │
+│                                                                  │
+│ After all beat events are generated for a bar:                   │
+│                                                                  │
+│ a. Sort events by time                                           │
+│ b. Walk through events in order                                  │
+│ c. If an active pattern exists, apply its next pitch             │
+│ d. Roll against Style Chance for a new pattern trigger           │
+│    → Replace mode: rolls every beat (may interrupt active)       │
+│    → Finish mode: only rolls when no pattern is active           │
+│    → If triggered, select random pattern (limited by Complexity) │
+│    → Build pitch sequence from enabled notes + start pitch       │
+│    → Override pitches of this and subsequent consecutive beats   │
+│ e. Max Notes limits pattern length (loops if exceeded)           │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 8: OUTPUT                                                   │
 │                                                                  │
 │ Final note with:                                                 │
-│ - Pitch (note + octave)                                          │
+│ - Pitch (note + octave, possibly style-pattern-overridden)       │
 │ - Velocity (derived from beat strength)                          │
 │ - Duration (note length)                                         │
 └─────────────────────────────────────────────────────────────────┘
@@ -543,6 +610,9 @@ struct NoteStabilityData {
     octave_rand_strength: u8,      // 0-127, default 64 (Any)
     octave_rand_length: u8,        // 0-127, default 64 (Any)
     octave_rand_direction: i8,     // -1=Down, 0=Both, 1=Up
+
+    // Style patterns
+    style_config: StyleConfigPresetData,
 }
 
 struct NoteSettings {
@@ -552,6 +622,13 @@ struct NoteSettings {
     strength_pref: u8,             // 0-127
     length_pref: u8,               // 0-127
     enabled: bool,
+}
+
+struct StyleConfigPresetData {
+    style: StylePattern,           // None, Classical, Blues, Jazz, etc.
+    chance: u8,                    // 0-127, default 0
+    complexity: u8,                // 1-20, default 10
+    max_notes: u8,                 // 1-10, default 4
 }
 ```
 
@@ -568,7 +645,13 @@ struct NoteSettings {
     "octave_rand_chance": 20,
     "octave_rand_strength": 64,
     "octave_rand_length": 64,
-    "octave_rand_direction": 0
+    "octave_rand_direction": 0,
+    "style_config": {
+        "style": "Blues",
+        "chance": 80,
+        "complexity": 10,
+        "max_notes": 4
+    }
 }
 ```
 
@@ -599,37 +682,43 @@ Together they create durational-melodic relationships:
 ## UI Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      NOTE STABILITY                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Scale: [Dorian        ▼]    Pattern: [Jazz Melodic    ▼]       │
-│                                                                  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    NOTE GRID                                 ││
-│  │  (Piano roll style or grid showing enabled notes            ││
-│  │   with sliders for Chance, Strength Pref, Length Pref)      ││
-│  │                                                              ││
-│  │  [Root] ████████████████████████████ 127  Any   Any         ││
-│  │  [2nd]  ██████████░░░░░░░░░░░░░░░░░░  60  Weak  Short       ││
-│  │  [b3rd] ████████████████░░░░░░░░░░░░  95  Str   Med         ││
-│  │  [4th]  ██████░░░░░░░░░░░░░░░░░░░░░░  40  Weak  Short       ││
-│  │  [5th]  ██████████████████████░░░░░░  90  Str   Long        ││
-│  │  [6th]  ██████████████░░░░░░░░░░░░░░  70  Med   Med         ││
-│  │  [b7th] ██████████████████░░░░░░░░░░  85  Str   Long        ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                  │
-├─────────────────────────────────────────────────────────────────┤
-│                  OCTAVE RANDOMIZATION                            │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │  Chance:    [░░░░░░░░░░░░░░░░░░░░░░░░] 0                    ││
-│  │  Strength:  [Weak]────[Any]────[Strong]                     ││
-│  │  Length:    [Short]───[Any]────[Long]                       ││
-│  │  Direction: [Down] [Both] [Up]                              ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              NOTE STABILITY                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Scale: [Dorian ▼]  Pattern: [Jazz ▼]  Style: [Blues ▼] │ Density:[==] Var:[==] [Suggest] │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                          NOTE GRID                                    │  │
+│  │  (Piano roll with enabled notes, click to add/remove)                 │  │
+│  │                                                                        │  │
+│  │  [Root] ████████████████████████████ 127  Any   Any                   │  │
+│  │  [2nd]  ██████████░░░░░░░░░░░░░░░░░░  60  Weak  Short                 │  │
+│  │  [b3rd] ████████████████░░░░░░░░░░░░  95  Str   Med                   │  │
+│  │  [4th]  ██████░░░░░░░░░░░░░░░░░░░░░░  40  Weak  Short                 │  │
+│  │  [5th]  ██████████████████████░░░░░░  90  Str   Long                  │  │
+│  │  [6th]  ██████████████░░░░░░░░░░░░░░  70  Med   Med                   │  │
+│  │  [b7th] ██████████████████░░░░░░░░░░  85  Str   Long                  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                        BOTTOM ROW (3 panels)                                 │
+│                                                                              │
+│  ┌─────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐   │
+│  │ SELECTED NOTE    │  │ OCTAVE RANDOMIZATION │  │ STYLE PATTERN        │   │
+│  │                  │  │                      │  │                      │   │
+│  │ Chance:  [====]  │  │ Chance:  [░░░░] 0    │  │ Chance:  [████] 80   │   │
+│  │ Strength:[====]  │  │ Strength:[Wk|Any|St] │  │ Complexity:[██] 10   │   │
+│  │ Length:  [====]  │  │ Length:  [Sh|Any|Lg]  │  │ Max Notes: [██] 4   │   │
+│  │                  │  │ Direction:[Dn|Bo|Up]  │  │ Mode:[Replace|Finish]│   │
+│  │ Effective Weight │  │                      │  │                      │   │
+│  │ Weak:  [████] 80%│  │                      │  │                      │   │
+│  │ Mid:   [██] 100% │  │                      │  │                      │   │
+│  │ Strong:[██] 120% │  │                      │  │                      │   │
+│  └─────────────────┘  └──────────────────────┘  └──────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---

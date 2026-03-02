@@ -117,7 +117,7 @@ Instead of a single pitch, notes are selected from a weighted pool.
 
 ### Root Note
 
-A designated root note always has 100% chance and serves as a fallback if no other note is selected.
+A designated root note serves as a fallback if no other note is selected. The root note's chance is editable (default 127), but even with low chance, the fallback mechanism ensures it always plays when nothing else qualifies.
 
 ### Strength-Based Selection
 
@@ -136,6 +136,68 @@ where strength_modifier =
   if bias < 0: 1.0 + (-bias × (1.0 - position_strength))
   else: 1.0
 ```
+
+## Style Patterns
+
+Style patterns override pitch selection for consecutive beats to create melodic figures characteristic of a musical style (arpeggios, licks, runs, etc.).
+
+### How It Works
+
+1. After all beat events are generated for a bar, a post-processing pass walks through events sorted by time
+2. For each event, a **chance roll** determines if a style pattern triggers
+3. If triggered, a pattern is selected randomly from the style's library (limited by complexity)
+4. The pattern assigns pitches to the current and subsequent consecutive beats
+5. Pattern interruption depends on the **Mode** setting:
+   - **Replace** (default): new pattern replaces any unfinished previous pattern
+   - **Finish**: waits for current pattern to complete before rolling for a new one
+
+### Parameters
+
+| Param | Range | Description |
+|-------|-------|-------------|
+| Style | Dropdown | Musical style (None disables) |
+| Chance | 0-127 | Probability of pattern triggering at each beat |
+| Complexity | 1-20 | Maximum pattern index (1=simplest only, 20=all patterns available) |
+| Max Notes | 1-10 | Maximum number of consecutive beats the pattern covers (loops pattern if exceeded) |
+| Mode | Replace/Finish | Replace: new patterns interrupt active ones. Finish: wait for active pattern to complete |
+
+### Pattern Mechanics
+
+Patterns are defined as **step sequences through enabled notes**. Each step is relative to the starting note's position in the sorted enabled note list:
+
+- `0` = current note (no change)
+- `1` = next higher enabled note
+- `-1` = next lower enabled note
+- `3` = three enabled notes up (may wrap to next octave)
+
+When stepping beyond the available enabled notes, the system wraps into the next octave (up or down by 12 semitones).
+
+### Available Styles
+
+| Style | Character |
+|-------|-----------|
+| Classical | Triads, scales, Alberti bass, scalar sequences, mordents, turns |
+| Blues | Blue note bends, call-response, pentatonic licks, turnarounds |
+| Jazz | Chord tone arpeggios, enclosures, bebop lines, chromatic approach |
+| Rock | Power chord shapes, pentatonic riffs, driving repeated notes |
+| Latin | Montuno figures, tumbao bass, salsa patterns, bossa nova |
+| Techno | Repetitive hypnotic sequences, acid 303 patterns, octave bounces |
+| Ambient | Wide open intervals, spacious arpeggios, slow unfolding |
+| Reggae | Root-fifth patterns, skank figures, dub spacing |
+| Dubstep | Sub-bass drops, octave dives, wobble patterns, glitch stutter |
+| Funk | Syncopated grooves, slap patterns, chromatic approach, octave slaps |
+| Middle Eastern | Maqam phrases, ornamental trills, taqsim improvisation |
+| Celtic | Jig and reel figures, grace notes, pentatonic dance patterns |
+
+Each style contains 20 patterns sorted from simple (index 1) to complex (index 20):
+- **1-5**: Simple figures (unisons, basic triads, short arpeggios)
+- **6-10**: Intermediate patterns (classic style phrases, 4-5 note figures)
+- **11-15**: Advanced patterns (extended phrases, style-specific idioms)
+- **16-20**: Complex patterns (long runs, multi-directional sequences)
+
+### Preset Compatibility
+
+Style config is saved in presets with `#[serde(default)]` for backwards compatibility. Old presets load with Style set to None (disabled).
 
 ## Note Duration
 
@@ -328,13 +390,20 @@ Grid of probability sliders for each beat position. Organized by division type w
 - Triplet: Orange shades
 - Dotted: Green shades
 - Swing control
+- ML suggestion controls: Density/Variation sliders, Suggest (beats only), Both (beats + pitch), Clear All
+- See `docs/ml-beat-suggestion.md` for ML suggestion details
 
 ### Notes Page
 
 Piano roll interface for note pool configuration:
 - Click to add/remove notes
-- Sliders for chance and strength bias
-- Root note indicator
+- Sliders for chance and strength bias per note
+- Root note indicator (chance now editable, with fallback safety net)
+- Top row: Scale, Pattern, and Style dropdowns + ML pitch suggestion (Density, Variation, Suggest)
+- Bottom row panels (left to right):
+  - Selected note info (chance, strength, length sliders + probability preview bars)
+  - Octave randomization (chance, strength, length, direction)
+  - Style pattern controls (chance, complexity 1-20, max notes 1-10, mode Replace/Finish)
 
 ### Strength Page
 
@@ -351,7 +420,129 @@ Controls for note duration, velocity, and position:
 - Velocity modifiers:
   - Strength-based (target: Weak/Any/Strong)
   - Length-based (target: Short/Any/Long)
+  - Velocity range preview bar showing min-max from modifier stacking
 - Two position modifier slots with target sliders (Weak/Any/Strong)
+
+## Multi-Bar Sequences
+
+Enables cycling through up to 8 bars with different NotePool and strength grid configurations per bar. Beat probabilities remain global (shared across all bars).
+
+### How It Works
+
+Each bar slot stores:
+- **Notes** — independent NotePool (per-note chance, strength bias, length bias)
+- **Root Note** — per-bar root note
+- **Strength Grid** — 96-position strength values
+- **Weight** — for weighted random ordering
+
+### Bar Ordering Modes
+
+| Mode | Behavior |
+|------|----------|
+| Sequential | Cycles 1→2→3→4→1→2→... |
+| Ping-Pong | Bounces 1→2→3→4→3→2→1→2→... |
+| Random | Picks any bar randomly |
+| Weighted | Picks bars randomly weighted by per-bar weight value |
+
+### UI Controls (Notes Page)
+
+Top row shows multi-bar controls when enabled:
+- **Multi-Bar toggle** — enable/disable
+- **Bar count** — 1 to 8 bars
+- **Numbered bar buttons** — click to edit that bar's NotePool and strength
+- **Order mode dropdown** — Sequential, Ping-Pong, Random, Weighted
+- **Copy to Next** — duplicates current bar's data to the next slot
+
+### Sequencer Integration
+
+At each bar boundary:
+1. Bar counter advances
+2. Next bar slot is selected using the ordering mode
+3. NotePool and strength values swap to the new slot's data
+4. New bar generates using the swapped data + global beat probabilities
+
+### Preset Compatibility
+
+Saved as `Option<MultiBarPresetData>` with `#[serde(default)]`. Old presets load with multi-bar disabled.
+
+## Melodic Fragment System
+
+Extracts real note sequences from MIDI files and applies generative variation to create melodies inspired by the original data.
+
+### How It Works
+
+1. **Extraction**: `midi_extract` extracts melodic fragments (ordered pitch + timing sequences) from each MIDI bar alongside beat and pitch distributions
+2. **Loading**: Fragments loaded from built-in `melody_data.bin` (via `include_bytes!`) or external dataset files
+3. **Variation**: Each time a bar generates, a fragment is selected and varied (pitch shifts, rhythm offsets, note drops, octave displacement)
+4. **Blending**: The `blend` parameter controls how fragment pitches interact with the probability-based NotePool selection
+
+### Variation Parameters
+
+| Param | Range | Description |
+|-------|-------|-------------|
+| Blend | 0.0-1.0 | 0.0 = pure melody, 1.0 = pure probability |
+| Pitch Variation | 0.0-1.0 | Chance of shifting each note ±1 semitone |
+| Rhythm Variation | 0.0-1.0 | Amount of timing shift per note |
+| Note Drop | 0.0-0.5 | Chance of omitting a note (never first note) |
+| Octave Variation | 0.0-0.5 | Chance of ±12 semitone displacement |
+
+### Fragment Binary Format (`melody_data.bin`)
+
+```
+magic:   [u8; 4] = "MLDT"
+version: u8 = 1
+count:   u32 (LE)
+
+Per fragment:
+  root_pitch_class: u8
+  note_count: u8
+  Per note (6 bytes):
+    relative_pitch: i8     (-24..+24 semitones from reference octave)
+    start_time: u16 LE     (0-10000 → 0.0-1.0 bar position)
+    duration: u16 LE       (0-10000 → 0.0-1.0 bar fraction)
+    velocity: u8
+```
+
+### Blend Behavior
+
+At each note event during bar generation:
+- With probability `(1.0 - blend)`, the nearest melodic fragment note's pitch is used
+- Otherwise, the standard NotePool selection applies
+- When blend = 0.0, fragments fully control pitch
+- When blend = 1.0, fragments are unused (pure probability mode)
+
+### UI Controls (Notes Page)
+
+Bottom row "Melody" section:
+- **Enable toggle** — activate melodic fragment system
+- **Blend slider** — Melody ↔ Probability
+- **Pitch/Rhythm/Drop/Oct sliders** — variation parameters
+- **New button** — picks a new random fragment
+
+## External Dataset Loading
+
+ML suggestion data (beat, pitch, melody) can be loaded from external files at runtime, removing binary size constraints.
+
+### Dataset Sources
+
+| Source | Location | Loaded via |
+|--------|----------|------------|
+| Built-in | Compiled into binary | `include_bytes!` |
+| External | `~/.local/share/Device/datasets/<name>/` | `MlDataset::load_from_dir()` |
+
+Each external dataset directory contains `beat_data.bin`, `pitch_data.bin`, and `melody_data.bin`. Files may be LZ4-compressed (auto-detected by `"LZ4\0"` magic header).
+
+### Dataset Selector
+
+The Beats page includes a dataset dropdown. Selecting a dataset loads all three data files and shares them via `Arc<MlDataset>` between UI and audio threads. The audio thread picks up the new dataset at the next bar boundary via a dirty flag.
+
+### Creating External Datasets
+
+```
+cargo run --bin midi_extract -- --dir midi/jazz --name jazz --install --compress
+```
+
+See `docs/ml-beat-suggestion.md` for full CLI options and binary format details.
 
 ## Creative Applications
 

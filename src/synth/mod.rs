@@ -15,6 +15,7 @@ pub use lfo::LfoBank;
 pub use limiter::MasterLimiter;
 use crate::sequencer::Sequencer;
 use crate::params::DeviceParams;
+use crate::midi::ExternalNoteEvent;
 use mod_sequencer::ModSequencer;
 
 pub struct SynthEngine {
@@ -160,10 +161,6 @@ impl SynthEngine {
         self.voice.set_pll_stereo_phase(phase as f64);
     }
 
-    pub fn set_pll_cross_feedback(&mut self, amount: f32) {
-        self.voice.set_pll_cross_feedback(amount as f64);
-    }
-
     pub fn set_pll_fm_env_amount(&mut self, amount: f32) {
         self.voice.set_pll_fm_env_amount(amount as f64);
     }
@@ -208,9 +205,13 @@ impl SynthEngine {
         vps: bool,
         coloration: bool,
         reverb: bool,
-        oversampling_factor: i32,
+        saw: bool,
     ) {
-        self.voice.set_bypass_switches(pll, vps, coloration, reverb, oversampling_factor);
+        self.voice.set_bypass_switches(pll, vps, coloration, reverb, saw);
+    }
+
+    pub fn set_oversampling(&mut self, pll: i32, saw: i32, vps: i32) {
+        self.voice.set_oversampling(pll, saw, vps);
     }
 
     pub fn set_base_rate(&mut self, rate_option: i32) {
@@ -237,8 +238,28 @@ impl SynthEngine {
         self.voice.set_sub_source(source);
     }
 
-    pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32) {
-        self.voice.set_filter_params(enabled, cutoff as f64, resonance as f64, env_amount as f64, drive as f64);
+    pub fn set_saw_volume(&mut self, volume: f32) {
+        self.voice.set_saw_volume(volume as f64);
+    }
+
+    pub fn set_saw_octave(&mut self, octave: i32) {
+        self.voice.set_saw_octave(octave);
+    }
+
+    pub fn set_saw_tune(&mut self, tune: i32) {
+        self.voice.set_saw_tune(tune);
+    }
+
+    pub fn set_saw_shape(&mut self, shape_type: i32, shape_amount: f32) {
+        self.voice.set_saw_shape(shape_type, shape_amount as f64);
+    }
+
+    pub fn set_saw_fold(&mut self, fold: f32) {
+        self.voice.set_saw_fold(fold as f64);
+    }
+
+    pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, stereo: f32) {
+        self.voice.set_filter_params(enabled, cutoff as f64, resonance as f64, env_amount as f64, drive as f64, stereo as f64);
     }
 
     pub fn set_volume(&mut self, volume: f32) {
@@ -265,6 +286,22 @@ impl SynthEngine {
 
     pub fn update_octave_randomization(&mut self, octave_randomization: crate::sequencer::OctaveRandomization) {
         self.sequencer.octave_randomization = octave_randomization;
+    }
+
+    pub fn update_style_config(&mut self, style_config: crate::sequencer::StyleConfig) {
+        self.sequencer.style_config = style_config;
+    }
+
+    pub fn update_multi_bar_config(&mut self, config: crate::sequencer::MultiBarConfig) {
+        self.sequencer.multi_bar = Some(config);
+    }
+
+    pub fn update_melodic_config(&mut self, config: crate::sequencer::MelodicConfig) {
+        self.sequencer.melodic_config = config;
+    }
+
+    pub fn update_ml_dataset(&mut self, dataset: std::sync::Arc<crate::sequencer::ml_dataset::MlDataset>) {
+        self.sequencer.dataset = dataset;
     }
 
     pub fn set_reverb_params(
@@ -361,14 +398,43 @@ impl SynthEngine {
         _base_freq: f32,
         midi_events: &mut Vec<(bool, bool, u8, u8, usize)>,
         seq_playing: bool,
+        external_notes: &[ExternalNoteEvent],
     ) {
         let bpm = self.sequencer.get_bpm();
         self.voice.set_bpm(bpm);
         midi_events.clear();
 
+        if seq_playing {
+            self.sequencer.prepare(output_l.len(), params);
+        }
+
+        let mut ext_idx = 0;
+
         for (sample_idx, (l, r)) in output_l.iter_mut().zip(output_r.iter_mut()).enumerate() {
+            while ext_idx < external_notes.len()
+                && (external_notes[ext_idx].timing as usize) <= sample_idx
+            {
+                let event = &external_notes[ext_idx];
+                if event.timing as usize == sample_idx {
+                    if event.is_note_on {
+                        self.voice.set_frequency(
+                            event.frequency,
+                            self.pll_feedback,
+                            feedback_amount as f64,
+                        );
+                        self.voice.set_velocity(event.velocity);
+                        self.voice.trigger();
+                        midi_events.push((true, false, event.note, event.velocity, sample_idx));
+                    } else {
+                        self.voice.release();
+                        midi_events.push((false, true, event.note, 0, sample_idx));
+                    }
+                }
+                ext_idx += 1;
+            }
+
             if seq_playing {
-                let (should_trigger, should_release, frequency, velocity, midi_note) = self.sequencer.update(params);
+                let (should_trigger, should_release, frequency, velocity, midi_note) = self.sequencer.update();
 
                 if should_trigger {
                     self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);

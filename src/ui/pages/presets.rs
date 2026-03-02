@@ -736,7 +736,6 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_pll_range, data.synth_pll_range);
     setter.set_parameter(&params.synth_pll_stereo_track_offset, data.synth_pll_stereo_track_offset);
     setter.set_parameter(&params.synth_pll_stereo_phase, data.synth_pll_stereo_phase);
-    setter.set_parameter(&params.synth_pll_cross_feedback, data.synth_pll_cross_feedback);
     setter.set_parameter(&params.synth_pll_fm_env_amount, data.synth_pll_fm_env_amount);
     setter.set_parameter(&params.synth_pll_precision, data.synth_pll_precision);
     setter.set_parameter(&params.synth_pll_enable, data.synth_pll_enable);
@@ -762,11 +761,20 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_sub_volume, data.synth_sub_volume);
     setter.set_parameter(&params.synth_sub_source, data.synth_sub_source);
 
+    setter.set_parameter(&params.synth_saw_enable, data.synth_saw_enable);
+    setter.set_parameter(&params.synth_saw_volume, data.synth_saw_volume);
+    setter.set_parameter(&params.synth_saw_octave, data.synth_saw_octave);
+    setter.set_parameter(&params.synth_saw_tune, data.synth_saw_tune);
+    setter.set_parameter(&params.synth_saw_fold, data.synth_saw_fold);
+    setter.set_parameter(&params.synth_saw_shape_type, data.synth_saw_shape_type);
+    setter.set_parameter(&params.synth_saw_shape_amount, data.synth_saw_shape_amount);
+
     setter.set_parameter(&params.synth_filter_enable, data.synth_filter_enable);
     setter.set_parameter(&params.synth_filter_cutoff, data.synth_filter_cutoff);
     setter.set_parameter(&params.synth_filter_resonance, data.synth_filter_resonance);
     setter.set_parameter(&params.synth_filter_env_amount, data.synth_filter_env_amount);
     setter.set_parameter(&params.synth_filter_drive, data.synth_filter_drive);
+    setter.set_parameter(&params.synth_filter_stereo, data.synth_filter_stereo);
 
     setter.set_parameter(&params.synth_vol_attack, data.synth_vol_attack);
     setter.set_parameter(&params.synth_vol_decay, data.synth_vol_decay);
@@ -921,7 +929,70 @@ fn load_preset_to_params(
         oct_rand.direction = data.octave_randomization.direction;
     }
 
+    if let Ok(mut style_config) = ui_state.style_config.lock() {
+        style_config.style = data.style_config.style;
+        style_config.chance = data.style_config.chance;
+        style_config.complexity = data.style_config.complexity;
+        style_config.max_notes = data.style_config.max_notes;
+        style_config.mode = data.style_config.mode;
+    }
+
+    if let Ok(mut multi_bar) = ui_state.multi_bar_config.lock() {
+        use crate::sequencer::multi_bar::{MultiBarConfig, BarSlot, NoteSlotData, MAX_BARS};
+        if let Some(ref mb_data) = data.multi_bar {
+            multi_bar.enabled = mb_data.enabled;
+            multi_bar.bar_count = mb_data.bar_count.min(MAX_BARS as u8);
+            multi_bar.order_mode = mb_data.order_mode;
+            multi_bar.bars.clear();
+            for bar_data in &mb_data.bars {
+                let notes: Vec<NoteSlotData> = bar_data.notes.iter().map(|n| NoteSlotData {
+                    midi_note: n.midi_note,
+                    octave_offset: n.octave_offset,
+                    chance: n.chance,
+                    strength_bias: n.strength_bias,
+                    length_bias: n.length_bias,
+                }).collect();
+                let strength: Vec<f32> = bar_data.strength_values.iter()
+                    .map(|&v| v as f32 / 127.0)
+                    .collect();
+                let beat_values = bar_data.beat_values.as_ref().map(|bv| {
+                    bv.iter().map(|&v| v as f32 / 2.0).collect::<Vec<f32>>()
+                });
+                multi_bar.bars.push(BarSlot {
+                    notes,
+                    root_note: bar_data.root_note,
+                    strength_values: strength,
+                    weight: bar_data.weight,
+                    beat_values,
+                    swing: bar_data.swing,
+                    melodic_fragment_index: bar_data.melodic_fragment_index,
+                });
+            }
+            while multi_bar.bars.len() < MAX_BARS {
+                multi_bar.bars.push(BarSlot::default());
+            }
+        } else {
+            *multi_bar = MultiBarConfig::default();
+        }
+    }
+
+    if let Ok(mut melodic) = ui_state.melodic_config.lock() {
+        use crate::sequencer::melodic_engine::MelodicConfig;
+        if let Some(ref mc_data) = data.melodic_config {
+            melodic.enabled = mc_data.enabled;
+            melodic.pitch_variation = mc_data.pitch_variation;
+            melodic.rhythm_variation = mc_data.rhythm_variation;
+            melodic.note_drop_chance = mc_data.note_drop_chance;
+            melodic.octave_variation = mc_data.octave_variation;
+            melodic.blend = mc_data.blend;
+            melodic.fragment_index = mc_data.fragment_index;
+        } else {
+            *melodic = MelodicConfig::default();
+        }
+    }
+
     ui_state.increment_preset_version();
+    ui_state.mark_seq_dirty();
     ui_state.request_dsp_reset();
 }
 
@@ -1154,7 +1225,6 @@ fn save_params_to_preset_data(
     data.synth_pll_range = params.synth_pll_range.modulated_plain_value();
     data.synth_pll_stereo_track_offset = params.synth_pll_stereo_track_offset.modulated_plain_value();
     data.synth_pll_stereo_phase = params.synth_pll_stereo_phase.modulated_plain_value();
-    data.synth_pll_cross_feedback = params.synth_pll_cross_feedback.modulated_plain_value();
     data.synth_pll_fm_env_amount = params.synth_pll_fm_env_amount.modulated_plain_value();
     data.synth_pll_precision = params.synth_pll_precision.value();
     data.synth_pll_enable = params.synth_pll_enable.value();
@@ -1180,11 +1250,20 @@ fn save_params_to_preset_data(
     data.synth_sub_volume = params.synth_sub_volume.modulated_plain_value();
     data.synth_sub_source = params.synth_sub_source.value();
 
+    data.synth_saw_enable = params.synth_saw_enable.value();
+    data.synth_saw_volume = params.synth_saw_volume.modulated_plain_value();
+    data.synth_saw_octave = params.synth_saw_octave.value();
+    data.synth_saw_tune = params.synth_saw_tune.value();
+    data.synth_saw_fold = params.synth_saw_fold.modulated_plain_value();
+    data.synth_saw_shape_type = params.synth_saw_shape_type.value();
+    data.synth_saw_shape_amount = params.synth_saw_shape_amount.modulated_plain_value();
+
     data.synth_filter_enable = params.synth_filter_enable.value();
     data.synth_filter_cutoff = params.synth_filter_cutoff.modulated_plain_value();
     data.synth_filter_resonance = params.synth_filter_resonance.modulated_plain_value();
     data.synth_filter_env_amount = params.synth_filter_env_amount.modulated_plain_value();
     data.synth_filter_drive = params.synth_filter_drive.modulated_plain_value();
+    data.synth_filter_stereo = params.synth_filter_stereo.modulated_plain_value();
 
     data.synth_vol_attack = params.synth_vol_attack.modulated_plain_value();
     data.synth_vol_decay = params.synth_vol_decay.modulated_plain_value();
@@ -1349,6 +1428,68 @@ fn save_params_to_preset_data(
             length_pref: oct_rand.length_pref,
             direction: oct_rand.direction,
         };
+    }
+
+    if let Ok(style_config) = ui_state.style_config.lock() {
+        data.style_config = crate::preset::StyleConfigPresetData {
+            style: style_config.style,
+            chance: style_config.chance,
+            complexity: style_config.complexity,
+            max_notes: style_config.max_notes,
+            mode: style_config.mode,
+        };
+    }
+
+    if let Ok(multi_bar) = ui_state.multi_bar_config.lock() {
+        if multi_bar.enabled {
+            let bars: Vec<crate::preset::BarSlotPresetData> = multi_bar.bars.iter()
+                .take(multi_bar.bar_count as usize)
+                .map(|slot| {
+                    let notes = slot.notes.iter().map(|n| crate::preset::NoteSlotPresetData {
+                        midi_note: n.midi_note,
+                        octave_offset: n.octave_offset,
+                        chance: n.chance,
+                        strength_bias: n.strength_bias,
+                        length_bias: n.length_bias,
+                    }).collect();
+                    let strength_values = slot.strength_values.iter()
+                        .map(|&v| (v * 127.0).clamp(0.0, 255.0) as u8)
+                        .collect();
+                    let beat_values = slot.beat_values.as_ref().map(|bv| {
+                        bv.iter().map(|&v| (v * 2.0).clamp(0.0, 255.0) as u8).collect()
+                    });
+                    crate::preset::BarSlotPresetData {
+                        notes,
+                        root_note: slot.root_note,
+                        strength_values,
+                        weight: slot.weight,
+                        beat_values,
+                        swing: slot.swing,
+                        melodic_fragment_index: slot.melodic_fragment_index,
+                    }
+                })
+                .collect();
+            data.multi_bar = Some(crate::preset::MultiBarPresetData {
+                enabled: multi_bar.enabled,
+                bar_count: multi_bar.bar_count,
+                order_mode: multi_bar.order_mode,
+                bars,
+            });
+        }
+    }
+
+    if let Ok(melodic) = ui_state.melodic_config.lock() {
+        if melodic.enabled {
+            data.melodic_config = Some(crate::preset::MelodicConfigPresetData {
+                enabled: melodic.enabled,
+                pitch_variation: melodic.pitch_variation,
+                rhythm_variation: melodic.rhythm_variation,
+                note_drop_chance: melodic.note_drop_chance,
+                octave_variation: melodic.octave_variation,
+                blend: melodic.blend,
+                fragment_index: melodic.fragment_index,
+            });
+        }
     }
 
     data

@@ -1,12 +1,22 @@
 mod note_utils;
+pub mod melodic_engine;
+pub mod ml_dataset;
+pub mod ml_suggest;
+pub mod multi_bar;
 pub mod scales;
+pub mod styles;
 
+use std::sync::Arc;
 use crate::params::{BeatMode, DeviceParams};
+use crate::sequencer::ml_suggest::flat_index;
 use rand::Rng;
 use nih_plug::prelude::Param;
 pub use note_utils::{NotePool, midi_to_frequency};
 #[allow(unused_imports)]
 pub use scales::{Scale, StabilityPattern, OctaveRandomization, OctaveDirection};
+pub use styles::{StylePattern, StyleConfig, build_pitch_sequence};
+pub use multi_bar::MultiBarConfig;
+pub use melodic_engine::MelodicConfig;
 
 #[derive(Clone, Debug)]
 struct NoteEvent {
@@ -30,10 +40,21 @@ pub struct Sequencer {
     pub note_pool: NotePool,
     pub strength_values: Vec<f32>,
     pub octave_randomization: OctaveRandomization,
+    pub style_config: StyleConfig,
     scratch_start_times: Vec<f32>,
     scratch_lost_beats: Vec<(f32, f32)>,
     scratch_candidates: Vec<(BeatMode, usize, usize, f32)>,
     scratch_events: Vec<NoteEvent>,
+    next_bar_ready: bool,
+    pub multi_bar: Option<MultiBarConfig>,
+    current_bar_slot: usize,
+    bar_counter: u64,
+    pub melodic_config: MelodicConfig,
+    pub dataset: Arc<ml_dataset::MlDataset>,
+    current_melodic_notes: Vec<melodic_engine::MelodicNote>,
+    next_event_idx: usize,
+    beat_overrides: Option<[f32; 152]>,
+    swing_override: Option<f32>,
 }
 
 impl Sequencer {
@@ -56,10 +77,21 @@ impl Sequencer {
             note_pool: NotePool::new(),
             strength_values,
             octave_randomization: OctaveRandomization::default(),
+            style_config: StyleConfig::default(),
             scratch_start_times: Vec::with_capacity(128),
             scratch_lost_beats: Vec::with_capacity(64),
             scratch_candidates: Vec::with_capacity(16),
             scratch_events: Vec::with_capacity(64),
+            next_bar_ready: false,
+            multi_bar: None,
+            current_bar_slot: 0,
+            bar_counter: 0,
+            melodic_config: MelodicConfig::default(),
+            dataset: Arc::new(ml_dataset::MlDataset::builtin()),
+            current_melodic_notes: Vec::new(),
+            next_event_idx: 0,
+            beat_overrides: None,
+            swing_override: None,
         }
     }
 
@@ -103,6 +135,12 @@ impl Sequencer {
         self.current_bar.clear();
         self.next_bar.clear();
         self.params_hash = 0;
+        self.next_bar_ready = false;
+        self.current_bar_slot = 0;
+        self.bar_counter = 0;
+        self.next_event_idx = 0;
+        self.beat_overrides = None;
+        self.swing_override = None;
     }
 
     fn hash_params(params: &DeviceParams) -> u64 {
@@ -161,8 +199,12 @@ impl Sequencer {
         for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
             for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
                 for index in 0..*count {
-                    let param = params.get_division_param(mode, *count, index);
-                    let probability = param.modulated_plain_value();
+                    let probability = if let Some(ref overrides) = self.beat_overrides {
+                        overrides[flat_index(mode, *count, index)]
+                    } else {
+                        let param = params.get_division_param(mode, *count, index);
+                        param.modulated_plain_value()
+                    };
 
                     if probability > 0.0 {
                         let (start, end) = DeviceParams::get_beat_time_span(mode, *count, index);
@@ -197,6 +239,36 @@ impl Sequencer {
         } else {
             ((value - min) / (max - min)).clamp(0.0, 1.0)
         }
+    }
+
+    fn prepare_melodic_notes(&mut self, rng: &mut impl Rng) {
+        self.current_melodic_notes.clear();
+        if !self.melodic_config.enabled || self.melodic_config.blend >= 1.0 {
+            return;
+        }
+        let root = self.note_pool.root_note.unwrap_or(48);
+        if let Some(idx) = self.melodic_config.pick_fragment_index(&self.dataset.melody, rng) {
+            self.current_melodic_notes = self.dataset.melody.generate_varied(
+                idx,
+                &self.melodic_config,
+                root,
+                rng,
+            );
+        }
+    }
+
+    fn nearest_melodic_midi_note(&self, start_time: f32, root: u8) -> Option<u8> {
+        if self.current_melodic_notes.is_empty() {
+            return None;
+        }
+        let nearest = self.current_melodic_notes.iter()
+            .min_by(|a, b| {
+                let da = (a.start_time - start_time).abs();
+                let db = (b.start_time - start_time).abs();
+                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+            })?;
+        let midi = root as i16 + nearest.relative_pitch as i16;
+        Some(midi.clamp(0, 127) as u8)
     }
 
     fn generate_bar_into(&mut self, params: &DeviceParams) {
@@ -241,8 +313,12 @@ impl Sequencer {
                         let (start, _end) = DeviceParams::get_beat_time_span(mode, *count, index);
 
                         if (start - start_time).abs() < 0.0001 {
-                            let param = params.get_division_param(mode, *count, index);
-                            let probability = param.modulated_plain_value();
+                            let probability = if let Some(ref overrides) = self.beat_overrides {
+                                overrides[flat_index(mode, *count, index)]
+                            } else {
+                                let param = params.get_division_param(mode, *count, index);
+                                param.modulated_plain_value()
+                            };
 
                             if probability > 0.0 {
                                 self.scratch_candidates.push((mode, *count, index, probability));
@@ -293,15 +369,29 @@ impl Sequencer {
                             let position_shift = params.calculate_position_shift(strength, duration_normalized, &mut rng);
                             let shifted_time = (start_time + position_shift).clamp(0.0, 1.0);
 
-                            let swing_amount = params.swing_amount.modulated_plain_value();
+                            let swing_amount = self.swing_override
+                                .unwrap_or_else(|| params.swing_amount.modulated_plain_value());
                             let swung_start_time = DeviceParams::apply_swing(shifted_time, swing_amount);
                             let sample_position = (swung_start_time * total_samples as f32) as usize;
 
                             let length_value = (capped_multiplier / 2.0).clamp(0.0, 1.0);
 
-                            let midi_note = self.note_pool.select_midi_note_with_length(strength, length_value, &mut rng)
-                                .or(self.note_pool.root_note)
-                                .unwrap_or(48);
+                            let midi_note = if self.melodic_config.enabled
+                                && self.melodic_config.blend < 1.0
+                                && rng.gen::<f32>() > self.melodic_config.blend
+                            {
+                                let root = self.note_pool.root_note.unwrap_or(48);
+                                self.nearest_melodic_midi_note(start_time, root)
+                                    .unwrap_or_else(|| {
+                                        self.note_pool.select_midi_note_with_length(strength, length_value, &mut rng)
+                                            .or(self.note_pool.root_note)
+                                            .unwrap_or(48)
+                                    })
+                            } else {
+                                self.note_pool.select_midi_note_with_length(strength, length_value, &mut rng)
+                                    .or(self.note_pool.root_note)
+                                    .unwrap_or(48)
+                            };
 
                             let final_midi_note = if let Some(shift) = self.octave_randomization.should_shift(strength, length_value, &mut rng) {
                                 (midi_note as i16 + shift as i16 * 12).clamp(0, 127) as u8
@@ -352,25 +442,170 @@ impl Sequencer {
                 }
             }
         }
+
+        self.apply_style_patterns();
+        self.scratch_events.sort_by_key(|e| e.sample_position);
     }
 
-    pub fn update(&mut self, params: &DeviceParams) -> (bool, bool, f64, u8, u8) {
-        let new_hash = Self::hash_params(params);
-        let params_changed = new_hash != self.params_hash;
-
-        if params_changed {
-            self.params_hash = new_hash;
-            self.generate_bar_into(params);
-            std::mem::swap(&mut self.next_bar, &mut self.scratch_events);
+    fn apply_style_patterns(&mut self) {
+        if self.style_config.style == StylePattern::None || self.style_config.chance == 0 {
+            return;
         }
 
+        let enabled_notes = self.get_enabled_notes_sorted();
+        if enabled_notes.is_empty() {
+            return;
+        }
+
+        self.scratch_events.sort_by(|a, b| a.sample_position.cmp(&b.sample_position));
+
+        let mut rng = rand::thread_rng();
+        let mut pattern_remaining: Option<(Vec<u8>, usize)> = None;
+        let finish_mode = self.style_config.mode == styles::StyleMode::Finish;
+
+        for i in 0..self.scratch_events.len() {
+            if let Some((ref pitches, ref mut pitch_idx)) = pattern_remaining {
+                if *pitch_idx < pitches.len() {
+                    let new_note = pitches[*pitch_idx];
+                    self.scratch_events[i].midi_note = new_note;
+                    self.scratch_events[i].frequency = note_utils::midi_to_frequency(new_note) as f64;
+                    *pitch_idx += 1;
+                }
+
+                if *pitch_idx >= pitches.len() {
+                    pattern_remaining = None;
+                }
+            }
+
+            let can_start_new = if finish_mode {
+                pattern_remaining.is_none()
+            } else {
+                true
+            };
+
+            if can_start_new {
+                if let Some(pattern) = self.style_config.select_pattern(&mut rng) {
+                    let start_note = self.scratch_events[i].midi_note;
+                    let pitches = build_pitch_sequence(pattern, &enabled_notes, start_note, self.style_config.max_notes);
+                    if pitches.len() > 1 {
+                        self.scratch_events[i].midi_note = pitches[0];
+                        self.scratch_events[i].frequency = note_utils::midi_to_frequency(pitches[0]) as f64;
+                        pattern_remaining = Some((pitches, 1));
+                    }
+                }
+            }
+        }
+    }
+
+    fn get_enabled_notes_sorted(&self) -> Vec<u8> {
+        let mut notes: Vec<u8> = self.note_pool.notes.iter()
+            .filter(|n| n.chance > 0.0)
+            .map(|n| n.effective_midi_note())
+            .collect();
+        notes.sort();
+        notes.dedup();
+        notes
+    }
+
+    fn apply_bar_slot(&mut self, slot_index: usize) {
+        if let Some(ref config) = self.multi_bar {
+            if let Some(slot) = config.bars.get(slot_index) {
+                self.note_pool.notes.clear();
+                self.note_pool.root_note = Some(slot.root_note);
+                self.note_pool.set_note(slot.root_note, 1.0, 0.0);
+                for note_data in &slot.notes {
+                    self.note_pool.set_note_full(
+                        note_data.midi_note,
+                        note_data.octave_offset,
+                        note_data.chance,
+                        note_data.strength_bias,
+                        note_data.length_bias,
+                    );
+                }
+                if slot.strength_values.len() == 96 {
+                    self.strength_values.copy_from_slice(&slot.strength_values);
+                }
+                if let Some(ref bv) = slot.beat_values {
+                    if bv.len() == 152 {
+                        let mut arr = [0.0f32; 152];
+                        arr.copy_from_slice(bv);
+                        self.beat_overrides = Some(arr);
+                    }
+                } else {
+                    self.beat_overrides = None;
+                }
+                self.swing_override = slot.swing;
+                if let Some(frag_idx) = slot.melodic_fragment_index {
+                    self.melodic_config.fragment_index = Some(frag_idx);
+                }
+            }
+        }
+    }
+
+    pub fn prepare(&mut self, block_size: usize, params: &DeviceParams) {
+        if self.current_bar.is_empty() {
+            if let Some(ref config) = self.multi_bar {
+                if config.enabled && config.bar_count > 1 {
+                    self.apply_bar_slot(self.current_bar_slot);
+                }
+            }
+            let mut rng = rand::thread_rng();
+            self.prepare_melodic_notes(&mut rng);
+            self.generate_bar_into(params);
+            std::mem::swap(&mut self.current_bar, &mut self.scratch_events);
+            self.next_event_idx = 0;
+            self.params_hash = Self::hash_params(params);
+            return;
+        }
+
+        let new_hash = Self::hash_params(params);
+        if new_hash != self.params_hash {
+            self.params_hash = new_hash;
+            self.next_bar_ready = false;
+            return;
+        }
+
+        let bar_boundary_in_block =
+            self.bar_position_samples + block_size >= self.bar_length_samples;
+
+        if bar_boundary_in_block && !self.next_bar_ready {
+            let next_slot = self.peek_next_bar_slot();
+            if let Some(ref config) = self.multi_bar {
+                if config.enabled && config.bar_count > 1 {
+                    self.apply_bar_slot(next_slot);
+                }
+            }
+            let mut rng = rand::thread_rng();
+            self.prepare_melodic_notes(&mut rng);
+            self.generate_bar_into(params);
+            std::mem::swap(&mut self.next_bar, &mut self.scratch_events);
+            self.next_bar_ready = true;
+        }
+    }
+
+    fn peek_next_bar_slot(&self) -> usize {
+        if let Some(ref config) = self.multi_bar {
+            if config.enabled && config.bar_count > 1 {
+                let next_counter = self.bar_counter + 1;
+                let mut rng = rand::thread_rng();
+                return config.next_bar_slot(next_counter, &mut rng);
+            }
+        }
+        0
+    }
+
+    pub fn update(&mut self) -> (bool, bool, f64, u8, u8) {
         let mut should_trigger = false;
         let mut should_release = false;
         let mut frequency = 130.81;
         let mut velocity = 100_u8;
         let mut midi_note = 48_u8;
 
-        for event in &self.current_bar {
+        while self.next_event_idx < self.current_bar.len() {
+            let event = &self.current_bar[self.next_event_idx];
+            if event.sample_position > self.bar_position_samples {
+                break;
+            }
             if event.sample_position == self.bar_position_samples {
                 should_trigger = true;
                 frequency = event.frequency;
@@ -380,8 +615,10 @@ impl Sequencer {
                     event.sample_position,
                     event.sample_position + event.duration_samples,
                 ));
+                self.next_event_idx += 1;
                 break;
             }
+            self.next_event_idx += 1;
         }
 
         if !should_trigger {
@@ -401,9 +638,17 @@ impl Sequencer {
             }
             self.bar_position_samples = 0;
             std::mem::swap(&mut self.current_bar, &mut self.next_bar);
-            self.generate_bar_into(params);
-            std::mem::swap(&mut self.next_bar, &mut self.scratch_events);
             self.current_note = None;
+            self.next_bar_ready = false;
+            self.next_event_idx = 0;
+
+            if let Some(ref config) = self.multi_bar {
+                if config.enabled && config.bar_count > 1 {
+                    self.bar_counter += 1;
+                    let mut rng = rand::thread_rng();
+                    self.current_bar_slot = config.next_bar_slot(self.bar_counter, &mut rng);
+                }
+            }
         }
 
         (should_trigger, should_release, frequency, velocity, midi_note)

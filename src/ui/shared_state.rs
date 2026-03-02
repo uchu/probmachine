@@ -1,9 +1,14 @@
 /// Shared state for UI communication with the audio engine
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use crate::sequencer::NotePool;
 use crate::sequencer::scales::{Scale, StabilityPattern, OctaveRandomization};
+use crate::sequencer::styles::StyleConfig;
+use crate::sequencer::multi_bar::MultiBarConfig;
+use crate::sequencer::melodic_engine::MelodicConfig;
+use crate::sequencer::ml_dataset::MlDataset;
 use crate::preset::PresetManager;
+use crate::midi_modes::MidiModeDisplay;
 
 #[derive(Clone)]
 pub struct SharedUiState {
@@ -16,7 +21,16 @@ pub struct SharedUiState {
     pub scale: Arc<Mutex<Scale>>,
     pub stability_pattern: Arc<Mutex<StabilityPattern>>,
     pub octave_randomization: Arc<Mutex<OctaveRandomization>>,
+    pub style_config: Arc<Mutex<StyleConfig>>,
+    pub multi_bar_config: Arc<Mutex<MultiBarConfig>>,
+    pub melodic_config: Arc<Mutex<MelodicConfig>>,
+    pub ml_dataset: Arc<Mutex<Arc<MlDataset>>>,
+    pub ml_dataset_dirty: Arc<AtomicBool>,
     pub request_dsp_reset: Arc<AtomicBool>,
+    pub seq_data_dirty: Arc<AtomicBool>,
+    pub midi_mode: Arc<AtomicU8>,
+    pub midi_mode_display: Arc<Mutex<MidiModeDisplay>>,
+    pub midi_clear_memory: Arc<AtomicBool>,
 }
 
 impl SharedUiState {
@@ -35,7 +49,16 @@ impl SharedUiState {
             scale: Arc::new(Mutex::new(Scale::default())),
             stability_pattern: Arc::new(Mutex::new(StabilityPattern::default())),
             octave_randomization: Arc::new(Mutex::new(OctaveRandomization::default())),
+            style_config: Arc::new(Mutex::new(StyleConfig::default())),
+            multi_bar_config: Arc::new(Mutex::new(MultiBarConfig::default())),
+            melodic_config: Arc::new(Mutex::new(MelodicConfig::default())),
+            ml_dataset: Arc::new(Mutex::new(Arc::new(MlDataset::builtin()))),
+            ml_dataset_dirty: Arc::new(AtomicBool::new(true)),
             request_dsp_reset: Arc::new(AtomicBool::new(false)),
+            seq_data_dirty: Arc::new(AtomicBool::new(true)),
+            midi_mode: Arc::new(AtomicU8::new(0)),
+            midi_mode_display: Arc::new(Mutex::new(MidiModeDisplay::default())),
+            midi_clear_memory: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -63,6 +86,14 @@ impl SharedUiState {
 
     pub fn get_output_level(&self) -> f32 {
         self.output_level.load(Ordering::Relaxed) as f32 / 1000.0
+    }
+
+    pub fn mark_seq_dirty(&self) {
+        self.seq_data_dirty.store(true, Ordering::Release);
+    }
+
+    pub fn take_seq_dirty(&self) -> bool {
+        self.seq_data_dirty.swap(false, Ordering::AcqRel)
     }
 
     pub fn request_dsp_reset(&self) {

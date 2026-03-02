@@ -56,8 +56,11 @@ const DEST_COMBO_WIDTH: f32 = 170.0;
 const COL_WIDTH: f32 = 330.0;
 const COL_GAP: f32 = 25.0;
 const COL_LEFT_PAD: f32 = 30.0;
-const COL_SLIDER_WIDTH: f32 = 290.0;
 const COL_DEST_COMBO: f32 = 130.0;
+const AMOUNT_INLINE_WIDTH: f32 = 150.0;
+const RATE_LABEL_WIDTH: f32 = 50.0;
+const RATE_SLIDER_INLINE: f32 = 260.0;
+const PM_SLIDER_INLINE: f32 = 100.0;
 
 const RATE_COLOR: Color32 = Color32::from_rgb(80, 100, 80);
 const PHASE_MOD_COLOR: Color32 = Color32::from_rgb(100, 60, 100);
@@ -85,39 +88,29 @@ pub fn render_ui(
     ui.horizontal(|ui| {
         ui.add_space(COL_LEFT_PAD);
 
-        let wave_row_width = WAVE_COUNT as f32 * WAVE_BTN_SIZE
-            + (WAVE_COUNT as f32 - 1.0) * WAVE_BTN_GAP;
-        let col_unused = COL_WIDTH - wave_row_width;
-        let gap1 = COL_GAP + 25.0;
-        let gap2 = COL_GAP + 25.0;
-
         render_lfo_column(ui, setter, 1,
             &params.lfo1_rate, &params.lfo1_waveform, &params.lfo1_tempo_sync,
             &params.lfo1_sync_division, &params.lfo1_sync_source, &params.lfo1_phase_mod,
             &params.lfo1_dest1, &params.lfo1_amount1, &params.lfo1_dest2, &params.lfo1_amount2);
 
-        let right_edge = ui.cursor().left() - col_unused;
-        let left_edge = ui.cursor().left() + gap1;
-        let sep_x = (right_edge + left_edge) / 2.0;
+        let sep_x = ui.cursor().left() + COL_GAP / 2.0;
         ui.painter().line_segment(
             [egui::pos2(sep_x, full_rect.top()), egui::pos2(sep_x, full_rect.bottom())],
             egui::Stroke::new(1.0, Color32::BLACK),
         );
-        ui.add_space(gap1);
+        ui.add_space(COL_GAP);
 
         render_lfo_column(ui, setter, 2,
             &params.lfo2_rate, &params.lfo2_waveform, &params.lfo2_tempo_sync,
             &params.lfo2_sync_division, &params.lfo2_sync_source, &params.lfo2_phase_mod,
             &params.lfo2_dest1, &params.lfo2_amount1, &params.lfo2_dest2, &params.lfo2_amount2);
 
-        let right_edge = ui.cursor().left() - col_unused;
-        let left_edge = ui.cursor().left() + gap2;
-        let sep_x = (right_edge + left_edge) / 2.0;
+        let sep_x = ui.cursor().left() + COL_GAP / 2.0;
         ui.painter().line_segment(
             [egui::pos2(sep_x, full_rect.top()), egui::pos2(sep_x, full_rect.bottom())],
             egui::Stroke::new(1.0, Color32::BLACK),
         );
-        ui.add_space(gap2);
+        ui.add_space(COL_GAP);
 
         render_lfo_column(ui, setter, 3,
             &params.lfo3_rate, &params.lfo3_waveform, &params.lfo3_tempo_sync,
@@ -153,31 +146,30 @@ fn render_lfo_column(
     ui.vertical(|ui| {
         ui.set_width(COL_WIDTH);
 
+        let is_synced = tempo_sync.value();
+
         ui.label(egui::RichText::new(format!("LFO {}", lfo_num))
             .size(HEADER_FONT).strong());
-        ui.add_space(14.0);
-
-        let is_synced = tempo_sync.value();
+        ui.add_space(18.0);
 
         ui.horizontal(|ui| {
             render_waveform_buttons(ui, lfo_num, waveform.value() as usize,
                 |i| setter.set_parameter(waveform, i));
         });
-        ui.add_space(20.0);
+        ui.add_space(24.0);
 
-        // RATE label
-        ui.label(egui::RichText::new("RATE").size(FONT).color(LABEL_COLOR));
-        ui.add_space(6.0);
-
-        // RATE slider
         ui.horizontal(|ui| {
+            ui.add_sized(
+                [RATE_LABEL_WIDTH, SLIDER_RAIL],
+                egui::Label::new(egui::RichText::new("RATE").size(FONT).color(LABEL_COLOR)),
+            );
             if is_synced {
                 set_disabled_slider_color(ui);
             } else {
                 set_slider_color(ui, RATE_COLOR);
             }
             let mut rate_val = rate.modulated_plain_value();
-            ui.style_mut().spacing.slider_width = COL_SLIDER_WIDTH;
+            ui.style_mut().spacing.slider_width = RATE_SLIDER_INLINE;
             ui.style_mut().spacing.slider_rail_height = SLIDER_RAIL;
             let slider = egui::Slider::new(&mut rate_val, 0.01..=50.0)
                 .logarithmic(true)
@@ -187,9 +179,8 @@ fn render_lfo_column(
                 setter.set_parameter(rate, rate_val);
             }
         });
-        ui.add_space(20.0);
+        ui.add_space(24.0);
 
-        // SYNC + division dropdown on same row
         ui.horizontal(|ui| {
             let mut sync = is_synced;
             render_toggle(ui, &mut sync, "SYNC");
@@ -203,20 +194,18 @@ fn render_lfo_column(
                     |i| setter.set_parameter(sync_division, i as i32));
             });
         });
-        ui.add_space(20.0);
+        ui.add_space(24.0);
 
-        // FROM
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("FROM").size(FONT).color(LABEL_COLOR));
             ui.add_space(4.0);
-            render_combo(ui, &format!("lfo{}_src", lfo_num), 110.0,
+            render_combo(ui, &format!("lfo{}_src", lfo_num), 100.0,
                 &["None", "LFO 1", "LFO 2", "LFO 3"],
                 source_to_index(sync_source.value(), lfo_num),
                 |i| setter.set_parameter(sync_source, index_to_source(i, lfo_num)));
-        });
-        ui.add_space(20.0);
-
-        ui.horizontal(|ui| {
+            ui.add_space(12.0);
+            ui.label(egui::RichText::new("PM").size(FONT).color(LABEL_COLOR));
+            ui.add_space(4.0);
             let has_source = sync_source.value() >= 0;
             if has_source {
                 set_slider_color(ui, PHASE_MOD_COLOR);
@@ -224,7 +213,7 @@ fn render_lfo_column(
                 set_disabled_slider_color(ui);
             }
             let mut pm_val = phase_mod.modulated_plain_value();
-            ui.style_mut().spacing.slider_width = COL_SLIDER_WIDTH;
+            ui.style_mut().spacing.slider_width = PM_SLIDER_INLINE;
             ui.style_mut().spacing.slider_rail_height = SLIDER_RAIL;
             let slider = egui::Slider::new(&mut pm_val, 0.0..=1.0)
                 .clamping(egui::SliderClamping::Always)
@@ -233,12 +222,19 @@ fn render_lfo_column(
                 setter.set_parameter(phase_mod, pm_val);
             }
         });
-        ui.add_space(22.0);
+        ui.add_space(28.0);
 
         let id_prefix = format!("lfo{}", lfo_num);
-        render_route_slot(ui, setter, &id_prefix, 1, dest1, amount1);
-        ui.add_space(18.0);
-        render_route_slot(ui, setter, &id_prefix, 2, dest2, amount2);
+        ui.horizontal(|ui| {
+            render_route_slot_horizontal(ui, setter, &id_prefix, 1, dest1, amount1,
+                COL_DEST_COMBO, AMOUNT_INLINE_WIDTH);
+        });
+        ui.add_space(22.0);
+
+        ui.horizontal(|ui| {
+            render_route_slot_horizontal(ui, setter, &id_prefix, 2, dest2, amount2,
+                COL_DEST_COMBO, AMOUNT_INLINE_WIDTH);
+        });
     });
 }
 
@@ -399,35 +395,6 @@ fn paint_arrow(ui: &mut egui::Ui) {
         egui::Stroke::new(2.0, arrow_color),
     );
     ui.add_space(4.0);
-}
-
-fn render_route_slot(
-    ui: &mut egui::Ui,
-    setter: &ParamSetter,
-    id_prefix: &str,
-    slot: usize,
-    dest: &IntParam,
-    amount: &FloatParam,
-) {
-    ui.horizontal(|ui| {
-        paint_arrow(ui);
-        render_dest_combo(ui, &format!("{}_{}_dest", id_prefix, slot), COL_DEST_COMBO,
-            dest.value(), |v| setter.set_parameter(dest, v));
-    });
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.add_space(4.0);
-        set_slider_color(ui, ROUTE_AMOUNT_COLOR);
-        let mut amt_val = amount.modulated_plain_value();
-        ui.style_mut().spacing.slider_width = COL_SLIDER_WIDTH;
-        ui.style_mut().spacing.slider_rail_height = SLIDER_RAIL;
-        let slider = egui::Slider::new(&mut amt_val, -1.0..=1.0)
-            .clamping(egui::SliderClamping::Always)
-            .show_value(false);
-        if ui.add(slider).changed() {
-            setter.set_parameter(amount, amt_val);
-        }
-    });
 }
 
 fn render_route_slot_horizontal(

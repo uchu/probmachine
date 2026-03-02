@@ -59,9 +59,16 @@ src/
 │   ├── simd.rs         # Portable SIMD helpers (f64x2 stereo)
 │   ├── limiter.rs      # Master output limiter
 │   └── lfo.rs          # 3 LFOs with mod matrix
+├── midi_modes/
+│   ├── mod.rs          # MIDI input mode enum, processor coordinator
+│   ├── chord_follow.rs # Chord Follow: held notes → NotePool
+│   ├── accompaniment.rs# Accompaniment: harmonic memory + key detection
+│   └── scale_detect.rs # Scale/chord detection algorithms
 ├── sequencer/
 │   ├── mod.rs          # Probability sequencer logic
-│   └── note_utils.rs   # MIDI note handling, NotePool
+│   ├── note_utils.rs   # MIDI note handling, NotePool
+│   ├── scales.rs       # Scale definitions, StabilityPattern presets
+│   └── styles.rs       # Style patterns (12 styles × 20 patterns each)
 ├── preset/
 │   ├── mod.rs          # Preset module exports
 │   ├── data.rs         # Preset data structures
@@ -79,7 +86,8 @@ src/
         ├── strength.rs          # 96-position strength grid
         ├── synth.rs             # Synthesis controls
         ├── modulation.rs        # LFO routing
-        └── presets.rs           # Preset management
+        ├── presets.rs           # Preset management
+        └── settings.rs          # MIDI mode, performance settings
 ```
 
 ## Audio Processing Flow
@@ -201,6 +209,11 @@ strip = "none"
 MIDI Input → MidiProcessor.input → MidiState
                                    ├── CC tracking
                                    └── External note events
+                                        ↓
+                                   MidiModeProcessor
+                                   ├── Passthrough → voice directly
+                                   ├── Chord Follow → NotePool update
+                                   └── Accompaniment → harmonic analysis → NotePool
 
 Sequencer → SynthEngine.process_block() → midi_events_buffer
                                               ↓
@@ -209,8 +222,27 @@ MidiProcessor.output ← note_on/note_off_from_sequencer()
 context.send_event() → MIDI Output
 ```
 
+### MIDI Input Modes
+
+Three modes control how incoming MIDI is handled, selected on the Settings page:
+
+| Mode | External MIDI | Sequencer | Voice driven by |
+|------|--------------|-----------|-----------------|
+| Passthrough | Plays voice directly | Also plays if enabled | Both (mono, last wins) |
+| Chord Follow | Updates NotePool from held chord | Plays from chord-derived pool | Sequencer only |
+| Accompaniment | Feeds harmonic analysis | Plays from analysis-derived pool | Sequencer only |
+
+**Passthrough**: External MIDI events are forwarded sample-accurately to the voice in `process_block()`. The sequencer can still run alongside — both compete for the single monophonic voice.
+
+**Chord Follow**: Held notes are tracked. On any change, a new NotePool is built where each held note becomes a note selection with velocity mapped to chance. The sequencer plays from this dynamically updated pool.
+
+**Accompaniment**: Incoming notes are accumulated per bar using DAW transport position. At each bar boundary, pitch class histograms are analyzed to detect key and scale (12 roots × 9 candidate scales with hysteresis). A NotePool is generated from the detected key with chord-root awareness. Harmonic memory persists across rewinds — stored bar analysis is reused when revisiting previously heard sections.
+
+Thread model: mode is read via `AtomicU8` (lockless on audio thread). Display state is written via `try_lock` on `MidiModeDisplay` (never blocks audio). Clear memory flag uses `AtomicBool`.
+
 ## Version History
 
+- **v1.8.0**: MIDI input modes (Passthrough, Chord Follow, Accompaniment), Settings page
 - **v1.7.0**: Full MIDI I/O - note input/output, CC handling, transport sync
 - **v1.6.0**: SIMD stereo DSP - Moog filter, wavefold, tube saturation, distortion
 - **v1.5.0**: Portable SIMD infrastructure for future stereo DSP optimization

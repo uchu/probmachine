@@ -5,6 +5,10 @@ use nih_plug_egui::egui::{self, Color32};
 use nih_plug_egui::egui::style::HandleShape;
 use std::sync::Arc;
 use crate::params::{BeatMode, DeviceParams};
+use crate::ui::SharedUiState;
+use crate::sequencer::ml_suggest::{flat_index, apply_pitch_suggestion, suggest_linked_filtered, rescale_beat_suggestion, rescale_pitch_suggestion, BeatSuggestion, PitchSuggestion, StyleFilter};
+use crate::sequencer::ml_dataset::{self, PerformanceParams};
+use crate::sequencer::multi_bar::NoteSlotData;
 
 const NUM_SLIDERS: usize = 4;
 
@@ -12,13 +16,170 @@ pub fn render(
     tui: &mut egui_taffy::Tui,
     params: &Arc<DeviceParams>,
     setter: &nih_plug::prelude::ParamSetter,
+    ui_state: &Arc<SharedUiState>,
 ) {
     let (beat_mode, num_sliders) = tui.ui(get_beat_state);
 
     tui.ui(|ui| {
         ui.add_space(8.0);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_space(166.0);
+        ui.horizontal(|ui| {
+            ui.add_space(16.0);
+
+            let suggest_state_id = egui::Id::new("suggest_density");
+            let mut density = ui.memory_mut(|mem| {
+                *mem.data.get_temp_mut_or(suggest_state_id, 1.0f32)
+            });
+
+            ui.label(egui::RichText::new("Density:").size(14.0));
+            ui.style_mut().spacing.slider_width = 80.0;
+            ui.style_mut().spacing.slider_rail_height = 8.0;
+            let density_changed = ui.add(egui::Slider::new(&mut density, 0.0..=1.0).show_value(false)).changed();
+            if density_changed {
+                ui.memory_mut(|mem| mem.data.insert_temp(suggest_state_id, density));
+            }
+
+            ui.add_space(8.0);
+
+            let spread_state_id = egui::Id::new("suggest_spread");
+            let mut spread = ui.memory_mut(|mem| {
+                *mem.data.get_temp_mut_or(spread_state_id, 1.0f32)
+            });
+
+            ui.label(egui::RichText::new("Spread:").size(14.0));
+            ui.style_mut().spacing.slider_width = 80.0;
+            ui.style_mut().spacing.slider_rail_height = 8.0;
+            let spread_changed = ui.add(egui::Slider::new(&mut spread, 0.0..=1.0).show_value(false)).changed();
+            if spread_changed {
+                ui.memory_mut(|mem| mem.data.insert_temp(spread_state_id, spread));
+            }
+
+            ui.add_space(8.0);
+
+            let complexity_id = egui::Id::new("suggest_complexity");
+            let (min_slots, max_slots) = {
+                let dataset = ui_state.ml_dataset.lock().unwrap();
+                (dataset.beat.min_active_slots(), dataset.beat.max_active_slots())
+            };
+            let mut complexity = ui.memory_mut(|mem| {
+                *mem.data.get_temp_mut_or(complexity_id, min_slots)
+            });
+            ui.label(egui::RichText::new("Min:").size(14.0));
+            ui.style_mut().spacing.slider_width = 60.0;
+            ui.style_mut().spacing.slider_rail_height = 8.0;
+            let complexity_resp = ui.add(egui::Slider::new(&mut complexity, min_slots..=max_slots));
+            if complexity_resp.changed() {
+                ui.memory_mut(|mem| mem.data.insert_temp(complexity_id, complexity));
+            }
+
+            ui.add_space(4.0);
+
+            let style_id = egui::Id::new("suggest_style");
+            let mut style_idx: u8 = ui.memory_mut(|mem| {
+                *mem.data.get_temp_mut_or(style_id, 0u8)
+            });
+            let style_labels = ["All", "Straight", "Offbeat"];
+            egui::ComboBox::from_id_salt(style_id)
+                .selected_text(egui::RichText::new(style_labels[style_idx as usize]).size(14.0))
+                .width(80.0)
+                .show_ui(ui, |ui| {
+                    for (i, label) in style_labels.iter().enumerate() {
+                        if ui.selectable_label(style_idx == i as u8, egui::RichText::new(*label).size(13.0)).clicked() {
+                            style_idx = i as u8;
+                            ui.memory_mut(|mem| mem.data.insert_temp(style_id, style_idx));
+                        }
+                    }
+                });
+
+            let style = match style_idx {
+                1 => StyleFilter::Straight,
+                2 => StyleFilter::Offbeat,
+                _ => StyleFilter::All,
+            };
+
+            ui.add_space(8.0);
+
+            let stored_beat_id = egui::Id::new("stored_raw_beat");
+            let stored_pitches_id = egui::Id::new("stored_raw_pitches");
+
+            let suggest_button = egui::Button::new(egui::RichText::new("Suggest").size(14.0))
+                .min_size(egui::vec2(80.0, 28.0));
+            if ui.add(suggest_button).clicked() {
+                let dataset = ui_state.ml_dataset.lock().unwrap().clone();
+                if dataset.beat.is_available() {
+                    let raw = dataset.beat.suggest_filtered(1.0, complexity, style, &mut rand::thread_rng());
+                    ui.memory_mut(|mem| {
+                        mem.data.insert_temp(stored_beat_id, raw.clone());
+                        mem.data.remove::<Vec<PitchSuggestion>>(stored_pitches_id);
+                    });
+                    let applied = rescale_beat_suggestion(&raw, density);
+                    apply_beat_suggestion(&applied, params, setter);
+                    apply_strength_suggestion(&applied, ui_state);
+                    if let Some(perf) = &dataset.performance {
+                        apply_performance_params(perf, params, setter);
+                    }
+                }
+            }
+
+            ui.add_space(4.0);
+
+            let both_button = egui::Button::new(egui::RichText::new("Both").size(14.0))
+                .min_size(egui::vec2(60.0, 28.0));
+            if ui.add(both_button).clicked() {
+                let dataset = ui_state.ml_dataset.lock().unwrap().clone();
+                if dataset.beat.is_available() && dataset.pitch.is_available() {
+                    let mut rng = rand::thread_rng();
+                    let (raw_beat, raw_pitch) = suggest_linked_filtered(
+                        &dataset.beat, &dataset.pitch, 1.0, 1.0, complexity, style, &mut rng,
+                    );
+                    ui.memory_mut(|mem| {
+                        mem.data.insert_temp(stored_beat_id, raw_beat.clone());
+                        mem.data.insert_temp(stored_pitches_id, vec![raw_pitch.clone()]);
+                    });
+                    let applied_beat = rescale_beat_suggestion(&raw_beat, density);
+                    apply_beat_suggestion(&applied_beat, params, setter);
+                    apply_strength_suggestion(&applied_beat, ui_state);
+
+                    let root = ui_state.note_pool.lock()
+                        .map(|np| np.root_note.unwrap_or(48))
+                        .unwrap_or(48);
+                    let applied_pitch = rescale_pitch_suggestion(&raw_pitch, density, spread);
+                    apply_pitch_suggestion(&applied_pitch, root, ui_state);
+
+                    let multi_bar_enabled = ui_state.multi_bar_config.lock().ok()
+                        .map(|c| c.enabled)
+                        .unwrap_or(false);
+                    if multi_bar_enabled {
+                        apply_pitch_to_all_bar_slots(&applied_pitch, root, ui_state);
+                    }
+
+                    if let Some(perf) = &dataset.performance {
+                        apply_performance_params(perf, params, setter);
+                    }
+                    ui_state.mark_seq_dirty();
+                }
+            }
+
+            if density_changed || spread_changed {
+                if density_changed {
+                    if let Some(raw_beat) = ui.memory(|mem| mem.data.get_temp::<BeatSuggestion>(stored_beat_id)) {
+                        let applied = rescale_beat_suggestion(&raw_beat, density);
+                        apply_beat_suggestion(&applied, params, setter);
+                    }
+                }
+                if let Some(raw_pitches) = ui.memory(|mem| mem.data.get_temp::<Vec<PitchSuggestion>>(stored_pitches_id)) {
+                    let root = ui_state.note_pool.lock()
+                        .map(|np| np.root_note.unwrap_or(48))
+                        .unwrap_or(48);
+                    if let Some(first) = raw_pitches.first() {
+                        let applied = rescale_pitch_suggestion(first, density, spread);
+                        apply_pitch_suggestion(&applied, root, ui_state);
+                    }
+                    ui_state.mark_seq_dirty();
+                }
+            }
+
+            ui.add_space(8.0);
+
             let clear_button = egui::Button::new(egui::RichText::new("Clear All").size(14.0))
                 .min_size(egui::vec2(80.0, 28.0));
             if ui.add(clear_button).clicked() {
@@ -32,7 +193,19 @@ pub fn render(
                         }
                     }
                 }
+                if let Ok(mut config) = ui_state.multi_bar_config.lock() {
+                    for bar in &mut config.bars {
+                        bar.beat_values = None;
+                        bar.swing = None;
+                    }
+                }
             }
+
+            ui.add_space(16.0);
+            ui.separator();
+            ui.add_space(8.0);
+
+            render_dataset_selector(ui, ui_state);
         });
     });
 
@@ -49,6 +222,90 @@ pub fn render(
         ui.add_space(16.0);
         render_controls(ui, params, setter, beat_mode, num_sliders);
     });
+}
+
+fn apply_beat_suggestion(
+    suggestion: &BeatSuggestion,
+    params: &Arc<DeviceParams>,
+    setter: &nih_plug::prelude::ParamSetter,
+) {
+    for mode in [BeatMode::Straight, BeatMode::Triplet, BeatMode::Dotted] {
+        for (count, _) in DeviceParams::get_divisions_for_mode(mode).iter() {
+            for index in 0..*count {
+                let flat = flat_index(mode, *count, index);
+                let param = params.get_division_param(mode, *count, index);
+                setter.begin_set_parameter(param);
+                setter.set_parameter(param, suggestion.beats[flat]);
+                setter.end_set_parameter(param);
+            }
+        }
+    }
+
+    setter.set_parameter(&params.swing_amount, suggestion.swing);
+    setter.set_parameter(&params.note_length_percent, 95.0);
+}
+
+fn apply_performance_params(
+    perf: &PerformanceParams,
+    params: &Arc<DeviceParams>,
+    setter: &nih_plug::prelude::ParamSetter,
+) {
+    setter.set_parameter(&params.len_mod_1_target, perf.len_mod_1_target);
+    setter.set_parameter(&params.len_mod_1_amount, perf.len_mod_1_amount);
+    setter.set_parameter(&params.len_mod_1_prob, perf.len_mod_1_prob);
+    setter.set_parameter(&params.len_mod_2_target, perf.len_mod_2_target);
+    setter.set_parameter(&params.len_mod_2_amount, perf.len_mod_2_amount);
+    setter.set_parameter(&params.len_mod_2_prob, perf.len_mod_2_prob);
+    setter.set_parameter(&params.vel_strength_target, perf.vel_strength_target);
+    setter.set_parameter(&params.vel_strength_amount, perf.vel_strength_amount);
+    setter.set_parameter(&params.vel_strength_prob, perf.vel_strength_prob);
+    setter.set_parameter(&params.vel_length_target, perf.vel_length_target);
+    setter.set_parameter(&params.vel_length_amount, perf.vel_length_amount);
+    setter.set_parameter(&params.vel_length_prob, perf.vel_length_prob);
+    setter.set_parameter(&params.pos_mod_1_target, perf.pos_mod_1_target);
+    setter.set_parameter(&params.pos_mod_1_shift, perf.pos_mod_1_shift);
+    setter.set_parameter(&params.pos_mod_1_prob, perf.pos_mod_1_prob);
+    setter.set_parameter(&params.pos_mod_2_target, perf.pos_mod_2_target);
+    setter.set_parameter(&params.pos_mod_2_shift, perf.pos_mod_2_shift);
+    setter.set_parameter(&params.pos_mod_2_prob, perf.pos_mod_2_prob);
+}
+
+fn apply_strength_suggestion(
+    suggestion: &BeatSuggestion,
+    ui_state: &Arc<SharedUiState>,
+) {
+    if let Ok(mut strength) = ui_state.strength_values.lock() {
+        strength.copy_from_slice(&suggestion.strength);
+    }
+    ui_state.mark_seq_dirty();
+}
+
+fn apply_pitch_to_all_bar_slots(
+    pitch: &PitchSuggestion,
+    root_note: u8,
+    ui_state: &Arc<SharedUiState>,
+) {
+    if let Ok(mut config) = ui_state.multi_bar_config.lock() {
+        for bar in &mut config.bars {
+            bar.root_note = root_note;
+            bar.notes.clear();
+
+            for entry in &pitch.notes {
+                let midi_i16 = root_note as i16 + entry.semitone_offset as i16;
+                if midi_i16 < 0 || midi_i16 > 127 { continue; }
+                let midi_note = midi_i16 as u8;
+
+                let chance = if entry.semitone_offset == 0 { 1.0 } else { entry.chance as f32 / 127.0 };
+                bar.notes.push(NoteSlotData {
+                    midi_note,
+                    octave_offset: 0,
+                    chance,
+                    strength_bias: (entry.strength_bias as f32 - 64.0) / 63.0,
+                    length_bias: (entry.length_bias as f32 - 64.0) / 63.0,
+                });
+            }
+        }
+    }
 }
 
 fn get_beat_state(ui: &mut egui::Ui) -> (BeatMode, usize) {
@@ -729,5 +986,50 @@ fn render_mode_buttons(ui: &mut egui::Ui, params: &Arc<DeviceParams>, beat_mode:
             });
         }
     });
+}
+
+fn render_dataset_selector(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
+    let datasets_id = egui::Id::new("dataset_list_cache");
+    let datasets: Vec<ml_dataset::DatasetInfo> = ui.memory_mut(|mem| {
+        mem.data.get_temp_mut_or_insert_with(datasets_id, ml_dataset::list_datasets).clone()
+    });
+
+    let current_name = ui_state.ml_dataset.lock()
+        .map(|d| d.name.clone())
+        .unwrap_or_else(|_| "Built-in".to_string());
+
+    ui.label(egui::RichText::new("Dataset:").size(14.0));
+
+    let combo_id = egui::Id::new("dataset_combo");
+    egui::ComboBox::from_id_salt(combo_id)
+        .selected_text(egui::RichText::new(&current_name).size(14.0))
+        .width(160.0)
+        .show_ui(ui, |ui| {
+            for info in &datasets {
+                let label = format!("{} ({})", info.name, info.beat_count);
+                if ui.selectable_label(info.name == current_name, egui::RichText::new(&label).size(13.0)).clicked() {
+                    let dir_name = if info.dir_name.is_empty() {
+                        "Built-in".to_string()
+                    } else {
+                        info.dir_name.clone()
+                    };
+                    if let Ok(dataset) = ml_dataset::load_dataset(&dir_name) {
+                        if let Ok(mut guard) = ui_state.ml_dataset.lock() {
+                            *guard = dataset;
+                        }
+                        ui_state.ml_dataset_dirty.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                }
+            }
+        });
+
+    let refresh_btn = egui::Button::new(egui::RichText::new("Refresh").size(12.0))
+        .min_size(egui::vec2(55.0, 24.0));
+    if ui.add(refresh_btn).clicked() {
+        let fresh = ml_dataset::list_datasets();
+        ui.memory_mut(|mem| {
+            mem.data.insert_temp(datasets_id, fresh);
+        });
+    }
 }
 

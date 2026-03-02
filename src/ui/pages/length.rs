@@ -145,8 +145,76 @@ fn render_velocity_section(
 
                 render_velocity_length_row(ui, setter,
                     &params.vel_length_target, &params.vel_length_amount, &params.vel_length_prob);
+
+                ui.add_space(12.0);
+                render_velocity_preview(ui, params);
             });
         });
+}
+
+fn render_velocity_preview(ui: &mut egui::Ui, params: &Arc<DeviceParams>) {
+    let base_vel: f32 = 100.0;
+    let strength_amount = params.vel_strength_amount.modulated_plain_value();
+    let strength_prob = params.vel_strength_prob.modulated_plain_value();
+    let length_amount = params.vel_length_amount.modulated_plain_value();
+    let length_prob = params.vel_length_prob.modulated_plain_value();
+
+    let mut min_offset: f32 = 0.0;
+    let mut max_offset: f32 = 0.0;
+
+    if strength_prob > 0.0 {
+        if strength_amount < 0.0 {
+            min_offset += strength_amount;
+        } else {
+            max_offset += strength_amount;
+        }
+    }
+
+    if length_prob > 0.0 {
+        if length_amount < 0.0 {
+            min_offset += length_amount;
+        } else {
+            max_offset += length_amount;
+        }
+    }
+
+    let min_vel = (base_vel + min_offset).clamp(1.0, 127.0) as u8;
+    let max_vel = (base_vel + max_offset).clamp(1.0, 127.0) as u8;
+
+    ui.label(egui::RichText::new(format!("Velocity range: {} - {}", min_vel, max_vel))
+        .size(13.0).color(Color32::from_gray(160)));
+    ui.add_space(4.0);
+
+    let bar_width = 400.0;
+    let bar_height = 16.0;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(bar_width, bar_height), egui::Sense::hover());
+    let painter = ui.painter();
+
+    painter.rect_filled(rect, 3.0, Color32::from_gray(35));
+
+    let min_ratio = (min_vel as f32 - 1.0) / 126.0;
+    let max_ratio = (max_vel as f32 - 1.0) / 126.0;
+
+    let range_rect = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + min_ratio * bar_width, rect.top()),
+        egui::pos2(rect.left() + max_ratio * bar_width, rect.bottom()),
+    );
+    painter.rect_filled(range_rect, 3.0, Color32::from_rgba_unmultiplied(100, 160, 220, 100));
+
+    let base_ratio = (base_vel - 1.0) / 126.0;
+    let base_x = rect.left() + base_ratio * bar_width;
+    painter.line_segment(
+        [egui::pos2(base_x, rect.top()), egui::pos2(base_x, rect.bottom())],
+        egui::Stroke::new(2.0, Color32::from_rgb(220, 180, 80)),
+    );
+
+    painter.text(
+        egui::pos2(base_x, rect.top() - 2.0),
+        egui::Align2::CENTER_BOTTOM,
+        "100",
+        egui::FontId::proportional(10.0),
+        Color32::from_gray(140),
+    );
 }
 
 fn render_velocity_strength_row(

@@ -67,13 +67,13 @@ esac
 
 if [ "$BACKEND" = "jack" ]; then
     start_jack
-    cargo run --release -- -b jack "$@"
+    cargo run --release --bin device -- -b jack "$@"
 elif [ "$BACKEND" = "coreaudio" ] || [ "$BACKEND" = "core-audio" ]; then
     echo "[INFO] Using CoreAudio at ${SAMPLE_RATE}Hz, buffer ${BUFFER_SIZE}"
-    cargo run --release -- -b core-audio -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
+    cargo run --release --bin device -- -b core-audio -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
 elif [ "$BACKEND" = "alsa" ]; then
     echo "[INFO] Using ALSA at ${SAMPLE_RATE}Hz, buffer ${BUFFER_SIZE}"
-    cargo run --release -- -b alsa -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
+    cargo run --release --bin device -- -b alsa -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
 else
-    cargo run --release -- -b "$BACKEND" -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
+    cargo run --release --bin device -- -b "$BACKEND" -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
 fi

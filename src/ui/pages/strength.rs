@@ -323,7 +323,16 @@ pub fn render(
                     }
                 });
 
+            if let Ok(config) = ui_state.multi_bar_config.lock() {
+                if config.enabled && config.bar_count > 1 {
+                    ui.add_space(24.0);
+                    ui.label(egui::RichText::new(format!("Multi-Bar: {} bars", config.bar_count))
+                        .size(16.0).color(Color32::from_rgb(200, 180, 100)));
+                }
+            }
+
             if state != state_before {
+                ui_state.mark_seq_dirty();
                 if let Ok(mut strength_values) = ui_state.strength_values.lock() {
                     for i in 0..96 {
                         strength_values[i] = state.beat_strength_values[i] as f32 / 100.0;
@@ -354,6 +363,7 @@ pub fn render(
         render_beat_strength(ui, &mut state, swing);
 
         if state != state_before {
+            ui_state.mark_seq_dirty();
             if let Ok(mut strength_values) = ui_state.strength_values.lock() {
                 for i in 0..96 {
                     strength_values[i] = state.beat_strength_values[i] as f32 / 100.0;

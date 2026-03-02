@@ -127,6 +127,67 @@ impl PolyBlepWrapper {
     }
 }
 
+pub struct SawOscillator {
+    phase: f64,
+    sample_rate: f64,
+    freq: f64,
+    dc_block_x1: f64,
+    dc_block_y1: f64,
+}
+
+impl SawOscillator {
+    pub fn new(sample_rate: f64) -> Self {
+        Self {
+            phase: rand_01() as f64 * 0.25,
+            sample_rate,
+            freq: 220.0,
+            dc_block_x1: 0.0,
+            dc_block_y1: 0.0,
+        }
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
+    }
+
+    pub fn set_frequency(&mut self, freq: f64) {
+        self.freq = freq;
+    }
+
+    pub fn trigger(&mut self) {
+        self.phase = 0.0;
+    }
+
+    #[inline]
+    fn poly_blep(t: f64, dt: f64) -> f64 {
+        if t < dt {
+            let t = t / dt;
+            2.0 * t - t * t - 1.0
+        } else if t > 1.0 - dt {
+            let t = (t - 1.0) / dt;
+            t * t + 2.0 * t + 1.0
+        } else {
+            0.0
+        }
+    }
+
+    pub fn next(&mut self) -> f64 {
+        let dt = self.freq / self.sample_rate;
+        let raw = 2.0 * self.phase - 1.0 - Self::poly_blep(self.phase, dt);
+
+        self.phase += dt;
+        if self.phase >= 1.0 {
+            self.phase -= 1.0;
+        }
+
+        let r = 0.9995;
+        let y = raw - self.dc_block_x1 + r * self.dc_block_y1;
+        self.dc_block_x1 = raw;
+        self.dc_block_y1 = y;
+        y
+    }
+}
+
 const COEFF_UPDATE_INTERVAL: u32 = 32;
 const PFD_COUNTER_RESET: i64 = 1 << 30;
 

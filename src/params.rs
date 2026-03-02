@@ -419,6 +419,21 @@ pub struct DeviceParams {
     #[id = "synth_sub_source"]
     pub synth_sub_source: IntParam,
 
+    #[id = "synth_saw_enable"]
+    pub synth_saw_enable: BoolParam,
+    #[id = "synth_saw_volume"]
+    pub synth_saw_volume: FloatParam,
+    #[id = "synth_saw_octave"]
+    pub synth_saw_octave: IntParam,
+    #[id = "synth_saw_tune"]
+    pub synth_saw_tune: IntParam,
+    #[id = "synth_saw_fold"]
+    pub synth_saw_fold: FloatParam,
+    #[id = "synth_saw_shape_type"]
+    pub synth_saw_shape_type: IntParam,
+    #[id = "synth_saw_shape_amount"]
+    pub synth_saw_shape_amount: FloatParam,
+
     #[id = "synth_pll_fm_amount"]
     pub synth_pll_fm_amount: FloatParam,
     #[id = "synth_pll_fm_ratio"]
@@ -526,8 +541,12 @@ pub struct DeviceParams {
     pub synth_coloration_enable: BoolParam,
     #[id = "synth_reverb_enable"]
     pub synth_reverb_enable: BoolParam,
-    #[id = "synth_oversampling_factor"]
-    pub synth_oversampling_factor: IntParam,
+    #[id = "synth_pll_oversampling"]
+    pub synth_pll_oversampling: IntParam,
+    #[id = "synth_saw_oversampling"]
+    pub synth_saw_oversampling: IntParam,
+    #[id = "synth_vps_oversampling"]
+    pub synth_vps_oversampling: IntParam,
     #[id = "synth_base_rate"]
     pub synth_base_rate: IntParam,  // 0=Auto, 1=44.1k, 2=88.2k, 3=96k, 4=192k
 
@@ -541,6 +560,8 @@ pub struct DeviceParams {
     pub synth_filter_env_amount: FloatParam,
     #[id = "synth_filter_drive"]
     pub synth_filter_drive: FloatParam,
+    #[id = "synth_filter_stereo"]
+    pub synth_filter_stereo: FloatParam,
 
     #[id = "global_volume"]
     pub global_volume: FloatParam,
@@ -1623,6 +1644,38 @@ impl Default for DeviceParams {
                 IntRange::Linear { min: 0, max: 1 }
             ),
 
+            synth_saw_enable: BoolParam::new("Saw Enable".to_string(), false),
+            synth_saw_volume: FloatParam::new(
+                "Saw Volume".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_saw_octave: IntParam::new(
+                "Saw Octave".to_string(),
+                0,
+                IntRange::Linear { min: -3, max: 3 }
+            ),
+            synth_saw_tune: IntParam::new(
+                "Saw Tune".to_string(),
+                0,
+                IntRange::Linear { min: -12, max: 12 }
+            ),
+            synth_saw_fold: FloatParam::new(
+                "Saw Fold".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_saw_shape_type: IntParam::new(
+                "Saw Shape Type".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 2 }
+            ),
+            synth_saw_shape_amount: FloatParam::new(
+                "Saw Shape Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
             synth_pll_fm_amount: FloatParam::new(
                 "PLL FM Amount".to_string(),
                 0.0,
@@ -1837,9 +1890,19 @@ impl Default for DeviceParams {
             synth_vps_enable: BoolParam::new("VPS Enable".to_string(), true),
             synth_coloration_enable: BoolParam::new("Coloration Enable".to_string(), true),
             synth_reverb_enable: BoolParam::new("Reverb Enable".to_string(), true),
-            synth_oversampling_factor: IntParam::new(
-                "Oversampling Factor",
-                0,  // Default to 1x (index 0: 1x=0, 2x=1, 4x=2, 8x=3, 16x=4)
+            synth_pll_oversampling: IntParam::new(
+                "PLL Oversampling",
+                0,
+                IntRange::Linear { min: 0, max: 4 },
+            ),
+            synth_saw_oversampling: IntParam::new(
+                "Saw Oversampling",
+                0,
+                IntRange::Linear { min: 0, max: 4 },
+            ),
+            synth_vps_oversampling: IntParam::new(
+                "VPS Oversampling",
+                0,
                 IntRange::Linear { min: 0, max: 4 },
             ),
             synth_base_rate: IntParam::new(
@@ -1871,6 +1934,11 @@ impl Default for DeviceParams {
                 "Filter Drive".to_string(),
                 1.0,
                 FloatRange::Linear { min: 1.0, max: 15.849 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_filter_stereo: FloatParam::new(
+                "Filter Stereo".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
             global_volume: FloatParam::new(
