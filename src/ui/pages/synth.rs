@@ -591,11 +591,8 @@ fn render_envelopes_tab(
                 ui.vertical(|ui| {
                     ui.label(egui::RichText::new("BRILLIANCE").size(HEADER_FONT).strong());
                     ui.add_space(10.0);
-                    ui.horizontal(|ui| {
-                        let color = Some(Color32::from_rgb(160, 130, 60));
-                        render_vertical_slider(ui, params, setter, &params.brilliance_amount, "AMT", 0.0, 1.0, SliderScale::Linear, color);
-                        render_vertical_slider(ui, params, setter, &params.brilliance_drive, "DRV", 0.0, 1.0, SliderScale::Linear, color);
-                    });
+                    let color = Some(Color32::from_rgb(160, 130, 60));
+                    render_brilliance_slider(ui, params, setter, color);
                 });
             });
     });
@@ -742,6 +739,41 @@ fn render_hpf_sub_buttons(
                 setter.set_parameter(&params.master_hpf_sub, *value);
             }
         }
+    });
+}
+
+fn render_brilliance_slider(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+    color: Option<Color32>,
+) {
+    ui.vertical(|ui| {
+        ui.set_width(SLIDER_COL_WIDTH);
+        let mut value: f32 = params.brilliance_amount.modulated_plain_value();
+
+        if let Some(fill_color) = color {
+            ui.style_mut().visuals.widgets.inactive.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.hovered.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.active.bg_fill = fill_color;
+        }
+
+        ui.style_mut().spacing.slider_width = SLIDER_RAIL_LENGTH;
+        ui.style_mut().spacing.slider_rail_height = SLIDER_RAIL_THICKNESS;
+
+        let slider = egui::Slider::new(&mut value, 0.0..=1.0)
+            .vertical()
+            .show_value(false);
+        if ui.add(slider).changed() {
+            setter.set_parameter(&params.brilliance_amount, value);
+            setter.set_parameter(&params.brilliance_drive, value);
+        }
+
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
+            ui.add_space(-7.0);
+            ui.label(egui::RichText::new("AMT").size(LABEL_FONT));
+        });
     });
 }
 
