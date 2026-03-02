@@ -43,9 +43,9 @@ cleanup() {
     echo ""
     echo "[INFO] Shutting down..."
 
-    pkill -TERM -f "target/release/device" 2>/dev/null || true
+    pkill -TERM -f "target/release/phaseburn" 2>/dev/null || true
     sleep 1
-    pkill -KILL -f "target/release/device" 2>/dev/null || true
+    pkill -KILL -f "target/release/phaseburn" 2>/dev/null || true
     sleep 0.5
 
     if [ "$BACKEND" = "jack" ]; then
@@ -67,13 +67,13 @@ esac
 
 if [ "$BACKEND" = "jack" ]; then
     start_jack
-    cargo run --release --bin device -- -b jack "$@"
+    cargo run --release --bin phaseburn -- -b jack "$@"
 elif [ "$BACKEND" = "coreaudio" ] || [ "$BACKEND" = "core-audio" ]; then
     echo "[INFO] Using CoreAudio at ${SAMPLE_RATE}Hz, buffer ${BUFFER_SIZE}"
-    cargo run --release --bin device -- -b core-audio -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
+    cargo run --release --bin phaseburn -- -b core-audio -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
 elif [ "$BACKEND" = "alsa" ]; then
     echo "[INFO] Using ALSA at ${SAMPLE_RATE}Hz, buffer ${BUFFER_SIZE}"
-    cargo run --release --bin device -- -b alsa -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
+    cargo run --release --bin phaseburn -- -b alsa -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
 else
-    cargo run --release --bin device -- -b "$BACKEND" -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
+    cargo run --release --bin phaseburn -- -b "$BACKEND" -r "$SAMPLE_RATE" -p "$BUFFER_SIZE" "$@"
 fi

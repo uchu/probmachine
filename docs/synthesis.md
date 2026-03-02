@@ -1,8 +1,8 @@
-# Device - Synthesis Engine
+# PhaseBurn - Synthesis Engine
 
 ## Oscillator Types
 
-Device features two distinct oscillator types plus a sub oscillator, each with unique character.
+PhaseBurn features two distinct oscillator types plus a sub oscillator, each with unique character.
 
 ### VPS Oscillator (Variable Phase Shaping)
 
@@ -101,7 +101,7 @@ A novel synthesis method modeling analog PLL circuits. The VCO attempts to track
 |-------|-------------|
 | FM Amount | FM modulation depth |
 | FM Ratio | Integer ratio for FM frequency |
-| FM Env | Filter envelope to FM depth |
+| FM Env | Envelope to FM depth (legacy parameter) |
 
 **Character:**
 The PLL oscillator excels at:
@@ -141,27 +141,40 @@ The PLL oscillator excels at:
 - LFO to PLL Mult: Discrete modulation steps between multiplier values (1,2,4,8,16,32,64) with slew
 - LFO to PLL Mult D: Direct continuous modulation of the frequency multiplier for evolving timbres
 
+### SAW Oscillator
+
+A polyBLEP sawtooth oscillator with DC blocking, waveshaping, and wavefold.
+
+**Parameters:**
+| Param | Range | Description |
+|-------|-------|-------------|
+| Volume | 0.0-1.0 | SAW output level |
+| Octave | -3 to +3 | Octave shift |
+| Tune | -12 to +12 | Semitone offset |
+| Fold | 0.0-1.0 | Wavefold amount |
+| Fold Range | 1X/PI | Fold function: 1X=sin(x), PI=sin(x*PI) for more aggressive folding |
+| Shape Type | 0-2 | Waveshaper type |
+| Shape Amount | 0.0-1.0 | Waveshaper intensity |
+
+**DC Block Filter:**
+The SAW oscillator uses a sample-rate-aware DC block filter with coefficient `r = exp(-2π × 3.5 / sample_rate)`. This keeps the HPF cutoff at ~3.5 Hz regardless of oversampling factor, preserving bass content at high oversampling ratios (32x, 64x, 128x).
+
 ### Sub Oscillator
 
-An oscillator one octave below the base frequency with selectable source.
+A pure sine wave one octave below the base frequency for clean bass reinforcement.
 
 **Parameters:**
 | Param | Range | Description |
 |-------|-------|-------------|
 | Volume | 0.0-1.0 | Sub level in mix |
-| Source | SIN/VPS | Sine wave or VPS-shaped sub |
 
-**Source Modes:**
-- **SIN**: Pure sine wave sub — clean, fundamental bass reinforcement
-- **VPS**: Uses a VPS oscillator at -1 octave with the same D/V parameters as the main VPS oscillator. Creates a sub that tonally matches the main sound, giving a more coherent low end that evolves with the same timbre settings.
-
-**Signal Path:** Added post-reverb to remain clean and punchy, bypassing all effects processing.
+**Signal Path:** Routed separately from main oscillator mix. By default bypasses the Master HPF (OUT mode) to preserve clean sub bass. Can be routed through the HPF (IN mode) via the SUB toggle in the Master HPF section.
 
 ## Effects Chain
 
 ### Coloration Section
 
-A set of effects applied to the oscillator mix before filtering.
+A set of effects applied to the oscillator mix.
 
 **Ring Modulation:**
 - Multiplies VPS × PLL outputs
@@ -195,78 +208,57 @@ A set of effects applied to the oscillator mix before filtering.
 - Aggressive volume compensation for consistent perceived loudness
 - Applied after tube saturation for maximum harmonic content
 
-### Filter (Moog Ladder)
+### Master Highpass Filter
 
-Classic 4-pole Moog ladder lowpass filter using the Stilson algorithm from synfx-dsp.
+A 2nd-order Butterworth SVF highpass filter on the master output, placed before volume and limiter.
 
-**Character:**
-| Feature | Description |
-|---------|-------------|
-| Type | 4-pole ladder (24 dB/oct) |
-| Mode | Low-pass only |
-| Sound | Fat, warm, squelchy vintage character |
-| Saturation | Built-in warm saturation via drive |
-| Self-oscillation | Near resonance 1.0 (clamped to 0.98 for stability) |
+**Frequency Modes:**
+| Mode | Cutoff | Description |
+|------|--------|-------------|
+| OFF | — | No filtering (default) |
+| 35 | 35 Hz | Removes sub-bass rumble |
+| 80 | 80 Hz | Tightens low end |
+| 120 | 120 Hz | Cuts mud frequencies |
+| 220 | 220 Hz | Aggressive bass cut |
+
+**Boost Modes:**
+| Mode | Q | Description |
+|------|---|-------------|
+| FLAT | 0.707 | Butterworth — maximally flat passband (default) |
+| MED | 2.0 | Resonant peak just above cutoff (same as SAW tight filter) |
+| HIGH | 4.0 | Aggressive resonant peak for bass emphasis |
+
+**Sub Routing:**
+| Mode | Description |
+|------|-------------|
+| OUT | Sub oscillator bypasses HPF — preserves clean sub bass (default) |
+| IN | Sub oscillator passes through HPF — filters sub along with main signal |
+
+**Implementation:** State Variable Filter (SVF) topology, f64 precision. Processes stereo independently.
+
+### Brilliance Filter
+
+A high-shelf exciter placed after the Master HPF in the signal chain. Extracts high-frequency content via an SVF highpass at 4.5kHz, optionally saturates it, and mixes it back into the signal.
 
 **Parameters:**
 | Param | Range | Description |
 |-------|-------|-------------|
-| Cutoff | 20 Hz - Nyquist×0.4 | Filter frequency |
-| Resonance | 0-0.98 | Q factor (self-oscillates at high values) |
-| Drive | 1-15 | Input saturation (tanh soft clipping) |
-| Env Amount | -5000 to +5000 | Filter envelope modulation |
+| Amount (AMT) | 0.0-1.0 | High-shelf boost level — how much processed highs are added back (0 = off) |
+| Drive (DRV) | 0.0-1.0 | Saturation intensity on extracted highs (0 = clean shelf boost, 1 = heavy harmonic exciter) |
 
-**Drive Behavior:**
-| Value | Effect |
-|-------|--------|
-| 1.0 | Clean (no saturation) |
-| 2.0-4.0 | Warm saturation |
-| 5.0-10.0 | Heavy distortion |
-| 10.0-15.0 | Aggressive clipping |
+**How it works:**
+1. SVF highpass (Q=0.5, 4.5kHz) extracts high-frequency content
+2. Drive applies tanh saturation to the extracted highs, generating new harmonics above the cutoff
+3. The processed highs are mixed back: `output = input + amount × saturated_highs`
 
-### Reverb (Dattorro)
+**Character:**
+- Amount alone (Drive=0): Clean high-shelf boost — adds air and presence
+- Amount + Drive: Harmonic exciter — creates new high-frequency harmonics that weren't in the original signal, adding sparkle and brilliance
+- Especially effective on PLL, FM, and wavefolder timbres where there is already rich harmonic content to excite
 
-High-quality plate reverb algorithm from synfx-dsp.
-
-**Input Section:**
-| Param | Range | Description |
-|-------|-------|-------------|
-| Pre-delay | 0-200 ms | Time before reverb onset |
-| Input HPF | 20-2000 Hz | High-pass before reverb |
-| Input LPF | 1000-20000 Hz | Low-pass before reverb |
-
-**Reverb Character:**
-| Param | Description |
-|-------|-------------|
-| Time Scale | Overall reverb size scaling |
-| Diffusion | Early reflection density |
-| Diffusion Mix | Early reflections amount |
-| Decay | RT60-like tail length |
-
-**Reverb Filters:**
-| Param | Description |
-|-------|-------------|
-| HPF | High-pass in reverb loop |
-| LPF | Low-pass in reverb loop |
-
-**Modulation:**
-| Param | Description |
-|-------|-------------|
-| Mod Speed | Internal LFO rate |
-| Mod Depth | Pitch modulation amount |
-| Mod Shape | LFO waveform |
-
-**Special:**
-| Param | Description |
-|-------|-------------|
-| Mix | Dry/wet balance |
-| Ducking | Reduce reverb when input is loud |
-
-**Smoothing:** Mix, ducking, and decay parameters are smoothed over 50ms for click-free transitions.
+**Implementation:** SVF topology, f64 precision, same as Master HPF. Processes stereo independently.
 
 ## Envelopes
-
-Two ADSR envelopes with shape control per segment.
 
 ### Volume Envelope
 
@@ -290,13 +282,6 @@ Controls amplitude of all oscillators.
 
 **Special:** Decay time can be modified per-note by the sequencer's decay modifier system.
 
-### Filter Envelope
-
-Modulates filter cutoff.
-
-**Parameters:** Same as volume envelope, plus:
-- **Env Amount**: Bipolar modulation depth to cutoff
-
 ## LFO System
 
 Three independent LFOs with flexible routing.
@@ -316,9 +301,7 @@ Three independent LFOs with flexible routing.
 **Available Destinations:**
 - PLL: Damping, Influence, Track Speed, FM Amount, Cross Feedback, Overtone (Burst), Range, Multiplier (discrete), Multiplier Direct (continuous)
 - VPS: D parameter, V parameter, Stereo V Offset, Stereo D Offset, Fold, Shape Amount
-- Filter: Cutoff, Resonance, Drive
 - Coloration: Drift, Tube Drive
-- Reverb: Mix, Decay
 - Volumes: PLL, VPS, Sub
 
 ## Modulation Step Sequencer
@@ -344,7 +327,6 @@ A tempo-synced 16-step modulation sequencer with 303-style tie/glide and control
 6. Output (-1.0 to 1.0) feeds into ModulationValues, accumulated with LFO modulation
 
 **Sound Design Tips:**
-- Use with filter cutoff for rhythmic filter patterns
 - Tie adjacent steps for smooth glide transitions (303-style)
 - High slew values create smooth, wavering modulation from step patterns
 - Combine with LFO modulation for complex rhythmic textures
@@ -357,9 +339,12 @@ Configurable oversampling to reduce aliasing at the cost of CPU.
 | Factor | Description | CPU Impact |
 |--------|-------------|------------|
 | 1x | No oversampling | Lowest |
-| 4x | Default, good quality | Moderate |
+| 4x | Good quality | Moderate |
 | 8x | High quality | Higher |
-| 16x | Maximum quality | Highest |
+| 16x | Very high quality | High |
+| 32x | Excellent quality | Very high |
+| 64x | Near-perfect quality | Extreme |
+| 128x | Maximum quality | Highest |
 
 **Base Rate Option:** Force minimum 88.2kHz internal rate for extra quality at lower host sample rates.
 
@@ -390,22 +375,26 @@ Configurable oversampling to reduce aliasing at the cost of CPU.
 │   │ Ring,Fold,Drift│                                       │
 │   │ Noise,Tube,Dist│                                       │
 │   └───────┬────────┘                                       │
-│           ▼                                                │
-│   ┌────────────────┐                                       │
-│   │  Moog Filter   │←──Envelope                            │
-│   └───────┬────────┘                                       │
-│           ▼                                                │
-│   ┌────────────────┐                                       │
-│   │ Dattorro Reverb│                                       │
-│   └───────┬────────┘                                       │
-│           │                                                │
-│     + ┌───┴───┐                                            │
-│       │  Sub  │ (added post-reverb)                        │
-│       └───────┘                                            │
 │           │                                                │
 │           ▼                                                │
 │      Master Volume                                         │
 └────────────┬───────────────────────────────────────────────┘
+             │
+     Main ───┤                ┌───────┐
+             │           ┌────│  Sub  │────┐
+             ▼           │    └───────┘    │
+      ┌──────────────┐   │  [IN]     [OUT] │
+      │ Master HPF   │◄──┘                 │
+      └──────┬───────┘                     │
+             ├─────────────────────────────┘
+             ▼
+      ┌──────────────┐
+      │ Brilliance   │ (Amount + Drive)
+      └──────┬───────┘
+             ▼
+      ┌──────────────┐
+      │   Limiter    │
+      └──────┬───────┘
              ▼
          Stereo Out
 ```

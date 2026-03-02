@@ -416,8 +416,6 @@ pub struct DeviceParams {
     pub synth_vps_phase_mode: IntParam,
     #[id = "synth_sub_volume"]
     pub synth_sub_volume: FloatParam,
-    #[id = "synth_sub_source"]
-    pub synth_sub_source: IntParam,
 
     #[id = "synth_saw_enable"]
     pub synth_saw_enable: BoolParam,
@@ -429,6 +427,10 @@ pub struct DeviceParams {
     pub synth_saw_tune: IntParam,
     #[id = "synth_saw_fold"]
     pub synth_saw_fold: FloatParam,
+    #[id = "synth_saw_fold_range"]
+    pub synth_saw_fold_range: IntParam,
+    #[id = "synth_saw_tight"]
+    pub synth_saw_tight: FloatParam,
     #[id = "synth_saw_shape_type"]
     pub synth_saw_shape_type: IntParam,
     #[id = "synth_saw_shape_amount"]
@@ -565,6 +567,20 @@ pub struct DeviceParams {
 
     #[id = "global_volume"]
     pub global_volume: FloatParam,
+
+    #[id = "master_hpf"]
+    pub master_hpf: IntParam,
+
+    #[id = "master_hpf_boost"]
+    pub master_hpf_boost: IntParam,
+
+    #[id = "master_hpf_sub"]
+    pub master_hpf_sub: IntParam,
+
+    #[id = "brilliance_amount"]
+    pub brilliance_amount: FloatParam,
+    #[id = "brilliance_drive"]
+    pub brilliance_drive: FloatParam,
 
     #[id = "limiter_enable"]
     pub limiter_enable: BoolParam,
@@ -1626,7 +1642,7 @@ impl Default for DeviceParams {
             synth_vps_shape_amount: FloatParam::new(
                 "VPS Shape Amount".to_string(),
                 0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
+                FloatRange::Linear { min: 0.0, max: 0.5 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
             synth_vps_phase_mode: IntParam::new(
                 "VPS Phase Mode".to_string(),
@@ -1638,11 +1654,6 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_sub_source: IntParam::new(
-                "Sub Source".to_string(),
-                0,
-                IntRange::Linear { min: 0, max: 1 }
-            ),
 
             synth_saw_enable: BoolParam::new("Saw Enable".to_string(), false),
             synth_saw_volume: FloatParam::new(
@@ -1662,6 +1673,16 @@ impl Default for DeviceParams {
             ),
             synth_saw_fold: FloatParam::new(
                 "Saw Fold".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_saw_fold_range: IntParam::new(
+                "Saw Fold Range".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 1 }
+            ),
+            synth_saw_tight: FloatParam::new(
+                "Saw Tight".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
@@ -1893,17 +1914,17 @@ impl Default for DeviceParams {
             synth_pll_oversampling: IntParam::new(
                 "PLL Oversampling",
                 0,
-                IntRange::Linear { min: 0, max: 4 },
+                IntRange::Linear { min: 0, max: 7 },
             ),
             synth_saw_oversampling: IntParam::new(
                 "Saw Oversampling",
                 0,
-                IntRange::Linear { min: 0, max: 4 },
+                IntRange::Linear { min: 0, max: 7 },
             ),
             synth_vps_oversampling: IntParam::new(
                 "VPS Oversampling",
                 0,
-                IntRange::Linear { min: 0, max: 4 },
+                IntRange::Linear { min: 0, max: 7 },
             ),
             synth_base_rate: IntParam::new(
                 "Base Sample Rate",
@@ -1946,6 +1967,35 @@ impl Default for DeviceParams {
                 0.5,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            master_hpf: IntParam::new(
+                "Master HPF".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 4 },
+            ),
+
+            master_hpf_boost: IntParam::new(
+                "Master HPF Boost".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 2 },
+            ),
+
+            master_hpf_sub: IntParam::new(
+                "Master HPF Sub".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 1 },
+            ),
+
+            brilliance_amount: FloatParam::new(
+                "Brilliance Amount".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            ).with_step_size(0.01),
+            brilliance_drive: FloatParam::new(
+                "Brilliance Drive".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            ).with_step_size(0.01),
 
             limiter_enable: BoolParam::new("Limiter".to_string(), true),
 

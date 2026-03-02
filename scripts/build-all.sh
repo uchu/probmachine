@@ -37,36 +37,36 @@ build_plugins() {
     log_info "Building plugins for $platform..."
 
     cd "$PROJECT_DIR"
-    cargo xtask bundle device --release
+    cargo xtask bundle phaseburn --release
 
     case "$platform" in
         macos)
-            if [ -d "target/bundled/device.vst3" ]; then
-                cp -r target/bundled/device.vst3 "$BUILD_DIR/macos/vst3/"
+            if [ -d "target/bundled/phaseburn.vst3" ]; then
+                cp -r target/bundled/phaseburn.vst3 "$BUILD_DIR/macos/vst3/"
                 log_success "VST3 plugin built for macOS"
             fi
-            if [ -d "target/bundled/device.clap" ]; then
-                cp -r target/bundled/device.clap "$BUILD_DIR/macos/clap/"
+            if [ -d "target/bundled/phaseburn.clap" ]; then
+                cp -r target/bundled/phaseburn.clap "$BUILD_DIR/macos/clap/"
                 log_success "CLAP plugin built for macOS"
             fi
             ;;
         linux)
-            if [ -f "target/bundled/device.vst3" ]; then
-                cp -r target/bundled/device.vst3 "$BUILD_DIR/linux/vst3/"
+            if [ -f "target/bundled/phaseburn.vst3" ]; then
+                cp -r target/bundled/phaseburn.vst3 "$BUILD_DIR/linux/vst3/"
                 log_success "VST3 plugin built for Linux"
             fi
-            if [ -f "target/bundled/device.clap" ]; then
-                cp target/bundled/device.clap "$BUILD_DIR/linux/clap/"
+            if [ -f "target/bundled/phaseburn.clap" ]; then
+                cp target/bundled/phaseburn.clap "$BUILD_DIR/linux/clap/"
                 log_success "CLAP plugin built for Linux"
             fi
             ;;
         windows)
-            if [ -f "target/bundled/device.vst3" ]; then
-                cp -r target/bundled/device.vst3 "$BUILD_DIR/windows/vst3/"
+            if [ -f "target/bundled/phaseburn.vst3" ]; then
+                cp -r target/bundled/phaseburn.vst3 "$BUILD_DIR/windows/vst3/"
                 log_success "VST3 plugin built for Windows"
             fi
-            if [ -f "target/bundled/device.clap" ]; then
-                cp target/bundled/device.clap "$BUILD_DIR/windows/clap/"
+            if [ -f "target/bundled/phaseburn.clap" ]; then
+                cp target/bundled/phaseburn.clap "$BUILD_DIR/windows/clap/"
                 log_success "CLAP plugin built for Windows"
             fi
             ;;
@@ -82,38 +82,38 @@ build_standalone() {
     cd "$PROJECT_DIR"
 
     if [ -n "$target" ]; then
-        cargo build --release --bin device --target "$target"
-        local binary_path="target/$target/release/device"
+        cargo build --release --bin phaseburn --target "$target"
+        local binary_path="target/$target/release/phaseburn"
     else
-        cargo build --release --bin device
-        local binary_path="target/release/device"
+        cargo build --release --bin phaseburn
+        local binary_path="target/release/phaseburn"
     fi
 
     case "$platform" in
         macos)
             if [ -f "${binary_path}" ]; then
-                cp "${binary_path}" "$BUILD_DIR/macos/standalone/device"
-                chmod +x "$BUILD_DIR/macos/standalone/device"
+                cp "${binary_path}" "$BUILD_DIR/macos/standalone/phaseburn"
+                chmod +x "$BUILD_DIR/macos/standalone/phaseburn"
                 log_success "Standalone built for macOS"
             fi
             ;;
         linux)
             if [ -f "${binary_path}" ]; then
-                cp "${binary_path}" "$BUILD_DIR/linux/standalone/device"
-                chmod +x "$BUILD_DIR/linux/standalone/device"
+                cp "${binary_path}" "$BUILD_DIR/linux/standalone/phaseburn"
+                chmod +x "$BUILD_DIR/linux/standalone/phaseburn"
                 log_success "Standalone built for Linux"
             fi
             ;;
         windows)
             if [ -f "${binary_path}.exe" ]; then
-                cp "${binary_path}.exe" "$BUILD_DIR/windows/standalone/device.exe"
+                cp "${binary_path}.exe" "$BUILD_DIR/windows/standalone/phaseburn.exe"
                 log_success "Standalone built for Windows"
             fi
             ;;
         raspberry-pi)
             if [ -f "${binary_path}" ]; then
-                cp "${binary_path}" "$BUILD_DIR/raspberry-pi/standalone/device"
-                chmod +x "$BUILD_DIR/raspberry-pi/standalone/device"
+                cp "${binary_path}" "$BUILD_DIR/raspberry-pi/standalone/phaseburn"
+                chmod +x "$BUILD_DIR/raspberry-pi/standalone/phaseburn"
                 log_success "Standalone built for Raspberry Pi"
             fi
             ;;
@@ -131,22 +131,22 @@ build_cross_platform_windows() {
     cd "$PROJECT_DIR"
 
     log_info "Building Windows standalone binary..."
-    cargo xwin build --release --bin device --target x86_64-pc-windows-msvc
+    cargo xwin build --release --bin phaseburn --target x86_64-pc-windows-msvc
 
-    if [ -f "target/x86_64-pc-windows-msvc/release/device.exe" ]; then
-        cp "target/x86_64-pc-windows-msvc/release/device.exe" "$BUILD_DIR/windows/standalone/"
+    if [ -f "target/x86_64-pc-windows-msvc/release/phaseburn.exe" ]; then
+        cp "target/x86_64-pc-windows-msvc/release/phaseburn.exe" "$BUILD_DIR/windows/standalone/"
         log_success "Windows standalone cross-compiled"
     fi
 
     log_info "Building Windows plugin library..."
     cargo xwin build --release --lib --target x86_64-pc-windows-msvc
 
-    if [ -f "target/x86_64-pc-windows-msvc/release/device.dll" ]; then
-        mkdir -p "$BUILD_DIR/windows/vst3/device.vst3/Contents/x86_64-win"
-        cp "target/x86_64-pc-windows-msvc/release/device.dll" "$BUILD_DIR/windows/vst3/device.vst3/Contents/x86_64-win/device.vst3"
+    if [ -f "target/x86_64-pc-windows-msvc/release/phaseburn.dll" ]; then
+        mkdir -p "$BUILD_DIR/windows/vst3/phaseburn.vst3/Contents/x86_64-win"
+        cp "target/x86_64-pc-windows-msvc/release/phaseburn.dll" "$BUILD_DIR/windows/vst3/phaseburn.vst3/Contents/x86_64-win/phaseburn.vst3"
         log_success "Windows VST3 plugin built"
 
-        cp "target/x86_64-pc-windows-msvc/release/device.dll" "$BUILD_DIR/windows/clap/device.clap"
+        cp "target/x86_64-pc-windows-msvc/release/phaseburn.dll" "$BUILD_DIR/windows/clap/phaseburn.clap"
         log_success "Windows CLAP plugin built"
     fi
 }
@@ -159,11 +159,11 @@ build_cross_platform_linux() {
         return 1
     fi
 
-    cross build --release --bin device --target x86_64-unknown-linux-gnu
+    cross build --release --bin phaseburn --target x86_64-unknown-linux-gnu
 
-    if [ -f "target/x86_64-unknown-linux-gnu/release/device" ]; then
-        cp "target/x86_64-unknown-linux-gnu/release/device" "$BUILD_DIR/linux/standalone/"
-        chmod +x "$BUILD_DIR/linux/standalone/device"
+    if [ -f "target/x86_64-unknown-linux-gnu/release/phaseburn" ]; then
+        cp "target/x86_64-unknown-linux-gnu/release/phaseburn" "$BUILD_DIR/linux/standalone/"
+        chmod +x "$BUILD_DIR/linux/standalone/phaseburn"
         log_success "Linux standalone cross-compiled"
     fi
 }
@@ -177,11 +177,11 @@ build_raspberry_pi() {
         return 1
     fi
 
-    cross build --release --bin device --target aarch64-unknown-linux-gnu
+    cross build --release --bin phaseburn --target aarch64-unknown-linux-gnu
 
-    if [ -f "target/aarch64-unknown-linux-gnu/release/device" ]; then
-        cp "target/aarch64-unknown-linux-gnu/release/device" "$BUILD_DIR/raspberry-pi/standalone/"
-        chmod +x "$BUILD_DIR/raspberry-pi/standalone/device"
+    if [ -f "target/aarch64-unknown-linux-gnu/release/phaseburn" ]; then
+        cp "target/aarch64-unknown-linux-gnu/release/phaseburn" "$BUILD_DIR/raspberry-pi/standalone/"
+        chmod +x "$BUILD_DIR/raspberry-pi/standalone/phaseburn"
         log_success "Raspberry Pi standalone built"
     fi
 }
@@ -190,29 +190,29 @@ create_readme() {
     log_info "Creating README..."
 
     cat > "$BUILD_DIR/README.md" << 'EOF'
-# Device - Build Artifacts
+# PhaseBurn - Build Artifacts
 
-Cross-platform builds for Device synthesizer with factory presets.
+Cross-platform builds for PhaseBurn synthesizer with factory presets.
 
 ## Platforms
 
 ### macOS (Intel/Apple Silicon)
-- **Standalone**: `macos/standalone/device`
-- **VST3**: `macos/vst3/device.vst3`
-- **CLAP**: `macos/clap/device.clap`
+- **Standalone**: `macos/standalone/phaseburn`
+- **VST3**: `macos/vst3/phaseburn.vst3`
+- **CLAP**: `macos/clap/phaseburn.clap`
 
 ### Windows (x86_64)
-- **Standalone**: `windows/standalone/device.exe`
-- **VST3**: `windows/vst3/device.vst3`
-- **CLAP**: `windows/clap/device.clap`
+- **Standalone**: `windows/standalone/phaseburn.exe`
+- **VST3**: `windows/vst3/phaseburn.vst3`
+- **CLAP**: `windows/clap/phaseburn.clap`
 
 ### Linux (x86_64)
-- **Standalone**: `linux/standalone/device`
-- **VST3**: `linux/vst3/device.vst3`
-- **CLAP**: `linux/clap/device.clap`
+- **Standalone**: `linux/standalone/phaseburn`
+- **VST3**: `linux/vst3/phaseburn.vst3`
+- **CLAP**: `linux/clap/phaseburn.clap`
 
 ### Raspberry Pi (ARM64)
-- **Standalone**: `raspberry-pi/standalone/device`
+- **Standalone**: `raspberry-pi/standalone/phaseburn`
 
 ## Installation
 
@@ -232,7 +232,7 @@ Extract the archive for your platform and copy files to the appropriate location
 ## Notes
 
 - Windows build includes 16MB stack size fix
-- macOS: Run with `./scripts/dev.sh` or `device -b core-audio`
+- macOS: Run with `./scripts/dev.sh` or `phaseburn -b core-audio`
 - All builds include factory presets bank A (slots 1-12)
 
 Build date: $(date +%Y-%m-%d)

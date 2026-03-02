@@ -1,5 +1,5 @@
 [package]
-name = "device"
+name = "phaseburn"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,8 +7,8 @@ edition = "2021"
 members = ["xtask"]
 
 [dependencies]
-nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["standalone"] }
-nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
+nih_plug = { git = "https://github.com/uchu/nih-plug.git", branch = "device-patches", features = ["standalone"] }
+nih_plug_egui = { git = "https://github.com/uchu/nih-plug.git", branch = "device-patches" }
 egui_taffy = "0.7"
 synfx-dsp = "0.5"
 rand = "0.8"
@@ -22,7 +22,7 @@ lz4_flex = "0.11"
 crate-type = ["cdylib", "lib"]
 
 [[bin]]
-name = "device"
+name = "phaseburn"
 path = "src/main.rs"
 
 [[bin]]

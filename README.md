@@ -1,4 +1,4 @@
-# Device - Audio Synthesizer
+# PhaseBurn - Audio Synthesizer
 
 A professional-grade monophonic synthesizer built in Rust featuring PLL synthesis, advanced DSP, and a polyrhythmic sequencer.
 
@@ -37,10 +37,10 @@ jackd -d alsa -d hw:0 -p 256 -n 2 &  # Linux
 cargo build --release
 
 # Mac (set library path)
-DYLD_LIBRARY_PATH=/opt/homebrew/lib ./target/release/device -b jack
+DYLD_LIBRARY_PATH=/opt/homebrew/lib ./target/release/phaseburn -b jack
 
 # Linux
-./target/release/device -b jack
+./target/release/phaseburn -b jack
 ```
 
 ## Buffer Size Configuration

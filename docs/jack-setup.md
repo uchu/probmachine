@@ -1,6 +1,6 @@
 # JACK Audio Setup Guide
 
-Device uses JACK as the primary audio backend for cross-platform low-latency audio. This guide covers setup for all supported platforms.
+PhaseBurn uses JACK as the primary audio backend for cross-platform low-latency audio. This guide covers setup for all supported platforms.
 
 ## Why JACK?
 
@@ -68,7 +68,7 @@ jackd -d coreaudio -p 512
 jackd -d coreaudio -p 1024
 ```
 
-**Run Device:**
+**Run PhaseBurn:**
 ```bash
 # Set library path for Homebrew JACK
 export DYLD_LIBRARY_PATH=/opt/homebrew/lib
@@ -107,7 +107,7 @@ jackd -d alsa -d hw:0 -p 256 -n 2
 cat /proc/asound/cards
 ```
 
-**Run Device:**
+**Run PhaseBurn:**
 ```bash
 ./target/release/device -b jack
 ```
@@ -147,7 +147,7 @@ aplay -l
 jackd -d alsa -d hw:1 -p 256 -n 2
 ```
 
-**Run Device:**
+**Run PhaseBurn:**
 ```bash
 ./target/release/device -b jack
 ```
@@ -168,7 +168,7 @@ jackd -d portaudio
 # Start Menu -> JACK -> JACK Control
 ```
 
-**Run Device:**
+**Run PhaseBurn:**
 ```cmd
 device.exe -b jack
 ```
@@ -197,7 +197,7 @@ jackd -d alsa -d hw:0 -p 128 -n 2  # Linux
 
 ## CLI Options
 
-Device supports various command-line options for audio configuration:
+PhaseBurn supports various command-line options for audio configuration:
 
 ```bash
 # Use JACK backend explicitly
@@ -257,7 +257,7 @@ Common sample rates and their uses:
 | 96000 Hz | Professional high-resolution |
 | 192000 Hz | Ultra high-resolution |
 
-Note: Higher sample rates require more CPU. Device uses internal oversampling (configurable 1x-16x) regardless of host sample rate.
+Note: Higher sample rates require more CPU. PhaseBurn uses internal oversampling (configurable 1x-16x) regardless of host sample rate.
 
 ## Using CoreAudio Directly (UAD, Apollo, etc.)
 
@@ -299,9 +299,9 @@ sudo apt install qjackctl  # Linux
 
 **Command-line routing:**
 ```bash
-# Connect Device outputs to system playback
-jack_connect Device:output_1 system:playback_1
-jack_connect Device:output_2 system:playback_2
+# Connect PhaseBurn outputs to system playback
+jack_connect PhaseBurn:output_1 system:playback_1
+jack_connect PhaseBurn:output_2 system:playback_2
 ```
 
 ## Running as a Service (Linux/Pi)
@@ -311,7 +311,7 @@ For headless operation:
 ```bash
 # Create systemd service /etc/systemd/system/device.service
 [Unit]
-Description=Device Audio Synth
+Description=PhaseBurn Audio Synth
 After=sound.target
 
 [Service]

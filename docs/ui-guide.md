@@ -1,4 +1,4 @@
-# Device - UI Guide
+# PhaseBurn - UI Guide
 
 ## Screen & Platform
 
@@ -215,8 +215,6 @@ ui.horizontal(|ui| {
 | Overtone | RGB(100, 80, 60) |
 | FM/Modulation | RGB(100, 60, 100) |
 | Volume/Mix | RGB(40, 80, 40) |
-| Filter | RGB(180, 120, 60) |
-| Reverb | RGB(100, 80, 140) |
 
 ### Beat division colors
 | Division | Color |

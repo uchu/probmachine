@@ -133,9 +133,14 @@ pub struct SawOscillator {
     freq: f64,
     dc_block_x1: f64,
     dc_block_y1: f64,
+    dc_block_r: f64,
 }
 
 impl SawOscillator {
+    fn compute_dc_block_r(sample_rate: f64) -> f64 {
+        (-std::f64::consts::TAU * 3.5 / sample_rate).exp()
+    }
+
     pub fn new(sample_rate: f64) -> Self {
         Self {
             phase: rand_01() as f64 * 0.25,
@@ -143,11 +148,13 @@ impl SawOscillator {
             freq: 220.0,
             dc_block_x1: 0.0,
             dc_block_y1: 0.0,
+            dc_block_r: Self::compute_dc_block_r(sample_rate),
         }
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: f64) {
         self.sample_rate = sample_rate;
+        self.dc_block_r = Self::compute_dc_block_r(sample_rate);
     }
 
     pub fn set_frequency(&mut self, freq: f64) {
@@ -180,8 +187,7 @@ impl SawOscillator {
             self.phase -= 1.0;
         }
 
-        let r = 0.9995;
-        let y = raw - self.dc_block_x1 + r * self.dc_block_y1;
+        let y = raw - self.dc_block_x1 + self.dc_block_r * self.dc_block_y1;
         self.dc_block_x1 = raw;
         self.dc_block_y1 = y;
         y

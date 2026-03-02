@@ -278,8 +278,6 @@ pub struct PresetData {
     pub synth_osc_volume: f32,
 
     pub synth_sub_volume: f32,
-    #[serde(default)]
-    pub synth_sub_source: i32,
 
     #[serde(default)]
     pub synth_saw_enable: bool,
@@ -291,6 +289,10 @@ pub struct PresetData {
     pub synth_saw_tune: i32,
     #[serde(default)]
     pub synth_saw_fold: f32,
+    #[serde(default)]
+    pub synth_saw_fold_range: i32,
+    #[serde(default)]
+    pub synth_saw_tight: f32,
     #[serde(default)]
     pub synth_saw_shape_type: i32,
     #[serde(default)]
@@ -469,6 +471,20 @@ pub struct PresetData {
     pub synth_reverb_enable: bool,
 
     #[serde(default)]
+    pub master_hpf: i32,
+
+    #[serde(default)]
+    pub master_hpf_boost: i32,
+
+    #[serde(default)]
+    pub master_hpf_sub: i32,
+
+    #[serde(default)]
+    pub brilliance_amount: f32,
+    #[serde(default)]
+    pub brilliance_drive: f32,
+
+    #[serde(default)]
     pub mseq_steps: Vec<f32>,
     #[serde(default)]
     pub mseq_ties: i32,
@@ -608,13 +624,14 @@ impl Default for PresetData {
             synth_osc_volume: 0.0,
 
             synth_sub_volume: 0.0,
-            synth_sub_source: 0,
 
             synth_saw_enable: false,
             synth_saw_volume: 0.0,
             synth_saw_octave: 0,
             synth_saw_tune: 0,
             synth_saw_fold: 0.0,
+            synth_saw_fold_range: 0,
+            synth_saw_tight: 0.0,
             synth_saw_shape_type: 0,
             synth_saw_shape_amount: 0.0,
 
@@ -723,6 +740,12 @@ impl Default for PresetData {
             synth_coloration_enable: true,
             synth_reverb_enable: true,
             synth_pll_mult_slew: true,
+
+            master_hpf: 0,
+            master_hpf_boost: 0,
+            master_hpf_sub: 0,
+            brilliance_amount: 0.0,
+            brilliance_drive: 0.0,
 
             mseq_steps: vec![0.0; 16],
             mseq_ties: 0,

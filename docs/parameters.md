@@ -1,4 +1,4 @@
-# Device - Parameter Reference
+# PhaseBurn - Parameter Reference
 
 Complete reference of all parameters and UI controls.
 
@@ -102,22 +102,20 @@ Complete reference of all parameters and UI controls.
 
 | ID | Name | Range | Default | Description |
 |----|------|-------|---------|-------------|
-| synth_sub_volume | Sub | 0.0-1.0 | 0.0 | Sub level (-1 oct) |
-| synth_sub_source | Src | 0-1 | 0 | Sub source (0=Sine, 1=VPS) |
+| synth_sub_volume | Sub | 0.0-1.0 | 0.0 | Sub level (-1 oct, sine) |
 
-### Filter
+### SAW Oscillator
 
 | ID | Name | Range | Default | Description |
 |----|------|-------|---------|-------------|
-| synth_filter_cutoff | Cut | 20-20000 Hz | 1000 | Filter frequency |
-| synth_filter_resonance | Res | 0.0-0.99 | 0.0 | Resonance/Q |
-| synth_filter_drive | Drive | 1.0-15.0 | 1.0 | Input saturation (NOTE: not yet implemented) |
-| synth_filter_env_amount | Env | -10000 to +10000 | 0 | Envelope modulation |
-| synth_filter_mode | Mode | 0-10 | 3 | Filter type (see below) |
-| synth_filter_enable | Enable | - | true | Bypass filter |
-
-**Filter Modes:**
-0=LP6, 1=LP12, 2=LP18, 3=LP24, 4=HP6, 5=HP12, 6=HP18, 7=HP24, 8=BP12, 9=BP24, 10=Notch
+| synth_saw_enable | Enable | bool | false | Enable SAW oscillator |
+| synth_saw_volume | Vol | 0.0-1.0 | 0.0 | SAW output level |
+| synth_saw_octave | Oct | -3 to +3 | 0 | Octave shift |
+| synth_saw_tune | Tune | -12 to +12 | 0 | Semitone offset |
+| synth_saw_fold | Fold | 0.0-1.0 | 0.0 | Wavefold amount |
+| synth_saw_fold_range | Fold Range | 0-1 | 0 | Fold mode (0=1X sin(x), 1=PI sin(x*PI)) |
+| synth_saw_shape_type | Shape | 0-2 | 0 | Waveshaper type |
+| synth_saw_shape_amount | SHP | 0.0-1.0 | 0.0 | Waveshaper intensity |
 
 ## Synth Page - Tab B
 
@@ -156,37 +154,20 @@ Complete reference of all parameters and UI controls.
 | synth_vol_release | Rel | 1-10000 ms | 5 | Release time |
 | synth_vol_release_shape | RelSh | -5 to +5 | 0 | Release curve |
 
-### Filter Envelope
+### Master HPF
 
 | ID | Name | Range | Default | Description |
 |----|------|-------|---------|-------------|
-| synth_filt_attack | Atk | 1-5000 ms | 1 | Attack time |
-| synth_filt_attack_shape | AtkSh | -5 to +5 | 0 | Attack curve |
-| synth_filt_decay | Dec | 1-10000 ms | 20 | Decay time |
-| synth_filt_decay_shape | DecSh | -5 to +5 | 0 | Decay curve |
-| synth_filt_sustain | Sus | 0.0-1.0 | 1.0 | Sustain level |
-| synth_filt_release | Rel | 1-10000 ms | 5 | Release time |
-| synth_filt_release_shape | RelSh | -5 to +5 | 0 | Release curve |
+| master_hpf | HPF | 0-4 | 0 | Master highpass filter (0=Off, 1=35Hz, 2=80Hz, 3=120Hz, 4=220Hz) |
+| master_hpf_boost | Boost | 0-2 | 0 | HPF resonance boost (0=Flat, 1=Medium Q=2.0, 2=High Q=4.0) |
+| master_hpf_sub | Sub | 0-1 | 0 | Sub routing (0=OUT bypasses HPF, 1=IN through HPF) |
 
-### Reverb
+### Brilliance
 
 | ID | Name | Range | Default | Description |
 |----|------|-------|---------|-------------|
-| synth_reverb_mix | Mix | 0.0-1.0 | 0.0 | Dry/wet balance |
-| synth_reverb_pre_delay | PreD | 0-200 ms | 50 | Pre-delay time |
-| synth_reverb_time_scale | Time | 0.0-2.0 | 0.85 | Size scaling |
-| synth_reverb_input_hpf | InHP | 20-2000 Hz | 20 | Input high-pass |
-| synth_reverb_input_lpf | InLP | 1k-20k Hz | 18000 | Input low-pass |
-| synth_reverb_hpf | HP | 20-2000 Hz | 100 | Reverb high-pass |
-| synth_reverb_lpf | LP | 1k-20k Hz | 14000 | Reverb low-pass |
-| synth_reverb_mod_speed | ModSpd | 0.0-2.0 | 0.3 | Modulation rate |
-| synth_reverb_mod_depth | ModDep | 0.0-1.0 | 0.4 | Modulation depth |
-| synth_reverb_mod_shape | ModShp | 0.0-1.0 | 0.5 | Mod waveform |
-| synth_reverb_diffusion_mix | DifMix | 0.0-1.0 | 0.85 | Early reflections |
-| synth_reverb_diffusion | Dif | 0.0-1.0 | 0.75 | Diffusion density |
-| synth_reverb_decay | Decay | 0.0-1.0 | 0.8 | Tail length |
-| synth_reverb_ducking | Duck | 0.0-1.0 | 0.0 | Sidechain ducking |
-| synth_reverb_enable | Enable | - | true | Bypass reverb |
+| brilliance_amount | AMT | 0.0-1.0 | 0.0 | High-shelf boost amount (0=off) |
+| brilliance_drive | DRV | 0.0-1.0 | 0.0 | Saturation intensity on extracted highs |
 
 ### Master
 
@@ -198,7 +179,7 @@ Complete reference of all parameters and UI controls.
 
 | ID | Name | Options | Default | Description |
 |----|------|---------|---------|-------------|
-| synth_oversampling_factor | OS | 0=1x, 1=2x, 2=4x, 3=8x, 4=16x | 0 | Oversampling factor |
+| synth_oversampling_factor | OS | 0=1x, 1=2x, 2=4x, 3=8x, 4=16x, 5=32x, 6=64x, 7=128x | 0 | Oversampling factor |
 
 **How it works:**
 - Base rate = DAW/system sample rate (automatic)
@@ -239,9 +220,8 @@ Complete reference of all parameters and UI controls.
 PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult (discrete), 21=Mult D (continuous) |
 Sub: 19=Vol |
 VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol |
-Filter: 10=Cut, 11=Res, 12=Drv |
-Coloration: 13=Drift, 14=Tube |
-Reverb: 15=Mix, 16=Decay
+SAW: 28=Fold, 29=SHP, 30=Vol |
+Coloration: 13=Drift, 14=Tube
 
 ## Synth Page - STEP MOD Tab
 

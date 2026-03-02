@@ -759,13 +759,14 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_osc_volume, data.synth_osc_volume);
 
     setter.set_parameter(&params.synth_sub_volume, data.synth_sub_volume);
-    setter.set_parameter(&params.synth_sub_source, data.synth_sub_source);
 
     setter.set_parameter(&params.synth_saw_enable, data.synth_saw_enable);
     setter.set_parameter(&params.synth_saw_volume, data.synth_saw_volume);
     setter.set_parameter(&params.synth_saw_octave, data.synth_saw_octave);
     setter.set_parameter(&params.synth_saw_tune, data.synth_saw_tune);
     setter.set_parameter(&params.synth_saw_fold, data.synth_saw_fold);
+    setter.set_parameter(&params.synth_saw_fold_range, data.synth_saw_fold_range);
+    setter.set_parameter(&params.synth_saw_tight, data.synth_saw_tight);
     setter.set_parameter(&params.synth_saw_shape_type, data.synth_saw_shape_type);
     setter.set_parameter(&params.synth_saw_shape_amount, data.synth_saw_shape_amount);
 
@@ -873,6 +874,12 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_noise_amount, data.synth_noise_amount);
     setter.set_parameter(&params.synth_color_distortion_amount, data.synth_color_distortion_amount);
     setter.set_parameter(&params.synth_color_distortion_threshold, data.synth_color_distortion_threshold);
+
+    setter.set_parameter(&params.master_hpf, data.master_hpf);
+    setter.set_parameter(&params.master_hpf_boost, data.master_hpf_boost);
+    setter.set_parameter(&params.master_hpf_sub, data.master_hpf_sub);
+    setter.set_parameter(&params.brilliance_amount, data.brilliance_amount);
+    setter.set_parameter(&params.brilliance_drive, data.brilliance_drive);
 
     let mseq_steps = [
         &params.mseq_step_1, &params.mseq_step_2, &params.mseq_step_3, &params.mseq_step_4,
@@ -1248,13 +1255,14 @@ fn save_params_to_preset_data(
     data.synth_osc_volume = params.synth_osc_volume.modulated_plain_value();
 
     data.synth_sub_volume = params.synth_sub_volume.modulated_plain_value();
-    data.synth_sub_source = params.synth_sub_source.value();
 
     data.synth_saw_enable = params.synth_saw_enable.value();
     data.synth_saw_volume = params.synth_saw_volume.modulated_plain_value();
     data.synth_saw_octave = params.synth_saw_octave.value();
     data.synth_saw_tune = params.synth_saw_tune.value();
     data.synth_saw_fold = params.synth_saw_fold.modulated_plain_value();
+    data.synth_saw_fold_range = params.synth_saw_fold_range.value();
+    data.synth_saw_tight = params.synth_saw_tight.modulated_plain_value();
     data.synth_saw_shape_type = params.synth_saw_shape_type.value();
     data.synth_saw_shape_amount = params.synth_saw_shape_amount.modulated_plain_value();
 
@@ -1365,6 +1373,12 @@ fn save_params_to_preset_data(
     data.synth_noise_amount = params.synth_noise_amount.modulated_plain_value();
     data.synth_color_distortion_amount = params.synth_color_distortion_amount.modulated_plain_value();
     data.synth_color_distortion_threshold = params.synth_color_distortion_threshold.modulated_plain_value();
+
+    data.master_hpf = params.master_hpf.value();
+    data.master_hpf_boost = params.master_hpf_boost.value();
+    data.master_hpf_sub = params.master_hpf_sub.value();
+    data.brilliance_amount = params.brilliance_amount.modulated_plain_value();
+    data.brilliance_drive = params.brilliance_drive.modulated_plain_value();
 
     data.mseq_steps = vec![
         params.mseq_step_1.modulated_plain_value(),

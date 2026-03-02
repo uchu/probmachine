@@ -1,5 +1,5 @@
-use device::Device;
+use phaseburn::PhaseBurn;
 
 fn main() {
-    nih_plug::nih_export_standalone::<Device>();
+    nih_plug::nih_export_standalone::<PhaseBurn>();
 }

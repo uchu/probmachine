@@ -1,4 +1,4 @@
-# Device - Architecture Overview
+# PhaseBurn - Architecture Overview
 
 A monophonic synthesizer and probability-based sequencer built in Rust with nih-plug and egui.
 
@@ -17,7 +17,7 @@ A monophonic synthesizer and probability-based sequencer built in Rust with nih-
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Device Plugin (lib.rs)                   │
+│                   PhaseBurn Plugin (lib.rs)                  │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │   Sequencer  │  │  Parameters  │  │     GUI      │      │
@@ -35,7 +35,7 @@ A monophonic synthesizer and probability-based sequencer built in Rust with nih-
 │               │  (synth/voice.rs)   │                       │
 │               │                     │                       │
 │               │  VPS ────┐          │                       │
-│               │  PLL ────┼─▶ Mix ─▶ Filter ─▶ Reverb ─▶ Out│
+│               │  PLL ────┼─▶ Mix ─▶ Coloration ─▶ Out      │
 │               │  Sub ────┘          │                       │
 │               └─────────────────────┘                       │
 └─────────────────────────────────────────────────────────────┘
@@ -53,9 +53,9 @@ src/
 │   ├── mod.rs          # SynthEngine coordinator
 │   ├── voice.rs        # Main voice with signal routing
 │   ├── oscillator.rs   # VPS, PolyBLEP, PLL oscillators
-│   ├── filter.rs       # Moog ladder filter (scalar + SIMD stereo)
 │   ├── envelope.rs     # ADSR with shape control
-│   ├── reverb.rs       # Dattorro reverb wrapper
+│   ├── master_hpf.rs   # Master highpass filter (SVF Butterworth)
+│   ├── brilliance.rs   # High-shelf exciter (SVF + saturation)
 │   ├── simd.rs         # Portable SIMD helpers (f64x2 stereo)
 │   ├── limiter.rs      # Master output limiter
 │   └── lfo.rs          # 3 LFOs with mod matrix
@@ -94,18 +94,19 @@ src/
 
 ### Per-Sample Processing (voice.rs)
 
-1. **Envelope Generation** - Volume and filter envelopes
+1. **Envelope Generation** - Volume envelope
 2. **Parameter Slewing** - All continuous parameters smoothed
 3. **Oversampling Loop** (1x/4x/8x/16x configurable):
    - VPS oscillator processing (if enabled)
    - PLL oscillator with FM (if enabled)
    - Mix oscillators
    - Coloration effects (ring mod, wavefold, drift, noise, tube)
-   - SVF filter with envelope modulation
-   - Dattorro reverb processing
-   - Sub oscillator added post-reverb
+   - Sub oscillator added post-coloration
 4. **Downsampling** - Anti-aliased reduction to DAW rate
-5. **Master Volume** - Final output level
+5. **Master HPF** - Butterworth highpass (Off/35/80/120/220Hz)
+6. **Brilliance** - High-shelf exciter (Amount + Drive)
+7. **Master Volume** - Final output level
+8. **Limiter** - Output protection
 
 ### Signal Precision
 
@@ -114,8 +115,8 @@ src/
 | Phase accumulators | f64 |
 | Oscillator DSP | f64 |
 | Envelopes | f64 |
-| Reverb (Dattorro) | f64 |
-| Filter (Moog Ladder) | f64 (SIMD stereo) |
+| Master HPF (SVF) | f64 |
+| Brilliance (SVF) | f64 |
 | Coloration | f64 (SIMD stereo) |
 | Oversampling buffers | f32 |
 | Plugin output | f32 |
@@ -129,7 +130,6 @@ SIMD module (`simd.rs`) provides cross-platform stereo processing using Rust's p
 - **Fallback**: Scalar operations on unsupported platforms
 
 Integrated SIMD components:
-- `StereoMoogFilter`: 4-pole Stilson Moog ladder filter (f64 precision)
 - `stereo_wavefold`: Sinusoidal wavefolding effect
 - `stereo_tube_saturate`: Asymmetric tube saturation
 - `stereo_distort_bram`: Bram de Jong waveshaper distortion
@@ -158,7 +158,7 @@ Instead of fixed patterns, each beat position has a probability value. Multiple 
 Novel approach using Phase-Locked Loop for chaotic, analog-like behavior. The VCO tracks a reference but can be pushed into unstable states.
 
 ### Selective Oversampling
-All oscillators, filter, and reverb run at the oversampled rate to prevent aliasing, but can be reduced for CPU savings.
+All oscillators and coloration run at the oversampled rate to prevent aliasing, but can be reduced for CPU savings.
 
 ### Parameter Organization
 ~250 parameters organized into logical groups:
@@ -244,7 +244,7 @@ Thread model: mode is read via `AtomicU8` (lockless on audio thread). Display st
 
 - **v1.8.0**: MIDI input modes (Passthrough, Chord Follow, Accompaniment), Settings page
 - **v1.7.0**: Full MIDI I/O - note input/output, CC handling, transport sync
-- **v1.6.0**: SIMD stereo DSP - Moog filter, wavefold, tube saturation, distortion
+- **v1.6.0**: SIMD stereo DSP - wavefold, tube saturation, distortion
 - **v1.5.0**: Portable SIMD infrastructure for future stereo DSP optimization
 - **v1.4.0**: JACK as primary backend, multi-platform support
 - **v1.3.0**: Musical note selection system, strength grid

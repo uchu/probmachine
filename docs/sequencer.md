@@ -1,8 +1,8 @@
-# Device - Probability Sequencer
+# PhaseBurn - Probability Sequencer
 
 ## Overview
 
-Device uses a probability-based sequencer instead of traditional step patterns. Each beat position has a probability value (0-127), and the sequencer generates patterns by rolling against these probabilities each bar.
+PhaseBurn uses a probability-based sequencer instead of traditional step patterns. Each beat position has a probability value (0-127), and the sequencer generates patterns by rolling against these probabilities each bar.
 
 ## Beat Divisions
 
@@ -528,7 +528,7 @@ ML suggestion data (beat, pitch, melody) can be loaded from external files at ru
 | Source | Location | Loaded via |
 |--------|----------|------------|
 | Built-in | Compiled into binary | `include_bytes!` |
-| External | `~/.local/share/Device/datasets/<name>/` | `MlDataset::load_from_dir()` |
+| External | `~/.local/share/PhaseBurn/datasets/<name>/` | `MlDataset::load_from_dir()` |
 
 Each external dataset directory contains `beat_data.bin`, `pitch_data.bin`, and `melody_data.bin`. Files may be LZ4-compressed (auto-detected by `"LZ4\0"` magic header).
 

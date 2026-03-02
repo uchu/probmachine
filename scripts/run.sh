@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/target/release/device"
+BINARY="$PROJECT_DIR/target/release/phaseburn"
 
 BUFFER_SIZE="${BUFFER_SIZE:-256}"
 SAMPLE_RATE="${SAMPLE_RATE:-48000}"
@@ -118,9 +118,9 @@ cleanup() {
     echo ""
     log_info "Shutting down..."
 
-    pkill -TERM -f "target/release/device" 2>/dev/null || true
+    pkill -TERM -f "target/release/phaseburn" 2>/dev/null || true
     sleep 1
-    pkill -KILL -f "target/release/device" 2>/dev/null || true
+    pkill -KILL -f "target/release/phaseburn" 2>/dev/null || true
     sleep 1
 
     if [ "$BACKEND" = "jack" ]; then

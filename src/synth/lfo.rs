@@ -306,16 +306,9 @@ pub enum ModDestination {
     // VPS parameters
     VpsD,
     VpsV,
-    // Filter parameters
-    FilterCutoff,
-    FilterResonance,
-    FilterDrive,
     // Coloration
     DriftAmount,
     TubeDrive,
-    // Reverb
-    ReverbMix,
-    ReverbDecay,
     // Volume/Mix
     PllVolume,
     VpsVolume,
@@ -348,13 +341,13 @@ impl ModDestination {
             7 => ModDestination::PllRange,
             8 => ModDestination::VpsD,
             9 => ModDestination::VpsV,
-            10 => ModDestination::FilterCutoff,
-            11 => ModDestination::FilterResonance,
-            12 => ModDestination::FilterDrive,
+            10 => ModDestination::None,
+            11 => ModDestination::None,
+            12 => ModDestination::None,
             13 => ModDestination::DriftAmount,
             14 => ModDestination::TubeDrive,
-            15 => ModDestination::ReverbMix,
-            16 => ModDestination::ReverbDecay,
+            15 => ModDestination::None,
+            16 => ModDestination::None,
             17 => ModDestination::PllVolume,
             18 => ModDestination::VpsVolume,
             19 => ModDestination::SubVolume,
@@ -384,13 +377,8 @@ impl ModDestination {
             ModDestination::PllRange => "PLL Rng",
             ModDestination::VpsD => "VPS D",
             ModDestination::VpsV => "VPS V",
-            ModDestination::FilterCutoff => "Filt Cut",
-            ModDestination::FilterResonance => "Filt Res",
-            ModDestination::FilterDrive => "Filt Drv",
             ModDestination::DriftAmount => "Drift",
             ModDestination::TubeDrive => "Tube",
-            ModDestination::ReverbMix => "Rev Mix",
-            ModDestination::ReverbDecay => "Rev Decay",
             ModDestination::PllVolume => "PLL Vol",
             ModDestination::VpsVolume => "VPS Vol",
             ModDestination::SubVolume => "Sub Vol",
@@ -420,13 +408,8 @@ pub struct ModulationValues {
     pub pll_range: f64,
     pub vps_d: f64,
     pub vps_v: f64,
-    pub filter_cutoff: f64,
-    pub filter_resonance: f64,
-    pub filter_drive: f64,
     pub drift_amount: f64,
     pub tube_drive: f64,
-    pub reverb_mix: f64,
-    pub reverb_decay: f64,
     pub pll_volume: f64,
     pub vps_volume: f64,
     pub sub_volume: f64,
@@ -453,13 +436,8 @@ impl ModulationValues {
         self.pll_range += other.pll_range;
         self.vps_d += other.vps_d;
         self.vps_v += other.vps_v;
-        self.filter_cutoff += other.filter_cutoff;
-        self.filter_resonance += other.filter_resonance;
-        self.filter_drive += other.filter_drive;
         self.drift_amount += other.drift_amount;
         self.tube_drive += other.tube_drive;
-        self.reverb_mix += other.reverb_mix;
-        self.reverb_decay += other.reverb_decay;
         self.pll_volume += other.pll_volume;
         self.vps_volume += other.vps_volume;
         self.sub_volume += other.sub_volume;
@@ -488,13 +466,8 @@ impl ModulationValues {
             ModDestination::PllRange => self.pll_range += mod_value,
             ModDestination::VpsD => self.vps_d += mod_value,
             ModDestination::VpsV => self.vps_v += mod_value,
-            ModDestination::FilterCutoff => self.filter_cutoff += mod_value,
-            ModDestination::FilterResonance => self.filter_resonance += mod_value,
-            ModDestination::FilterDrive => self.filter_drive += mod_value,
             ModDestination::DriftAmount => self.drift_amount += mod_value,
             ModDestination::TubeDrive => self.tube_drive += mod_value,
-            ModDestination::ReverbMix => self.reverb_mix += mod_value,
-            ModDestination::ReverbDecay => self.reverb_decay += mod_value,
             ModDestination::PllVolume => self.pll_volume += mod_value,
             ModDestination::VpsVolume => self.vps_volume += mod_value,
             ModDestination::SubVolume => self.sub_volume += mod_value,

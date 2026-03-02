@@ -140,6 +140,16 @@ pub fn stereo_wavefold(s: Stereo, amount: f64) -> Stereo {
 }
 
 #[inline(always)]
+pub fn stereo_wavefold_pi(s: Stereo, amount: f64) -> Stereo {
+    let fold_gain = 1.0 + amount * 4.0;
+    let x = s * Stereo::splat(fold_gain);
+    let folded = stereo_sin(x * Stereo::splat(std::f64::consts::PI));
+    let amt = Stereo::splat(amount);
+    let one_minus_amt = Stereo::splat(1.0 - amount);
+    s * one_minus_amt + folded * amt
+}
+
+#[inline(always)]
 pub fn stereo_tube_saturate(s: Stereo, drive: f64) -> Stereo {
     let drive_factor = 1.0 + drive * 3.0;
     let driven = s * Stereo::splat(drive_factor);
@@ -219,6 +229,35 @@ impl StereoSlewValue {
 }
 
 impl Default for StereoSlewValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct OnePoleSlewValue {
+    current: f64,
+    sample_rate: f64,
+}
+
+impl OnePoleSlewValue {
+    pub fn new() -> Self {
+        Self { current: 0.0, sample_rate: 44100.0 }
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: f64) {
+        self.sample_rate = sample_rate;
+    }
+
+    #[inline(always)]
+    pub fn next(&mut self, target: f64, time_ms: f64) -> f64 {
+        let samples = (time_ms * self.sample_rate / 1000.0).max(1.0);
+        let coeff = 1.0 / samples;
+        self.current += (target - self.current) * coeff;
+        self.current
+    }
+}
+
+impl Default for OnePoleSlewValue {
     fn default() -> Self {
         Self::new()
     }

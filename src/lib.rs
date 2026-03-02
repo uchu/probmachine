@@ -18,11 +18,12 @@ use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
 use ui::{Page, SharedUiState};
-use synth::{SynthEngine, MasterLimiter};
+use synth::{SynthEngine, MasterLimiter, MasterHpf, BrillianceFilter};
+use synth::master_hpf::{HpfMode, HpfBoost};
 use midi::MidiProcessor;
 use midi_modes::{MidiInputMode, MidiModeProcessor, MidiModeResult};
 
-pub struct Device {
+pub struct PhaseBurn {
     params: Arc<DeviceParams>,
     synth_engine: Option<SynthEngine>,
     ui_state: Arc<SharedUiState>,
@@ -32,16 +33,19 @@ pub struct Device {
     volume_slew: f32,
     output_level_smoothed: f32,
     limiter: MasterLimiter,
+    master_hpf: MasterHpf,
+    brilliance: BrillianceFilter,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
     midi_mode_processor: MidiModeProcessor,
     transport_has_played: bool,
     was_playing: bool,
     output_buffer_l: Vec<f32>,
     output_buffer_r: Vec<f32>,
+    sub_buffer: Vec<f32>,
     cpu_measure_counter: u32,
 }
 
-impl Default for Device {
+impl Default for PhaseBurn {
     fn default() -> Self {
         Self {
             params: Arc::new(DeviceParams::default()),
@@ -53,20 +57,23 @@ impl Default for Device {
             volume_slew: 0.5,
             output_level_smoothed: 0.0,
             limiter: MasterLimiter::new(44100.0),
+            master_hpf: MasterHpf::new(44100.0),
+            brilliance: BrillianceFilter::new(44100.0),
             midi_events_buffer: Vec::with_capacity(64),
             midi_mode_processor: MidiModeProcessor::new(),
             transport_has_played: false,
             was_playing: false,
             output_buffer_l: Vec::new(),
             output_buffer_r: Vec::new(),
+            sub_buffer: Vec::new(),
             cpu_measure_counter: 0,
         }
     }
 }
 
-impl Plugin for Device {
-    const NAME: &'static str = "Device";
-    const VENDOR: &'static str = "Device Audio";
+impl Plugin for PhaseBurn {
+    const NAME: &'static str = "PhaseBurn";
+    const VENDOR: &'static str = "PhaseBurn Audio";
     const URL: &'static str = "https://example.com";
     const EMAIL: &'static str = "info@example.com";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -96,7 +103,18 @@ impl Plugin for Device {
         create_egui_editor(
             self.params.editor_state.clone(),
             (),
-            |_, _| {},
+            |egui_ctx, _| {
+                let mut fonts = egui::FontDefinitions::default();
+                fonts.font_data.insert(
+                    "inter_bold".to_owned(),
+                    std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/fonts/Inter-Bold.ttf"))),
+                );
+                fonts.families.insert(
+                    egui::FontFamily::Name("bold".into()),
+                    vec!["inter_bold".to_owned()],
+                );
+                egui_ctx.set_fonts(fonts);
+            },
             move |egui_ctx, setter, _state| {
                 egui_ctx.style_mut(|style| {
                     let bg = egui::Color32::from_gray(18);
@@ -166,6 +184,8 @@ impl Plugin for Device {
         if self.synth_engine.is_none() || sample_rate_changed {
             self.synth_engine = Some(SynthEngine::new(new_sample_rate));
             self.limiter.set_sample_rate(new_sample_rate);
+            self.master_hpf.set_sample_rate(new_sample_rate);
+            self.brilliance.set_sample_rate(new_sample_rate);
         }
 
         true
@@ -273,12 +293,13 @@ impl Plugin for Device {
             synth.set_vps_phase_mode(self.params.synth_vps_phase_mode.value());
 
             synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
-            synth.set_sub_source(self.params.synth_sub_source.value());
 
             synth.set_saw_volume(self.params.synth_saw_volume.modulated_plain_value());
             synth.set_saw_octave(self.params.synth_saw_octave.value());
             synth.set_saw_tune(self.params.synth_saw_tune.value());
             synth.set_saw_fold(self.params.synth_saw_fold.modulated_plain_value());
+            synth.set_saw_fold_range(self.params.synth_saw_fold_range.value());
+            synth.set_saw_tight(self.params.synth_saw_tight.modulated_plain_value());
             synth.set_saw_shape(
                 self.params.synth_saw_shape_type.value(),
                 self.params.synth_saw_shape_amount.modulated_plain_value(),
@@ -374,14 +395,6 @@ impl Plugin for Device {
                 synth.set_legato_time(self.params.legato_time.modulated_plain_value());
             }
 
-            synth.set_filter_params(
-                self.params.synth_filter_enable.value(),
-                self.params.synth_filter_cutoff.modulated_plain_value(),
-                self.params.synth_filter_resonance.modulated_plain_value(),
-                self.params.synth_filter_env_amount.modulated_plain_value(),
-                self.params.synth_filter_drive.modulated_plain_value(),
-                self.params.synth_filter_stereo.modulated_plain_value(),
-            );
 
             synth.set_volume(1.0);
 
@@ -395,32 +408,6 @@ impl Plugin for Device {
                 self.params.synth_vol_release_shape.modulated_plain_value(),
             );
 
-            synth.set_filter_envelope(
-                self.params.synth_filt_attack.modulated_plain_value(),
-                self.params.synth_filt_attack_shape.modulated_plain_value(),
-                self.params.synth_filt_decay.modulated_plain_value(),
-                self.params.synth_filt_decay_shape.modulated_plain_value(),
-                self.params.synth_filt_sustain.modulated_plain_value(),
-                self.params.synth_filt_release.modulated_plain_value(),
-                self.params.synth_filt_release_shape.modulated_plain_value(),
-            );
-
-            synth.set_reverb_params(
-                self.params.synth_reverb_mix.modulated_plain_value(),
-                self.params.synth_reverb_pre_delay.modulated_plain_value(),
-                self.params.synth_reverb_time_scale.modulated_plain_value(),
-                self.params.synth_reverb_input_hpf.modulated_plain_value(),
-                self.params.synth_reverb_input_lpf.modulated_plain_value(),
-                self.params.synth_reverb_hpf.modulated_plain_value(),
-                self.params.synth_reverb_lpf.modulated_plain_value(),
-                self.params.synth_reverb_mod_speed.modulated_plain_value(),
-                self.params.synth_reverb_mod_depth.modulated_plain_value(),
-                self.params.synth_reverb_mod_shape.modulated_plain_value(),
-                self.params.synth_reverb_diffusion_mix.modulated_plain_value(),
-                self.params.synth_reverb_diffusion.modulated_plain_value(),
-                self.params.synth_reverb_decay.modulated_plain_value(),
-                self.params.synth_reverb_ducking.modulated_plain_value(),
-            );
 
             synth.set_lfo_params(
                 0,
@@ -485,8 +472,10 @@ impl Plugin for Device {
             let num_samples = buffer.samples();
             self.output_buffer_l.resize(num_samples, 0.0);
             self.output_buffer_r.resize(num_samples, 0.0);
+            self.sub_buffer.resize(num_samples, 0.0);
             self.output_buffer_l.fill(0.0);
             self.output_buffer_r.fill(0.0);
+            self.sub_buffer.fill(0.0);
 
             let pll_feedback_amt = self.params.synth_pll_feedback.modulated_plain_value();
             let base_freq = 220.0;
@@ -537,6 +526,7 @@ impl Plugin for Device {
             synth.process_block(
                 &mut self.output_buffer_l,
                 &mut self.output_buffer_r,
+                &mut self.sub_buffer,
                 &self.params,
                 pll_feedback_amt,
                 base_freq,
@@ -553,7 +543,7 @@ impl Plugin for Device {
                 }
             }
 
-            self.midi_processor.send_output::<Device>(
+            self.midi_processor.send_output::<PhaseBurn>(
                 context,
                 is_playing,
                 buffer.samples(),
@@ -571,6 +561,30 @@ impl Plugin for Device {
                 self.cpu_load_smoothed = alpha * cpu_load + (1.0 - alpha) * self.cpu_load_smoothed;
                 self.ui_state.set_cpu_load(self.cpu_load_smoothed);
             }
+
+            let sub_in_hpf = self.params.master_hpf_sub.value() == 1;
+
+            if sub_in_hpf {
+                for i in 0..num_samples {
+                    self.output_buffer_l[i] += self.sub_buffer[i];
+                    self.output_buffer_r[i] += self.sub_buffer[i];
+                }
+            }
+
+            self.master_hpf.set_mode(HpfMode::from_index(self.params.master_hpf.value()));
+            self.master_hpf.set_boost(HpfBoost::from_index(self.params.master_hpf_boost.value()));
+            self.master_hpf.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+
+            if !sub_in_hpf {
+                for i in 0..num_samples {
+                    self.output_buffer_l[i] += self.sub_buffer[i];
+                    self.output_buffer_r[i] += self.sub_buffer[i];
+                }
+            }
+
+            self.brilliance.set_amount(self.params.brilliance_amount.modulated_plain_value() as f64);
+            self.brilliance.set_drive(self.params.brilliance_drive.modulated_plain_value() as f64);
+            self.brilliance.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
 
             let target_volume = self.params.global_volume.modulated_plain_value();
             let slew_coeff = 1.0 - (-1.0 / (self.sample_rate * 0.01)).exp();
@@ -617,9 +631,9 @@ impl Plugin for Device {
     }
 }
 
-impl ClapPlugin for Device {
-    const CLAP_ID: &'static str = "com.device-audio.device";
-    const CLAP_DESCRIPTION: Option<&'static str> = Some("A 4/4 rhythm loop device");
+impl ClapPlugin for PhaseBurn {
+    const CLAP_ID: &'static str = "com.phaseburn-audio.phaseburn";
+    const CLAP_DESCRIPTION: Option<&'static str> = Some("A monophonic synthesizer and probability sequencer");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
     const CLAP_FEATURES: &'static [ClapFeature] = &[
@@ -629,11 +643,11 @@ impl ClapPlugin for Device {
     ];
 }
 
-impl Vst3Plugin for Device {
-    const VST3_CLASS_ID: [u8; 16] = *b"DeviceAudioDev01";
+impl Vst3Plugin for PhaseBurn {
+    const VST3_CLASS_ID: [u8; 16] = *b"PhaseBurnAudi01\0";
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
         &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth];
 }
 
-nih_plug::nih_export_clap!(Device);
-nih_plug::nih_export_vst3!(Device);
+nih_plug::nih_export_clap!(PhaseBurn);
+nih_plug::nih_export_vst3!(PhaseBurn);

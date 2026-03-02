@@ -24,6 +24,13 @@ pub fn render(ui: &mut egui::Ui, current_page: &mut Page, params: &Arc<DevicePar
             ui.set_min_width(1280.0);
             ui.set_max_width(1280.0);
             ui.horizontal(|ui| {
+                let logo_font = egui::FontId::new(22.0, egui::FontFamily::Name("bold".into()));
+                let logo_galley = ui.painter().layout_no_wrap("phaseburn".to_string(), logo_font, Color32::WHITE);
+                let size = logo_galley.size();
+                let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+                ui.painter().galley(egui::pos2(rect.left(), rect.top() + 4.0), logo_galley, Color32::WHITE);
+                ui.add_space(16.0);
+
                 for page in Page::all() {
                     let button = egui::Button::new(egui::RichText::new(page.label().to_uppercase()).size(20.0).color(Color32::WHITE))
                         .min_size(egui::vec2(96.0, 56.0))

@@ -24,7 +24,7 @@ const DIVISION_DISPLAY_ORDER: [usize; 16] = [
     6, 7, 8, 9,
     10, 11, 12, 13,
 ];
-const DEST_ENTRIES: [(&str, i32); 28] = [
+const DEST_ENTRIES: [(&str, i32); 26] = [
     ("None", 0),
     // PLL
     ("PLL Damp", 1), ("PLL Infl", 2), ("PLL Track", 3), ("PLL FM", 4),
@@ -35,12 +35,10 @@ const DEST_ENTRIES: [(&str, i32); 28] = [
     // VPS
     ("VPS D", 8), ("VPS V", 9), ("VPS VΔ", 25), ("VPS DΔ", 23),
     ("VPS Fold", 24), ("VPS SHP", 22), ("VPS Vol", 18),
-    // Filter
-    ("Filt Cut", 10), ("Filt Res", 11), ("Filt Drv", 12),
+    // SAW
+    ("Saw Fold", 28), ("Saw SHP", 29), ("Saw Vol", 30),
     // Coloration
     ("Drift", 13), ("Tube", 14),
-    // Reverb
-    ("Rev Mix", 15), ("Rev Decay", 16),
 ];
 
 const FONT: f32 = 17.0;

@@ -25,7 +25,7 @@ midi/**/*.mid  →  cargo run --bin midi_extract  →  beat_data.bin
                                    MlDataset ─┤
                                               │
                                               └─── External files (runtime)
-                                                   ~/.local/share/Device/datasets/<name>/
+                                                   ~/.local/share/PhaseBurn/datasets/<name>/
                                                             ↓
                                           Arc<MlDataset> shared between threads
                                                             ↓
@@ -43,7 +43,7 @@ midi/**/*.mid  →  cargo run --bin midi_extract  →  beat_data.bin
 Default dataset compiled into the binary via `include_bytes!`. Always available.
 
 ### External (runtime)
-Stored in `~/.local/share/Device/datasets/<name>/` (Mac/Linux) or equivalent via `dirs::data_local_dir()`. Each subdirectory contains `beat_data.bin`, `pitch_data.bin`, `melody_data.bin`, and optionally `groups.bin`. Selected via UI dropdown. No binary size limits.
+Stored in `~/.local/share/PhaseBurn/datasets/<name>/` (Mac/Linux) or equivalent via `dirs::data_local_dir()`. Each subdirectory contains `beat_data.bin`, `pitch_data.bin`, `melody_data.bin`, and optionally `groups.bin`. Selected via UI dropdown. No binary size limits.
 
 ### Compression
 External datasets can be LZ4-compressed (use `--compress` flag). Format: `"LZ4\0" + u32_le(uncompressed_size) + lz4_data`. Auto-detected on load.
@@ -56,7 +56,7 @@ Place `.mid` / `.midi` files in a folder. Subfolders are supported. The extracto
 
 Two output modes:
 - **Embedded** (default) — writes to `src/sequencer/`, compiled into the binary via `include_bytes!`
-- **External** (`--install`) — writes to `~/.local/share/Device/datasets/<name>/`, loaded at runtime
+- **External** (`--install`) — writes to `~/.local/share/PhaseBurn/datasets/<name>/`, loaded at runtime
 
 ### Groove Filtering
 
@@ -99,7 +99,7 @@ cargo run --bin midi_extract -- --dir midi/jazz --name jazz --install --compress
 cargo run --bin midi_extract -- --dir midi/electronic --name electronic --install --compress
 cargo run --bin midi_extract -- --dir midi/classical --name classical --install --compress
 ```
-Each command creates a separate dataset in `~/.local/share/Device/datasets/<name>/`. External datasets have no practical size limit — they load from disk at runtime. Use `--compress` to save disk space (LZ4, auto-decompressed on load).
+Each command creates a separate dataset in `~/.local/share/PhaseBurn/datasets/<name>/`. External datasets have no practical size limit — they load from disk at runtime. Use `--compress` to save disk space (LZ4, auto-decompressed on load).
 
 **4. User selects datasets in the UI** via the dropdown on the Beats page. "Built-in" is always available; external datasets appear after extraction with `--install`.
 
@@ -130,7 +130,7 @@ When the total number of extracted bars exceeds `--max`, **stratified downsampli
 --dir <PATH>     MIDI input directory (default: midi/)
 --max <N>        Max distributions to keep (default: 50000)
 --name <NAME>    Dataset name (used with --install)
---install        Write to ~/.local/share/Device/datasets/<name>/)
+--install        Write to ~/.local/share/PhaseBurn/datasets/<name>/)
 --compress       Compress output with LZ4
 ```
 

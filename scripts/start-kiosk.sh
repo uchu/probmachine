@@ -20,4 +20,4 @@ for i in {1..30}; do
 done
 
 # Run device in Cage (use -- to pass arguments to the app)
-exec cage -s -- /home/uchu/probmachine/target/release/device -b jack
+exec cage -s -- /home/uchu/probmachine/target/release/phaseburn -b jack

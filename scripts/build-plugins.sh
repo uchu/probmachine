@@ -15,7 +15,7 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step() { echo -e "${BLUE}[STEP]${NC} $1"; }
 
-PLUGIN_NAME="device"
+PLUGIN_NAME="phaseburn"
 BUILD_TYPE="release"
 INSTALL_PLUGINS=false
 BUILD_UNIVERSAL=false
@@ -24,7 +24,7 @@ BUILD_STANDALONE_ONLY=false
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "Build VST3 and CLAP plugins for Device"
+    echo "Build VST3 and CLAP plugins for PhaseBurn"
     echo ""
     echo "Options:"
     echo "  -d, --debug       Build debug version instead of release"
@@ -115,7 +115,7 @@ build_plugins() {
 
     if [ "$BUILD_STANDALONE_ONLY" = true ]; then
         log_step "Building standalone binary ($BUILD_TYPE mode)..."
-        cargo build $build_flag --bin device
+        cargo build $build_flag --bin phaseburn
         return
     fi
 
@@ -125,7 +125,7 @@ build_plugins() {
         log_info "Building universal binary (arm64 + x86_64)..."
         cargo run -p xtask -- bundle-universal device $build_flag
     else
-        cargo run -p xtask -- bundle device $build_flag
+        cargo run -p xtask -- bundle phaseburn $build_flag
     fi
 }
 
@@ -167,7 +167,7 @@ show_results() {
     echo ""
 
     if [ "$BUILD_STANDALONE_ONLY" = true ]; then
-        local standalone_path="$PROJECT_DIR/target/$BUILD_TYPE/device"
+        local standalone_path="$PROJECT_DIR/target/$BUILD_TYPE/phaseburn"
         if [ -f "$standalone_path" ]; then
             echo "Standalone binary:"
             ls -lh "$standalone_path"

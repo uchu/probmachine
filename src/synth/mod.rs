@@ -2,17 +2,19 @@
 
 pub mod simd;
 mod oscillator;
-mod filter;
 mod envelope;
-mod reverb;
 mod voice;
 pub mod lfo;
 mod limiter;
 pub mod mod_sequencer;
+pub mod master_hpf;
+pub mod brilliance;
 
 pub use voice::Voice;
 pub use lfo::LfoBank;
 pub use limiter::MasterLimiter;
+pub use master_hpf::MasterHpf;
+pub use brilliance::BrillianceFilter;
 use crate::sequencer::Sequencer;
 use crate::params::DeviceParams;
 use crate::midi::ExternalNoteEvent;
@@ -234,9 +236,6 @@ impl SynthEngine {
         self.voice.set_sub_volume(volume as f64);
     }
 
-    pub fn set_sub_source(&mut self, source: i32) {
-        self.voice.set_sub_source(source);
-    }
 
     pub fn set_saw_volume(&mut self, volume: f32) {
         self.voice.set_saw_volume(volume as f64);
@@ -258,8 +257,12 @@ impl SynthEngine {
         self.voice.set_saw_fold(fold as f64);
     }
 
-    pub fn set_filter_params(&mut self, enabled: bool, cutoff: f32, resonance: f32, env_amount: f32, drive: f32, stereo: f32) {
-        self.voice.set_filter_params(enabled, cutoff as f64, resonance as f64, env_amount as f64, drive as f64, stereo as f64);
+    pub fn set_saw_tight(&mut self, tight: f32) {
+        self.voice.set_saw_tight(tight as f64);
+    }
+
+    pub fn set_saw_fold_range(&mut self, range: i32) {
+        self.voice.set_saw_fold_range(range);
     }
 
     pub fn set_volume(&mut self, volume: f32) {
@@ -268,10 +271,6 @@ impl SynthEngine {
 
     pub fn set_volume_envelope(&mut self, attack: f32, attack_shape: f32, decay: f32, decay_shape: f32, sustain: f32, release: f32, release_shape: f32) {
         self.voice.set_volume_envelope(attack as f64, attack_shape as f64, decay as f64, decay_shape as f64, sustain as f64, release as f64, release_shape as f64);
-    }
-
-    pub fn set_filter_envelope(&mut self, attack: f32, attack_shape: f32, decay: f32, decay_shape: f32, sustain: f32, release: f32, release_shape: f32) {
-        self.voice.set_filter_envelope(attack as f64, attack_shape as f64, decay as f64, decay_shape as f64, sustain as f64, release as f64, release_shape as f64);
     }
 
     pub fn update_note_pool(&mut self, note_pool: crate::sequencer::NotePool) {
@@ -302,41 +301,6 @@ impl SynthEngine {
 
     pub fn update_ml_dataset(&mut self, dataset: std::sync::Arc<crate::sequencer::ml_dataset::MlDataset>) {
         self.sequencer.dataset = dataset;
-    }
-
-    pub fn set_reverb_params(
-        &mut self,
-        mix: f32,
-        pre_delay_ms: f32,
-        time_scale: f32,
-        input_hpf_hz: f32,
-        input_lpf_hz: f32,
-        reverb_hpf_hz: f32,
-        reverb_lpf_hz: f32,
-        mod_speed: f32,
-        mod_depth: f32,
-        mod_shape: f32,
-        input_diffusion_mix: f32,
-        diffusion: f32,
-        decay: f32,
-        ducking: f32,
-    ) {
-        self.voice.set_reverb_params(
-            mix as f64,
-            pre_delay_ms as f64,
-            time_scale as f64,
-            input_hpf_hz as f64,
-            input_lpf_hz as f64,
-            reverb_hpf_hz as f64,
-            reverb_lpf_hz as f64,
-            mod_speed as f64,
-            mod_depth as f64,
-            mod_shape as f64,
-            input_diffusion_mix as f64,
-            diffusion as f64,
-            decay as f64,
-            ducking as f64,
-        );
     }
 
     pub fn set_lfo_params(
@@ -393,6 +357,7 @@ impl SynthEngine {
         &mut self,
         output_l: &mut [f32],
         output_r: &mut [f32],
+        sub_output: &mut [f32],
         params: &DeviceParams,
         feedback_amount: f32,
         _base_freq: f32,
@@ -454,10 +419,11 @@ impl SynthEngine {
             mod_values.accumulate(&seq_mod);
             self.voice.apply_modulation(&mod_values);
 
-            let (left_sample, right_sample) = self.voice.process(self.pll_feedback);
+            let (left_sample, right_sample, sub_sample) = self.voice.process(self.pll_feedback);
 
             *l = left_sample as f32;
             *r = right_sample as f32;
+            sub_output[sample_idx] = sub_sample as f32;
         }
     }
 }

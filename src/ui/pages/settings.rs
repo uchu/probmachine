@@ -180,7 +180,7 @@ fn render_performance_section(
 }
 
 fn os_label(val: i32) -> &'static str {
-    match val { 0 => "1x (off)", 1 => "2x", 2 => "4x", 3 => "8x", _ => "16x" }
+    match val { 0 => "1x (off)", 1 => "2x", 2 => "4x", 3 => "8x", 4 => "16x", 5 => "32x", 6 => "64x", _ => "128x" }
 }
 
 fn render_os_combo(
@@ -199,7 +199,7 @@ fn render_os_combo(
             .width(90.0)
             .selected_text(egui::RichText::new(os_label(current)).size(UI_FONT))
             .show_ui(ui, |ui| {
-                for (val, lbl) in [(0, "1x (off)"), (1, "2x"), (2, "4x"), (3, "8x"), (4, "16x")] {
+                for (val, lbl) in [(0, "1x (off)"), (1, "2x"), (2, "4x"), (3, "8x"), (4, "16x"), (5, "32x"), (6, "64x"), (7, "128x")] {
                     let btn = egui::Button::new(egui::RichText::new(lbl).size(UI_FONT))
                         .min_size(egui::vec2(80.0, 36.0))
                         .selected(current == val);

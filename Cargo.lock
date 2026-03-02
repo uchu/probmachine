@@ -769,22 +769,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "device"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "egui_taffy",
- "lz4_flex",
- "midly",
- "nih_plug",
- "nih_plug_egui",
- "rand",
- "serde",
- "serde_json",
- "synfx-dsp",
-]
-
-[[package]]
 name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1471,7 +1455,7 @@ dependencies = [
 [[package]]
 name = "nih_plug"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#28b149ec4d62757d0b448809148a0c3ca6e09a95"
+source = "git+https://github.com/uchu/nih-plug.git?branch=device-patches#a389906f3c74599e347bcde0f00fb2cc47fc2385"
 dependencies = [
  "anyhow",
  "anymap3",
@@ -1507,7 +1491,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_derive"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#28b149ec4d62757d0b448809148a0c3ca6e09a95"
+source = "git+https://github.com/uchu/nih-plug.git?branch=device-patches#a389906f3c74599e347bcde0f00fb2cc47fc2385"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1517,7 +1501,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_egui"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#28b149ec4d62757d0b448809148a0c3ca6e09a95"
+source = "git+https://github.com/uchu/nih-plug.git?branch=device-patches#a389906f3c74599e347bcde0f00fb2cc47fc2385"
 dependencies = [
  "baseview 0.1.0 (git+https://github.com/RustAudio/baseview.git?rev=9a0b42c09d712777b2edb4c5e0cb6baf21e988f0)",
  "crossbeam",
@@ -1969,6 +1953,22 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "phaseburn"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "egui_taffy",
+ "lz4_flex",
+ "midly",
+ "nih_plug",
+ "nih_plug_egui",
+ "rand",
+ "serde",
+ "serde_json",
+ "synfx-dsp",
+]
 
 [[package]]
 name = "pin-project"

@@ -1,4 +1,4 @@
-# Device - Bottlenecks & Improvement Ideas
+# PhaseBurn - Bottlenecks & Improvement Ideas
 
 Analysis of current limitations and potential enhancements for experimental electronic music.
 
@@ -8,7 +8,6 @@ Analysis of current limitations and potential enhancements for experimental elec
 
 | Component | Impact | Notes |
 |-----------|--------|-------|
-| Dattorro Reverb | High | 4 allpass chains, modulation at sample rate |
 | PLL per-sample math | Medium | Complex PI loop calculations |
 | 16x Oversampling | High | 16× more DSP operations |
 | Parameter slewing | Low-Medium | Many SlewValue instances per sample |
@@ -16,7 +15,6 @@ Analysis of current limitations and potential enhancements for experimental elec
 
 ### Memory Access Patterns
 
-- **Reverb delay lines**: Large memory footprint, potential cache misses
 - **SlewValue state**: Many small objects, scattered memory access
 - **Double-buffered sequencer**: Minimal impact but additional allocation
 
@@ -36,12 +34,11 @@ Portable SIMD (`src/synth/simd.rs`) fully integrated using `f64x2` for parallel 
 Cross-platform: Compiles to SSE/AVX on x86_64, NEON on ARM64 (Raspberry Pi 5)
 
 **Integrated components:**
-- `StereoMoogFilter`: Stilson Moog 4-pole ladder filter (f64 precision)
 - `stereo_wavefold`: Sinusoidal wavefolding effect
 - `stereo_tube_saturate`: Asymmetric tube saturation with soft clipping
 - `stereo_distort_bram`: Bram de Jong waveshaper (matching synfx-dsp formula)
 
-**Benefit**: Stereo filter and coloration effects now use parallel SIMD operations
+**Benefit**: Coloration effects now use parallel SIMD operations
 
 #### 2. Block-Based LFO Processing
 LFOs computed per-sample but change slowly. Could:
@@ -50,13 +47,6 @@ LFOs computed per-sample but change slowly. Could:
 - Maintain smooth modulation with far less computation
 
 **Estimated gain**: 20-40% on LFO system
-
-#### 3. Reverb Optimization
-- Pre-compute modulation tables
-- Consider simpler reverb algorithms for lower quality settings
-- Optionally run reverb at lower internal rate
-
-**Estimated gain**: 10-25% when reverb enabled
 
 ### Medium Impact
 
@@ -123,7 +113,6 @@ Many parameters only need updates on change:
 #### 3. Filter Enhancements
 
 **Additional Filter Types**
-- Ladder filter (classic Moog character)
 - Comb filter (resonant harmonics)
 - Formant banks (multiple vowels simultaneously)
 - Phaser-style allpass chains
@@ -285,8 +274,6 @@ Current warnings to address:
 ## Quick Wins
 
 1. **Fix compiler warnings** - Clean up unused code
-2. **Implement filter drive** - Parameter exists but is not applied in filter.rs
-3. ~~**Host tempo sync** - Read from transport context~~ ✅ Complete
+2. ~~**Host tempo sync** - Read from transport context~~ ✅ Complete
 4. ~~**MIDI CC mapping** - Infrastructure exists, just needs wiring~~ ✅ Complete (full MIDI I/O)
 5. **Block-based LFO** - Straightforward refactor
-6. **Reverb quality setting** - Lower internal rate option

@@ -1,4 +1,4 @@
-# Device - Building Guide
+# PhaseBurn - Building Guide
 
 ## Prerequisites
 
@@ -66,9 +66,9 @@ cargo xtask bundle device --release
 ```
 
 **Output location:**
-- macOS: `target/bundled/Device.vst3`
-- Linux: `target/bundled/Device.vst3`
-- Windows: `target/bundled/Device.vst3`
+- macOS: `target/bundled/PhaseBurn.vst3`
+- Linux: `target/bundled/PhaseBurn.vst3`
+- Windows: `target/bundled/PhaseBurn.vst3`
 
 ### CLAP Plugin
 
@@ -78,9 +78,9 @@ cargo xtask bundle device --release
 ```
 
 **Output location:**
-- macOS: `target/bundled/Device.clap`
-- Linux: `target/bundled/Device.clap`
-- Windows: `target/bundled/Device.clap`
+- macOS: `target/bundled/PhaseBurn.clap`
+- Linux: `target/bundled/PhaseBurn.clap`
+- Windows: `target/bundled/PhaseBurn.clap`
 
 ## Platform-Specific Builds
 
@@ -171,22 +171,22 @@ cargo build
 ## Installation
 
 ### VST3
-Copy `target/bundled/Device.vst3` to:
+Copy `target/bundled/PhaseBurn.vst3` to:
 - **macOS**: `~/Library/Audio/Plug-Ins/VST3/` or `/Library/Audio/Plug-Ins/VST3/`
 - **Linux**: `~/.vst3/` or `/usr/lib/vst3/`
 - **Windows**: `C:\Program Files\Common Files\VST3\`
 
 ### CLAP
-Copy `target/bundled/Device.clap` to:
+Copy `target/bundled/PhaseBurn.clap` to:
 - **macOS**: `~/Library/Audio/Plug-Ins/CLAP/` or `/Library/Audio/Plug-Ins/CLAP/`
 - **Linux**: `~/.clap/` or `/usr/lib/clap/`
 - **Windows**: `C:\Program Files\Common Files\CLAP\`
 
 ### Standalone
 Place the binary anywhere and run it. On first launch, it will create:
-- **macOS**: `~/Library/Application Support/Device/`
-- **Linux**: `~/.local/share/Device/`
-- **Windows**: `%APPDATA%\Device\`
+- **macOS**: `~/Library/Application Support/PhaseBurn/`
+- **Linux**: `~/.local/share/PhaseBurn/`
+- **Windows**: `%APPDATA%\PhaseBurn\`
 
 ## Troubleshooting
 
