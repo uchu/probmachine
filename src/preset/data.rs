@@ -298,23 +298,10 @@ pub struct PresetData {
     #[serde(default)]
     pub synth_saw_shape_amount: f32,
 
-    pub synth_filter_enable: bool,
-    pub synth_filter_cutoff: f32,
-    pub synth_filter_resonance: f32,
-    pub synth_filter_env_amount: f32,
-    pub synth_filter_drive: f32,
-    #[serde(default)]
-    pub synth_filter_stereo: f32,
-
     pub synth_vol_attack: f32,
     pub synth_vol_decay: f32,
     pub synth_vol_sustain: f32,
     pub synth_vol_release: f32,
-
-    pub synth_filt_attack: f32,
-    pub synth_filt_decay: f32,
-    pub synth_filt_sustain: f32,
-    pub synth_filt_release: f32,
 
     pub synth_reverb_mix: f32,
     pub synth_reverb_time_scale: f32,
@@ -404,6 +391,12 @@ pub struct PresetData {
     pub legato_mode: bool,
     #[serde(default = "default_legato_time")]
     pub legato_time: f32,
+    #[serde(default)]
+    pub legato_velocity_lock: bool,
+    #[serde(default)]
+    pub vca_mode: bool,
+    #[serde(default)]
+    pub note_priority: i32,
 
     #[serde(default)]
     pub len_mod_1_target: f32,
@@ -635,22 +628,10 @@ impl Default for PresetData {
             synth_saw_shape_type: 0,
             synth_saw_shape_amount: 0.0,
 
-            synth_filter_enable: false,
-            synth_filter_cutoff: 1000.0,
-            synth_filter_resonance: 0.0,
-            synth_filter_env_amount: 0.0,
-            synth_filter_drive: 1.0,
-            synth_filter_stereo: 0.0,
-
             synth_vol_attack: 10.0,
             synth_vol_decay: 100.0,
             synth_vol_sustain: 0.7,
             synth_vol_release: 200.0,
-
-            synth_filt_attack: 10.0,
-            synth_filt_decay: 100.0,
-            synth_filt_sustain: 0.5,
-            synth_filt_release: 200.0,
 
             synth_reverb_mix: 0.0,
             synth_reverb_time_scale: 0.5,
@@ -703,6 +684,9 @@ impl Default for PresetData {
 
             legato_mode: false,
             legato_time: 50.0,
+            legato_velocity_lock: false,
+            vca_mode: false,
+            note_priority: 0,
 
             len_mod_1_target: 0.0,
             len_mod_1_amount: 100.0,

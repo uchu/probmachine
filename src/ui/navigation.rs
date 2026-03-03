@@ -26,9 +26,17 @@ pub fn render(ui: &mut egui::Ui, current_page: &mut Page, params: &Arc<DevicePar
             ui.horizontal(|ui| {
                 let logo_font = egui::FontId::new(22.0, egui::FontFamily::Name("bold".into()));
                 let logo_galley = ui.painter().layout_no_wrap("phaseburn".to_string(), logo_font, Color32::WHITE);
-                let size = logo_galley.size();
-                let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-                ui.painter().galley(egui::pos2(rect.left(), rect.top() + 4.0), logo_galley, Color32::WHITE);
+                let one_font = egui::FontId::new(20.0, egui::FontFamily::Name("bold".into()));
+                let one_galley = ui.painter().layout_no_wrap("ONE".to_string(), one_font, Color32::from_rgb(230, 140, 40));
+                let logo_w = logo_galley.size().x;
+                let logo_h = logo_galley.size().y;
+                let one_h = one_galley.size().y;
+                let one_w = one_galley.size().x;
+                let (rect, _) = ui.allocate_exact_size(egui::vec2(logo_w, logo_h + one_h - 6.0), egui::Sense::hover());
+                ui.painter().galley(egui::pos2(rect.left(), rect.top()), logo_galley, Color32::WHITE);
+                let one_x = rect.left() + logo_w - one_w - 10.0;
+                let one_y = rect.top() + logo_h - 12.0;
+                ui.painter().galley(egui::pos2(one_x, one_y), one_galley, Color32::from_rgb(230, 140, 40));
                 ui.add_space(16.0);
 
                 for page in Page::all() {
@@ -78,7 +86,8 @@ pub fn render(ui: &mut egui::Ui, current_page: &mut Page, params: &Arc<DevicePar
                 let total_width = 5.0 * box_size.x + 4.0 * spacing;
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(total_width, box_size.y), egui::Sense::hover());
 
-                let level = ((output_level * 5.0).ceil() as usize).min(5);
+                let thresholds = [0.05, 0.15, 0.35, 0.60, 0.85];
+                let level = thresholds.iter().filter(|&&t| output_level >= t).count();
                 let colors_on = [
                     Color32::from_rgb(80, 200, 80),
                     Color32::from_rgb(80, 200, 80),

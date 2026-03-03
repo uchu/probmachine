@@ -552,19 +552,6 @@ pub struct DeviceParams {
     #[id = "synth_base_rate"]
     pub synth_base_rate: IntParam,  // 0=Auto, 1=44.1k, 2=88.2k, 3=96k, 4=192k
 
-    #[id = "synth_filter_enable"]
-    pub synth_filter_enable: BoolParam,
-    #[id = "synth_filter_cutoff"]
-    pub synth_filter_cutoff: FloatParam,
-    #[id = "synth_filter_resonance"]
-    pub synth_filter_resonance: FloatParam,
-    #[id = "synth_filter_env_amount"]
-    pub synth_filter_env_amount: FloatParam,
-    #[id = "synth_filter_drive"]
-    pub synth_filter_drive: FloatParam,
-    #[id = "synth_filter_stereo"]
-    pub synth_filter_stereo: FloatParam,
-
     #[id = "global_volume"]
     pub global_volume: FloatParam,
 
@@ -599,21 +586,6 @@ pub struct DeviceParams {
     pub synth_vol_release: FloatParam,
     #[id = "synth_vol_release_shape"]
     pub synth_vol_release_shape: FloatParam,
-
-    #[id = "synth_filt_attack"]
-    pub synth_filt_attack: FloatParam,
-    #[id = "synth_filt_attack_shape"]
-    pub synth_filt_attack_shape: FloatParam,
-    #[id = "synth_filt_decay"]
-    pub synth_filt_decay: FloatParam,
-    #[id = "synth_filt_decay_shape"]
-    pub synth_filt_decay_shape: FloatParam,
-    #[id = "synth_filt_sustain"]
-    pub synth_filt_sustain: FloatParam,
-    #[id = "synth_filt_release"]
-    pub synth_filt_release: FloatParam,
-    #[id = "synth_filt_release_shape"]
-    pub synth_filt_release_shape: FloatParam,
 
     #[id = "synth_reverb_mix"]
     pub synth_reverb_mix: FloatParam,
@@ -810,6 +782,13 @@ pub struct DeviceParams {
     pub legato_mode: BoolParam,
     #[id = "legato_time"]
     pub legato_time: FloatParam,
+    #[id = "legato_velocity_lock"]
+    pub legato_velocity_lock: BoolParam,
+    #[id = "vca_mode"]
+    pub vca_mode: BoolParam,
+
+    #[id = "note_priority"]
+    pub note_priority: IntParam,
 
     #[id = "sequencer_enable"]
     pub sequencer_enable: BoolParam,
@@ -1932,41 +1911,11 @@ impl Default for DeviceParams {
                 IntRange::Linear { min: 0, max: 4 },
             ),
 
-            synth_filter_enable: BoolParam::new(
-                "Filter Enable".to_string(),
-                true
-            ),
-            synth_filter_cutoff: FloatParam::new(
-                "Filter Cutoff".to_string(),
-                1000.0,
-                FloatRange::Skewed { min: 20.0, max: 20000.0, factor: 0.3 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filter_resonance: FloatParam::new(
-                "Filter Resonance".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 0.99 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filter_env_amount: FloatParam::new(
-                "Filter Env Amount".to_string(),
-                0.0,
-                FloatRange::Linear { min: -5000.0, max: 5000.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filter_drive: FloatParam::new(
-                "Filter Drive".to_string(),
-                1.0,
-                FloatRange::Linear { min: 1.0, max: 15.849 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filter_stereo: FloatParam::new(
-                "Filter Stereo".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-
             global_volume: FloatParam::new(
                 "Global Volume".to_string(),
                 0.5,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            ),
 
             master_hpf: IntParam::new(
                 "Master HPF".to_string(),
@@ -2031,42 +1980,6 @@ impl Default for DeviceParams {
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_release_shape: FloatParam::new(
                 "Vol Release Shape".to_string(),
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-
-            synth_filt_attack: FloatParam::new(
-                "Filt Attack".to_string(),
-                10.0,
-                FloatRange::Linear { min: 1.0, max: 1000.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filt_attack_shape: FloatParam::new(
-                "Filt Attack Shape".to_string(),
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filt_decay: FloatParam::new(
-                "Filt Decay".to_string(),
-                100.0,
-                FloatRange::Linear { min: 1.0, max: 1000.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filt_decay_shape: FloatParam::new(
-                "Filt Decay Shape".to_string(),
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filt_sustain: FloatParam::new(
-                "Filt Sustain".to_string(),
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filt_release: FloatParam::new(
-                "Filt Release".to_string(),
-                200.0,
-                FloatRange::Linear { min: 1.0, max: 1000.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_filt_release_shape: FloatParam::new(
-                "Filt Release Shape".to_string(),
                 0.5,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
@@ -2370,8 +2283,163 @@ impl Default for DeviceParams {
                 50.0,
                 FloatRange::Skewed { min: 1.0, max: 500.0, factor: 0.4 }
             ).with_unit(" ms"),
+            legato_velocity_lock: BoolParam::new("Velocity Lock", false),
+            vca_mode: BoolParam::new("VCA Mode", false),
+
+            note_priority: IntParam::new("Note Priority", 0, IntRange::Linear { min: 0, max: 2 }),
 
             sequencer_enable: BoolParam::new("Sequencer Enable", false),
+        }
+    }
+}
+
+impl DeviceParams {
+    pub fn apply_normalized_cc(&self, setter: &ParamSetter, param_id: &str, value: f32) -> bool {
+        macro_rules! set_float {
+            ($param:expr) => {{
+                setter.set_parameter_normalized(&$param, value);
+                true
+            }};
+        }
+        macro_rules! set_int {
+            ($param:expr) => {{
+                setter.set_parameter_normalized(&$param, value);
+                true
+            }};
+        }
+        macro_rules! set_bool {
+            ($param:expr) => {{
+                if value >= 0.5 {
+                    setter.set_parameter(&$param, !$param.value());
+                }
+                true
+            }};
+        }
+        match param_id {
+            "synth_osc_d" => set_float!(self.synth_osc_d),
+            "synth_osc_v" => set_float!(self.synth_osc_v),
+            "synth_osc_stereo_v_offset" => set_float!(self.synth_osc_stereo_v_offset),
+            "synth_osc_stereo_d_offset" => set_float!(self.synth_osc_stereo_d_offset),
+            "synth_osc_volume" => set_float!(self.synth_osc_volume),
+            "synth_osc_fold" => set_float!(self.synth_osc_fold),
+            "synth_osc_fine" => set_float!(self.synth_osc_fine),
+            "synth_osc_octave" => set_int!(self.synth_osc_octave),
+            "synth_osc_tune" => set_int!(self.synth_osc_tune),
+            "synth_vps_shape_type" => set_int!(self.synth_vps_shape_type),
+            "synth_vps_shape_amount" => set_float!(self.synth_vps_shape_amount),
+            "synth_sub_volume" => set_float!(self.synth_sub_volume),
+            "synth_saw_volume" => set_float!(self.synth_saw_volume),
+            "synth_saw_octave" => set_int!(self.synth_saw_octave),
+            "synth_saw_tune" => set_int!(self.synth_saw_tune),
+            "synth_saw_fold" => set_float!(self.synth_saw_fold),
+            "synth_saw_tight" => set_float!(self.synth_saw_tight),
+            "synth_saw_shape_type" => set_int!(self.synth_saw_shape_type),
+            "synth_saw_shape_amount" => set_float!(self.synth_saw_shape_amount),
+            "synth_pll_fm_amount" => set_float!(self.synth_pll_fm_amount),
+            "synth_pll_fm_ratio_float" => set_float!(self.synth_pll_fm_ratio_float),
+            "synth_pll_track_speed" => set_float!(self.synth_pll_track_speed),
+            "synth_pll_damping" => set_float!(self.synth_pll_damping),
+            "synth_pll_mult" => set_int!(self.synth_pll_mult),
+            "synth_pll_mult_slew_time" => set_float!(self.synth_pll_mult_slew_time),
+            "synth_pll_ref_octave" => set_int!(self.synth_pll_ref_octave),
+            "synth_pll_ref_tune" => set_int!(self.synth_pll_ref_tune),
+            "synth_pll_ref_fine" => set_float!(self.synth_pll_ref_fine),
+            "synth_pll_ref_pulse_width" => set_float!(self.synth_pll_ref_pulse_width),
+            "synth_pll_feedback" => set_float!(self.synth_pll_feedback),
+            "synth_pll_influence" => set_float!(self.synth_pll_influence),
+            "synth_pll_volume" => set_float!(self.synth_pll_volume),
+            "synth_pll_stereo_damp_offset" => set_float!(self.synth_pll_stereo_damp_offset),
+            "synth_pll_glide" => set_float!(self.synth_pll_glide),
+            "synth_pll_retrigger" => set_float!(self.synth_pll_retrigger),
+            "synth_pll_burst_threshold" => set_float!(self.synth_pll_burst_threshold),
+            "synth_pll_burst_amount" => set_float!(self.synth_pll_burst_amount),
+            "synth_pll_loop_saturation" => set_float!(self.synth_pll_loop_saturation),
+            "synth_pll_color_amount" => set_float!(self.synth_pll_color_amount),
+            "synth_pll_edge_sensitivity" => set_float!(self.synth_pll_edge_sensitivity),
+            "synth_pll_range" => set_float!(self.synth_pll_range),
+            "synth_pll_stereo_track_offset" => set_float!(self.synth_pll_stereo_track_offset),
+            "synth_pll_stereo_phase" => set_float!(self.synth_pll_stereo_phase),
+            "synth_pll_fm_env_amount" => set_float!(self.synth_pll_fm_env_amount),
+            "synth_pll_injection_amount" => set_float!(self.synth_pll_injection_amount),
+            "synth_ring_mod" => set_float!(self.synth_ring_mod),
+            "synth_wavefold" => set_float!(self.synth_wavefold),
+            "synth_drift_amount" => set_float!(self.synth_drift_amount),
+            "synth_drift_rate" => set_float!(self.synth_drift_rate),
+            "synth_tube_drive" => set_float!(self.synth_tube_drive),
+            "synth_vol_attack" => set_float!(self.synth_vol_attack),
+            "synth_vol_decay" => set_float!(self.synth_vol_decay),
+            "synth_vol_sustain" => set_float!(self.synth_vol_sustain),
+            "synth_vol_release" => set_float!(self.synth_vol_release),
+            "global_volume" => set_float!(self.global_volume),
+            "brilliance_amount" => set_float!(self.brilliance_amount),
+            "synth_pll_enable" => set_bool!(self.synth_pll_enable),
+            "synth_pll_colored" => set_bool!(self.synth_pll_colored),
+            "synth_pll_mode" => set_bool!(self.synth_pll_mode),
+            "synth_pll_precision" => set_bool!(self.synth_pll_precision),
+            "synth_pll_injection_x4" => set_bool!(self.synth_pll_injection_x4),
+            "synth_pll_fm_expand" => set_bool!(self.synth_pll_fm_expand),
+            "synth_saw_enable" => set_bool!(self.synth_saw_enable),
+            "synth_vps_enable" => set_bool!(self.synth_vps_enable),
+            _ => false,
+        }
+    }
+
+    pub fn read_normalized_value(&self, param_id: &str) -> Option<f32> {
+        macro_rules! read_float {
+            ($param:expr) => { Some($param.modulated_normalized_value()) };
+        }
+        macro_rules! read_int {
+            ($param:expr) => { Some($param.modulated_normalized_value()) };
+        }
+        macro_rules! read_bool {
+            ($param:expr) => { Some(if $param.value() { 1.0 } else { 0.0 }) };
+        }
+        match param_id {
+            "synth_osc_d" => read_float!(self.synth_osc_d),
+            "synth_osc_v" => read_float!(self.synth_osc_v),
+            "synth_osc_stereo_v_offset" => read_float!(self.synth_osc_stereo_v_offset),
+            "synth_osc_stereo_d_offset" => read_float!(self.synth_osc_stereo_d_offset),
+            "synth_osc_volume" => read_float!(self.synth_osc_volume),
+            "synth_osc_fold" => read_float!(self.synth_osc_fold),
+            "synth_osc_octave" => read_int!(self.synth_osc_octave),
+            "synth_osc_tune" => read_int!(self.synth_osc_tune),
+            "synth_vps_shape_type" => read_int!(self.synth_vps_shape_type),
+            "synth_vps_shape_amount" => read_float!(self.synth_vps_shape_amount),
+            "synth_sub_volume" => read_float!(self.synth_sub_volume),
+            "synth_saw_volume" => read_float!(self.synth_saw_volume),
+            "synth_saw_octave" => read_int!(self.synth_saw_octave),
+            "synth_saw_tune" => read_int!(self.synth_saw_tune),
+            "synth_saw_fold" => read_float!(self.synth_saw_fold),
+            "synth_saw_tight" => read_float!(self.synth_saw_tight),
+            "synth_saw_shape_type" => read_int!(self.synth_saw_shape_type),
+            "synth_saw_shape_amount" => read_float!(self.synth_saw_shape_amount),
+            "synth_pll_fm_amount" => read_float!(self.synth_pll_fm_amount),
+            "synth_pll_fm_ratio_float" => read_float!(self.synth_pll_fm_ratio_float),
+            "synth_pll_track_speed" => read_float!(self.synth_pll_track_speed),
+            "synth_pll_damping" => read_float!(self.synth_pll_damping),
+            "synth_pll_mult" => read_int!(self.synth_pll_mult),
+            "synth_pll_mult_slew_time" => read_float!(self.synth_pll_mult_slew_time),
+            "synth_pll_ref_octave" => read_int!(self.synth_pll_ref_octave),
+            "synth_pll_ref_tune" => read_int!(self.synth_pll_ref_tune),
+            "synth_pll_influence" => read_float!(self.synth_pll_influence),
+            "synth_pll_volume" => read_float!(self.synth_pll_volume),
+            "synth_pll_stereo_damp_offset" => read_float!(self.synth_pll_stereo_damp_offset),
+            "synth_pll_burst_amount" => read_float!(self.synth_pll_burst_amount),
+            "synth_pll_color_amount" => read_float!(self.synth_pll_color_amount),
+            "synth_pll_range" => read_float!(self.synth_pll_range),
+            "synth_pll_injection_amount" => read_float!(self.synth_pll_injection_amount),
+            "synth_drift_amount" => read_float!(self.synth_drift_amount),
+            "synth_drift_rate" => read_float!(self.synth_drift_rate),
+            "synth_tube_drive" => read_float!(self.synth_tube_drive),
+            "synth_pll_enable" => read_bool!(self.synth_pll_enable),
+            "synth_pll_colored" => read_bool!(self.synth_pll_colored),
+            "synth_pll_mode" => read_bool!(self.synth_pll_mode),
+            "synth_pll_precision" => read_bool!(self.synth_pll_precision),
+            "synth_pll_injection_x4" => read_bool!(self.synth_pll_injection_x4),
+            "synth_pll_fm_expand" => read_bool!(self.synth_pll_fm_expand),
+            "synth_saw_enable" => read_bool!(self.synth_saw_enable),
+            "synth_vps_enable" => read_bool!(self.synth_vps_enable),
+            _ => None,
         }
     }
 }

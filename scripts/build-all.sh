@@ -224,9 +224,9 @@ Extract the archive for your platform and copy files to the appropriate location
 
 ## Audio Backends
 
-- **macOS**: JACK (recommended), CoreAudio
+- **macOS**: CoreAudio (default), JACK
 - **Windows**: WASAPI (default), JACK
-- **Linux**: JACK, ALSA
+- **Linux**: ALSA (default), JACK
 - **Raspberry Pi**: JACK
 
 ## Notes

@@ -9,6 +9,8 @@ use crate::sequencer::melodic_engine::MelodicConfig;
 use crate::sequencer::ml_dataset::MlDataset;
 use crate::preset::PresetManager;
 use crate::midi_modes::MidiModeDisplay;
+use crate::midi_devices::{MidiDeviceManager, MidiInputQueue, MidiOutputQueue};
+use crate::midi_learn::MidiLearnState;
 
 #[derive(Clone)]
 pub struct SharedUiState {
@@ -31,18 +33,46 @@ pub struct SharedUiState {
     pub midi_mode: Arc<AtomicU8>,
     pub midi_mode_display: Arc<Mutex<MidiModeDisplay>>,
     pub midi_clear_memory: Arc<AtomicBool>,
+    pub sample_rate: Arc<AtomicU32>,
+    pub limiter_latency_samples: Arc<AtomicU32>,
+    pub midi_device_manager: Arc<Mutex<MidiDeviceManager>>,
+    pub midi_device_input_queue: MidiInputQueue,
+    pub midi_device_output_queue: MidiOutputQueue,
+    pub midi_learn: Arc<MidiLearnState>,
+    pub midi_clock_in: Arc<AtomicBool>,
+    pub midi_clock_out: Arc<AtomicBool>,
+    pub midi_transport_in: Arc<AtomicBool>,
+    pub midi_transport_out: Arc<AtomicBool>,
+    pub midi_transport_start: Arc<AtomicBool>,
+    pub midi_transport_stop: Arc<AtomicBool>,
+    pub soft_takeover: Arc<AtomicBool>,
 }
 
 impl SharedUiState {
     pub fn new() -> Self {
-        let mut manager = PresetManager::new();
-        let _ = manager.load_from_file();
-        let _ = manager.load_favorites();
+        let mut preset_manager = PresetManager::new();
+        let _ = preset_manager.load_from_file();
+        let _ = preset_manager.load_favorites();
+
+        let mut midi_mgr = MidiDeviceManager::new();
+        let cfg = midi_mgr.load_config();
+        midi_mgr.refresh_devices();
+        midi_mgr.reconnect_saved_devices();
+        midi_mgr.auto_select_if_single();
+
+        let input_queue = midi_mgr.input_queue();
+        let output_queue = midi_mgr.output_queue();
+        let restored_midi_mode = cfg.midi_mode;
+        let midi_learn = Arc::new(MidiLearnState::with_mappings(
+            cfg.midi_learn_mappings_data(),
+            cfg.selector_cc,
+            cfg.value_cc,
+        ));
 
         Self {
             note_pool: Arc::new(Mutex::new(NotePool::new())),
             strength_values: Arc::new(Mutex::new(vec![0.0; 96])),
-            preset_manager: Arc::new(Mutex::new(manager)),
+            preset_manager: Arc::new(Mutex::new(preset_manager)),
             preset_version: Arc::new(AtomicU64::new(0)),
             cpu_load: Arc::new(AtomicU32::new(0)),
             output_level: Arc::new(AtomicU32::new(0)),
@@ -56,9 +86,22 @@ impl SharedUiState {
             ml_dataset_dirty: Arc::new(AtomicBool::new(true)),
             request_dsp_reset: Arc::new(AtomicBool::new(false)),
             seq_data_dirty: Arc::new(AtomicBool::new(true)),
-            midi_mode: Arc::new(AtomicU8::new(0)),
+            midi_mode: Arc::new(AtomicU8::new(restored_midi_mode)),
             midi_mode_display: Arc::new(Mutex::new(MidiModeDisplay::default())),
             midi_clear_memory: Arc::new(AtomicBool::new(false)),
+            sample_rate: Arc::new(AtomicU32::new(44100)),
+            limiter_latency_samples: Arc::new(AtomicU32::new(0)),
+            midi_device_manager: Arc::new(Mutex::new(midi_mgr)),
+            midi_device_input_queue: input_queue,
+            midi_device_output_queue: output_queue,
+            midi_learn,
+            midi_clock_in: Arc::new(AtomicBool::new(cfg.midi_clock_in)),
+            midi_clock_out: Arc::new(AtomicBool::new(cfg.midi_clock_out)),
+            midi_transport_in: Arc::new(AtomicBool::new(cfg.midi_transport_in)),
+            midi_transport_out: Arc::new(AtomicBool::new(cfg.midi_transport_out)),
+            midi_transport_start: Arc::new(AtomicBool::new(false)),
+            midi_transport_stop: Arc::new(AtomicBool::new(false)),
+            soft_takeover: Arc::new(AtomicBool::new(cfg.soft_takeover)),
         }
     }
 

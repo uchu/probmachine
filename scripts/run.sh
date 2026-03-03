@@ -57,7 +57,9 @@ main() {
 
     case "$platform" in
         macos)
-            export DYLD_LIBRARY_PATH="/opt/homebrew/lib:$DYLD_LIBRARY_PATH"
+            if [ "$BACKEND" = "auto" ]; then
+                BACKEND="core-audio"
+            fi
             ;;
         raspberrypi)
             if [ "$BACKEND" = "auto" ]; then

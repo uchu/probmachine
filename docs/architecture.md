@@ -49,6 +49,7 @@ src/
 ├── main.rs             # Standalone binary entry
 ├── params.rs           # All automatable parameters (~250 params)
 ├── midi.rs             # Full MIDI I/O processing
+├── midi_devices.rs     # Direct MIDI device selection (midir), persistent settings
 ├── synth/
 │   ├── mod.rs          # SynthEngine coordinator
 │   ├── voice.rs        # Main voice with signal routing
@@ -87,7 +88,7 @@ src/
         ├── synth.rs             # Synthesis controls
         ├── modulation.rs        # LFO routing
         ├── presets.rs           # Preset management
-        └── settings.rs          # MIDI mode, performance settings
+        └── settings.rs          # MIDI devices, MIDI mode, performance settings
 ```
 
 ## Audio Processing Flow
@@ -206,21 +207,26 @@ strip = "none"
 
 ### MIDI Processing Architecture
 ```
-MIDI Input → MidiProcessor.input → MidiState
-                                   ├── CC tracking
-                                   └── External note events
-                                        ↓
-                                   MidiModeProcessor
-                                   ├── Passthrough → voice directly
-                                   ├── Chord Follow → NotePool update
-                                   └── Accompaniment → harmonic analysis → NotePool
+DAW MIDI Input → context.next_event() ──┐
+                                         ├──→ MidiProcessor.input → MidiState
+Direct Device (midir) → input_queue ────┘     ├── CC tracking
+                                              └── External note events
+                                                   ↓
+                                              MidiModeProcessor
+                                              ├── Passthrough → voice directly
+                                              ├── Chord Follow → NotePool update
+                                              └── Accompaniment → harmonic analysis → NotePool
 
 Sequencer → SynthEngine.process_block() → midi_events_buffer
                                               ↓
 MidiProcessor.output ← note_on/note_off_from_sequencer()
        ↓
-context.send_event() → MIDI Output
+context.send_event() → MIDI Output (DAW)
+MidiDeviceManager.flush_output() → MIDI Output (direct device)
 ```
+
+### Direct MIDI Device Support (Standalone)
+When running standalone (no DAW), users select MIDI devices from the Settings page. Uses `midir` crate for device enumeration and connection. Input callback pushes raw messages to a lock-free queue, drained by the audio thread via `try_lock()`. Settings (device names, channels, MIDI mode) persist to `Device/settings.json`.
 
 ### MIDI Input Modes
 
@@ -238,10 +244,11 @@ Three modes control how incoming MIDI is handled, selected on the Settings page:
 
 **Accompaniment**: Incoming notes are accumulated per bar using DAW transport position. At each bar boundary, pitch class histograms are analyzed to detect key and scale (12 roots × 9 candidate scales with hysteresis). A NotePool is generated from the detected key with chord-root awareness. Harmonic memory persists across rewinds — stored bar analysis is reused when revisiting previously heard sections.
 
-Thread model: mode is read via `AtomicU8` (lockless on audio thread). Display state is written via `try_lock` on `MidiModeDisplay` (never blocks audio). Clear memory flag uses `AtomicBool`.
+Thread model: mode is read via `AtomicU8` (lockless on audio thread). Display state is written via `try_lock` on `MidiModeDisplay` (never blocks audio). Clear memory flag uses `AtomicBool`. MIDI mode persists to `Device/settings.json` and is restored on launch.
 
 ## Version History
 
+- **v1.9.0**: Direct MIDI device selection (midir), persistent settings, channel filtering
 - **v1.8.0**: MIDI input modes (Passthrough, Chord Follow, Accompaniment), Settings page
 - **v1.7.0**: Full MIDI I/O - note input/output, CC handling, transport sync
 - **v1.6.0**: SIMD stereo DSP - wavefold, tube saturation, distortion

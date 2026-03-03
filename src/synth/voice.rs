@@ -292,6 +292,8 @@ pub struct Voice {
     // ===== Target Values =====
     glide_time_ms: f64,
     legato_mode: bool,
+    legato_velocity_lock: bool,
+    vca_mode: bool,
     target_frequency: f64,
     target_pll_volume: f64,
     target_pll_track: f64,
@@ -681,6 +683,8 @@ impl Voice {
 
             glide_time_ms: 0.0,
             legato_mode: false,
+            legato_velocity_lock: false,
+            vca_mode: false,
             target_frequency: 220.0,
             target_pll_volume: 0.0,
             target_pll_track: 0.5,
@@ -1005,6 +1009,14 @@ impl Voice {
         self.legato_mode = enabled;
     }
 
+    pub fn set_legato_velocity_lock(&mut self, enabled: bool) {
+        self.legato_velocity_lock = enabled;
+    }
+
+    pub fn set_vca_mode(&mut self, enabled: bool) {
+        self.vca_mode = enabled;
+    }
+
     pub fn set_frequency(&mut self, freq: f64, _pll_feedback: f64, feedback_amount: f64) {
         self.target_frequency = freq;
         self.target_pll_feedback = feedback_amount;
@@ -1242,9 +1254,14 @@ impl Voice {
     }
 
     pub fn trigger(&mut self) {
-        let is_playing = self.volume_envelope.is_active();
+        if self.vca_mode {
+            return;
+        }
 
-        if self.legato_mode && is_playing {
+        if self.legato_mode && self.volume_envelope.is_held() {
+            if self.legato_velocity_lock {
+                self.target_velocity = self.velocity;
+            }
             return;
         }
 
@@ -1258,6 +1275,24 @@ impl Voice {
             self.vol_env_release_shape,
         );
 
+        self.reset_oscillator_phases();
+    }
+
+    pub fn trigger_articulated(&mut self) {
+        self.volume_envelope.restart(
+            self.vol_env_attack,
+            self.vol_env_attack_shape,
+            self.vol_env_decay,
+            self.vol_env_decay_shape,
+            self.vol_env_sustain,
+            self.vol_env_release,
+            self.vol_env_release_shape,
+        );
+
+        self.reset_oscillator_phases();
+    }
+
+    fn reset_oscillator_phases(&mut self) {
         self.pll_oscillator_left.trigger();
         self.pll_oscillator_right.trigger();
         match self.vps_phase_mode {
@@ -1278,10 +1313,16 @@ impl Voice {
     }
 
     pub fn release(&mut self) {
+        if self.vca_mode {
+            return;
+        }
         self.volume_envelope.release();
     }
 
     pub fn stop(&mut self) {
+        if self.vca_mode {
+            return;
+        }
         self.volume_envelope.release();
     }
 
@@ -1298,11 +1339,25 @@ impl Voice {
     }
 
     pub fn process(&mut self, _pll_feedback: f64) -> (f64, f64, f64) {
-        let volume_env = self.volume_envelope.next();
+        let volume_env = if self.vca_mode {
+            1.0
+        } else {
+            self.volume_envelope.update_params(
+                self.vol_env_attack,
+                self.vol_env_attack_shape,
+                self.vol_env_decay,
+                self.vol_env_decay_shape,
+                self.vol_env_sustain,
+                self.vol_env_release,
+                self.vol_env_release_shape,
+            );
+            self.volume_envelope.next()
+        };
 
-        // Slew all continuous parameters
         let glide_ms = if self.glide_time_ms > 0.5 { self.glide_time_ms } else { 0.5 };
-        self.base_frequency = self.freq_slew.next(self.target_frequency, glide_ms / 500.0);
+        let target_log2 = self.target_frequency.max(1.0).log2();
+        let slewed_log2 = self.freq_slew.next(target_log2, glide_ms);
+        self.base_frequency = (2.0_f64).powf(slewed_log2);
 
         // PLL slews + modulation
         self.pll_volume = (self.pll_volume_slew.next(self.target_pll_volume, 20.0) + self.mod_pll_volume).clamp(0.0, 1.0);
@@ -1371,6 +1426,9 @@ impl Voice {
         // Master volume slew for click-free volume changes (20ms)
         self.master_volume = self.master_volume_slew.next(self.target_master_volume, 20.0);
 
+        if !self.vca_mode && !self.volume_envelope.is_active() {
+            return (0.0, 0.0, 0.0);
+        }
 
         // ===== PLL OVERSAMPLED BLOCK =====
         let mut pll_sample_l = 0.0_f64;

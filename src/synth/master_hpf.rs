@@ -27,7 +27,7 @@ impl HpfBoost {
 
     fn q(&self) -> f64 {
         match self {
-            HpfBoost::None => 0.7071,   // Butterworth — flat
+            HpfBoost::None => std::f64::consts::FRAC_1_SQRT_2,
             HpfBoost::Medium => 2.0,    // Same as SAW tight filter at full amount
             HpfBoost::High => 4.0,      // Aggressive resonant peak
         }

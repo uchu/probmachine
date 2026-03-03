@@ -22,7 +22,10 @@ trap cleanup EXIT INT TERM
 
 case "$(uname -s)" in
     Darwin*)
-        export DYLD_LIBRARY_PATH="/opt/homebrew/lib:$DYLD_LIBRARY_PATH"
+        if [ "$BACKEND" = "auto" ]; then
+            BACKEND="core-audio"
+            echo "[INFO] macOS detected, using CoreAudio backend"
+        fi
         ;;
     Linux*)
         if [ "$BACKEND" = "auto" ]; then

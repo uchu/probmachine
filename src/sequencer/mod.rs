@@ -621,12 +621,10 @@ impl Sequencer {
             self.next_event_idx += 1;
         }
 
-        if !should_trigger {
-            if let Some((_start_pos, end_pos)) = self.current_note {
-                if self.bar_position_samples >= end_pos {
-                    should_release = true;
-                    self.current_note = None;
-                }
+        if let Some((_start_pos, end_pos)) = self.current_note {
+            if self.bar_position_samples >= end_pos {
+                should_release = true;
+                self.current_note = None;
             }
         }
 

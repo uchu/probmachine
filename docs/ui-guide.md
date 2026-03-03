@@ -157,6 +157,35 @@ ui.horizontal(|ui| {
 });
 ```
 
+### Pattern 6: Manual section backgrounds (Synth/Sound — best approach)
+When you need tinted backgrounds behind sections in a horizontal layout, **do not use `Frame::fill()`** — it creates gaps between frames due to layout spacing. Instead:
+
+1. Render all content frames without fill
+2. Capture boundary positions (e.g., separator line x-coordinates)
+3. Paint backgrounds on `Order::Background` layer using those boundaries
+
+```rust
+// Capture positions during layout
+let line_rect = ui.available_rect_before_wrap(); // between sections
+
+// After all content is rendered, paint backgrounds on bg layer
+let bg_painter = ui.painter().clone().with_layer_id(
+    egui::LayerId::new(egui::Order::Background, egui::Id::new("section_bg")),
+);
+let sep_x = line_rect.left() - 15.0; // separator line position
+bg_painter.rect_filled(
+    egui::Rect::from_min_max(egui::pos2(left, top), egui::pos2(sep_x, bottom)),
+    0.0,
+    Color32::from_rgba_premultiplied(6, 0, 0, 5), // very subtle tint
+);
+```
+
+Key points:
+- Use shared x-coordinates (separator positions) as boundaries — guarantees no gaps
+- Paint on `Order::Background` layer so tints render behind content
+- Use `from_rgba_premultiplied` with very low values (3-8 range) for subtle tints
+- Separator lines paint on the normal foreground layer, on top of backgrounds
+
 ---
 
 ## Anti-Patterns
@@ -169,6 +198,9 @@ ui.horizontal(|ui| {
 | Rely on flex alignment for pixel-precise positioning | Use manual spacing + position checks |
 | Use Frame for full-page backgrounds | Use `painter.rect_filled()` edge-to-edge |
 | Pack too many controls horizontally | Split into sub-pages/tabs when space is tight |
+| Use `Frame::fill()` for adjacent section backgrounds | Paint manually on `Order::Background` layer |
+| Use `outer_margin` with negative values to extend bg | It moves content too; use manual `rect_filled` instead |
+| Use `Frame::fill()` + `outer_margin` to close gaps | Gaps are inherent in layout spacing; manual painting avoids them |
 
 ---
 
@@ -178,7 +210,7 @@ ui.horizontal(|ui| {
 |------|--------|-------|
 | Presets | Excellent | Responsive grid, dynamic sizing, clean painting |
 | Beats | Good | Custom grid, well-sized controls (96×48 buttons) |
-| Synth/Sound | Almost good | Good slider columns, but negative margins and hard-coded offsets |
+| Synth/Sound | Good | Slider columns, section bg tints via manual painting, separator lines |
 | Strength | Adequate | Reuses Beats grid pattern |
 | Length | Adequate | Side-by-side frames, hard-coded widths |
 | Notes (piano) | Good | Proportional key sizing, custom painting |
@@ -215,6 +247,21 @@ ui.horizontal(|ui| {
 | Overtone | RGB(100, 80, 60) |
 | FM/Modulation | RGB(100, 60, 100) |
 | Volume/Mix | RGB(40, 80, 40) |
+
+### Section background tints (Sound tab)
+Very subtle tints to visually differentiate oscillator sections:
+| Section | Color (premultiplied RGBA) |
+|---------|---------------------------|
+| PLL OSC | (4, 3, 0, 3) — warm yellow |
+| SUB | (6, 0, 0, 5) — red |
+| SAW | (0, 3, 0, 2) — green |
+| VPS | (1, 1, 8, 7) — blue |
+
+### Logo
+| Element | Style |
+|---------|-------|
+| "phaseburn" | 22pt bold, white |
+| "ONE" | 20pt bold, RGB(230, 140, 40) orange, positioned below phaseburn, right-aligned |
 
 ### Beat division colors
 | Division | Color |

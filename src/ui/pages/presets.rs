@@ -770,22 +770,10 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_saw_shape_type, data.synth_saw_shape_type);
     setter.set_parameter(&params.synth_saw_shape_amount, data.synth_saw_shape_amount);
 
-    setter.set_parameter(&params.synth_filter_enable, data.synth_filter_enable);
-    setter.set_parameter(&params.synth_filter_cutoff, data.synth_filter_cutoff);
-    setter.set_parameter(&params.synth_filter_resonance, data.synth_filter_resonance);
-    setter.set_parameter(&params.synth_filter_env_amount, data.synth_filter_env_amount);
-    setter.set_parameter(&params.synth_filter_drive, data.synth_filter_drive);
-    setter.set_parameter(&params.synth_filter_stereo, data.synth_filter_stereo);
-
     setter.set_parameter(&params.synth_vol_attack, data.synth_vol_attack);
     setter.set_parameter(&params.synth_vol_decay, data.synth_vol_decay);
     setter.set_parameter(&params.synth_vol_sustain, data.synth_vol_sustain);
     setter.set_parameter(&params.synth_vol_release, data.synth_vol_release);
-
-    setter.set_parameter(&params.synth_filt_attack, data.synth_filt_attack);
-    setter.set_parameter(&params.synth_filt_decay, data.synth_filt_decay);
-    setter.set_parameter(&params.synth_filt_sustain, data.synth_filt_sustain);
-    setter.set_parameter(&params.synth_filt_release, data.synth_filt_release);
 
     setter.set_parameter(&params.synth_reverb_mix, data.synth_reverb_mix);
     setter.set_parameter(&params.synth_reverb_time_scale, data.synth_reverb_time_scale);
@@ -838,6 +826,9 @@ fn load_preset_to_params(
 
     setter.set_parameter(&params.legato_mode, data.legato_mode);
     setter.set_parameter(&params.legato_time, data.legato_time);
+    setter.set_parameter(&params.legato_velocity_lock, data.legato_velocity_lock);
+    setter.set_parameter(&params.vca_mode, data.vca_mode);
+    setter.set_parameter(&params.note_priority, data.note_priority);
 
     setter.set_parameter(&params.len_mod_1_target, data.len_mod_1_target);
     setter.set_parameter(&params.len_mod_1_amount, data.len_mod_1_amount);
@@ -1266,22 +1257,10 @@ fn save_params_to_preset_data(
     data.synth_saw_shape_type = params.synth_saw_shape_type.value();
     data.synth_saw_shape_amount = params.synth_saw_shape_amount.modulated_plain_value();
 
-    data.synth_filter_enable = params.synth_filter_enable.value();
-    data.synth_filter_cutoff = params.synth_filter_cutoff.modulated_plain_value();
-    data.synth_filter_resonance = params.synth_filter_resonance.modulated_plain_value();
-    data.synth_filter_env_amount = params.synth_filter_env_amount.modulated_plain_value();
-    data.synth_filter_drive = params.synth_filter_drive.modulated_plain_value();
-    data.synth_filter_stereo = params.synth_filter_stereo.modulated_plain_value();
-
     data.synth_vol_attack = params.synth_vol_attack.modulated_plain_value();
     data.synth_vol_decay = params.synth_vol_decay.modulated_plain_value();
     data.synth_vol_sustain = params.synth_vol_sustain.modulated_plain_value();
     data.synth_vol_release = params.synth_vol_release.modulated_plain_value();
-
-    data.synth_filt_attack = params.synth_filt_attack.modulated_plain_value();
-    data.synth_filt_decay = params.synth_filt_decay.modulated_plain_value();
-    data.synth_filt_sustain = params.synth_filt_sustain.modulated_plain_value();
-    data.synth_filt_release = params.synth_filt_release.modulated_plain_value();
 
     data.synth_reverb_mix = params.synth_reverb_mix.modulated_plain_value();
     data.synth_reverb_time_scale = params.synth_reverb_time_scale.modulated_plain_value();
@@ -1334,6 +1313,9 @@ fn save_params_to_preset_data(
 
     data.legato_mode = params.legato_mode.value();
     data.legato_time = params.legato_time.modulated_plain_value();
+    data.legato_velocity_lock = params.legato_velocity_lock.value();
+    data.vca_mode = params.vca_mode.value();
+    data.note_priority = params.note_priority.value();
 
     data.len_mod_1_target = params.len_mod_1_target.modulated_plain_value();
     data.len_mod_1_amount = params.len_mod_1_amount.modulated_plain_value();

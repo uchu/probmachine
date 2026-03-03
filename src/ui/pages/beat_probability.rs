@@ -799,6 +799,16 @@ fn render_timing_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter:
         ui.add_space(16.0);
 
         ui.horizontal(|ui| {
+            let vca_on = params.vca_mode.value();
+            let vca_button = egui::Button::new(egui::RichText::new("VCA").size(18.0))
+                .min_size(egui::vec2(70.0, 32.0))
+                .selected(vca_on);
+            if ui.add(vca_button).clicked() {
+                setter.set_parameter(&params.vca_mode, !vca_on);
+            }
+
+            ui.add_space(12.0);
+
             let legato_on = params.legato_mode.value();
             let button = egui::Button::new(egui::RichText::new("Legato").size(18.0))
                 .min_size(egui::vec2(80.0, 32.0))

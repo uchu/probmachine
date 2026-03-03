@@ -7,6 +7,9 @@ mod synth;
 mod sequencer;
 mod midi;
 mod midi_modes;
+mod midi_devices;
+mod midi_learn;
+mod midi_clock;
 
 use egui_taffy::taffy::{
     prelude::*,
@@ -37,8 +40,12 @@ pub struct PhaseBurn {
     brilliance: BrillianceFilter,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
     midi_mode_processor: MidiModeProcessor,
+    midi_clock_pll: midi_clock::MidiClockPll,
+    midi_clock_out_phase: f64,
+    process_time_seconds: f64,
     transport_has_played: bool,
     was_playing: bool,
+    was_seq_playing: bool,
     output_buffer_l: Vec<f32>,
     output_buffer_r: Vec<f32>,
     sub_buffer: Vec<f32>,
@@ -54,15 +61,19 @@ impl Default for PhaseBurn {
             midi_processor: MidiProcessor::new(),
             sample_rate: 44100.0,
             cpu_load_smoothed: 0.0,
-            volume_slew: 0.5,
+            volume_slew: 0.125,
             output_level_smoothed: 0.0,
             limiter: MasterLimiter::new(44100.0),
             master_hpf: MasterHpf::new(44100.0),
             brilliance: BrillianceFilter::new(44100.0),
             midi_events_buffer: Vec::with_capacity(64),
             midi_mode_processor: MidiModeProcessor::new(),
+            midi_clock_pll: midi_clock::MidiClockPll::new(),
+            midi_clock_out_phase: 0.0,
+            process_time_seconds: 0.0,
             transport_has_played: false,
             was_playing: false,
+            was_seq_playing: false,
             output_buffer_l: Vec::new(),
             output_buffer_r: Vec::new(),
             sub_buffer: Vec::new(),
@@ -122,6 +133,9 @@ impl Plugin for PhaseBurn {
                     style.visuals.window_fill = bg;
                     style.visuals.faint_bg_color = bg;
                 });
+
+                apply_midi_learn(&params, setter, &ui_state);
+
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
                     taffy_layout(ui, ui.id().with("page_layout"))
                         .reserve_available_space()
@@ -161,6 +175,10 @@ impl Plugin for PhaseBurn {
 
                             current_page.render(tui, &params, setter, &ui_state);
                         });
+
+                    if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+                        mgr.flush_output();
+                    }
                 });
             },
         )
@@ -180,6 +198,11 @@ impl Plugin for PhaseBurn {
         let sample_rate_changed = (new_sample_rate - self.sample_rate).abs() > 0.1;
 
         self.sample_rate = new_sample_rate;
+
+        self.ui_state.sample_rate.store(
+            new_sample_rate as u32,
+            std::sync::atomic::Ordering::Relaxed,
+        );
 
         if self.synth_engine.is_none() || sample_rate_changed {
             self.synth_engine = Some(SynthEngine::new(new_sample_rate));
@@ -214,15 +237,79 @@ impl Plugin for PhaseBurn {
             self.midi_processor.process_incoming_event(event);
         }
 
+        let clock_in_enabled = self.ui_state.midi_clock_in.load(std::sync::atomic::Ordering::Relaxed);
+        let transport_in_enabled = self.ui_state.midi_transport_in.load(std::sync::atomic::Ordering::Relaxed);
+
+        if let Ok(mut q) = self.ui_state.midi_device_input_queue.try_lock() {
+            while let Some(raw) = q.pop_front() {
+                if raw.len >= 1 {
+                    match raw.data[0] {
+                        0xF8 => {
+                            if clock_in_enabled {
+                                self.midi_clock_pll.process_tick(self.process_time_seconds);
+                            }
+                            continue;
+                        }
+                        0xFA | 0xFB => {
+                            if transport_in_enabled {
+                                self.ui_state.midi_transport_start.store(true, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            continue;
+                        }
+                        0xFC => {
+                            if transport_in_enabled {
+                                self.ui_state.midi_transport_stop.store(true, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            continue;
+                        }
+                        _ => {}
+                    }
+                }
+                if let Some(event) = midi_devices::raw_midi_to_note_event(&raw) {
+                    self.midi_processor.process_incoming_event(event);
+                }
+            }
+        }
+
+        for cc in 0u8..128 {
+            let value = self.midi_processor.input.cc_state.get_cc(cc);
+            let prev = f32::from_bits(
+                self.ui_state.midi_learn.cc_values[cc as usize]
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            );
+            if (value - prev).abs() > 0.001 {
+                self.ui_state.midi_learn.store_cc(cc, value);
+            }
+        }
+
         let transport = context.transport();
-        let tempo = transport.tempo.unwrap_or(120.0);
-        let is_playing = transport.playing;
+        let num_samples = buffer.samples();
+
+        self.midi_clock_pll.advance_samples(num_samples as u32, self.sample_rate);
+        self.process_time_seconds += num_samples as f64 / self.sample_rate as f64;
+
+        let tempo = if clock_in_enabled && self.midi_clock_pll.is_locked() {
+            self.midi_clock_pll.bpm()
+        } else {
+            transport.tempo.unwrap_or(120.0)
+        };
+
+        let mut is_playing = transport.playing;
+
+        if transport_in_enabled {
+            if self.ui_state.midi_transport_start.swap(false, std::sync::atomic::Ordering::Relaxed) {
+                is_playing = true;
+                self.transport_has_played = true;
+            }
+            if self.ui_state.midi_transport_stop.swap(false, std::sync::atomic::Ordering::Relaxed) {
+                is_playing = false;
+            }
+        }
 
         if is_playing {
             self.transport_has_played = true;
         }
 
-        // Detect transport stop transition: release voice and send MIDI note-off
         let just_stopped = self.was_playing && !is_playing;
         self.was_playing = is_playing;
 
@@ -394,6 +481,9 @@ impl Plugin for PhaseBurn {
             if self.params.legato_mode.value() {
                 synth.set_legato_time(self.params.legato_time.modulated_plain_value());
             }
+            synth.set_legato_velocity_lock(self.params.legato_velocity_lock.value());
+            synth.set_vca_mode(self.params.vca_mode.value());
+            synth.set_note_priority(self.params.note_priority.value());
 
 
             synth.set_volume(1.0);
@@ -486,6 +576,13 @@ impl Plugin for PhaseBurn {
                 self.params.sequencer_enable.value()
             };
 
+            let prev_seq_playing = self.was_seq_playing;
+            if prev_seq_playing && !seq_playing {
+                synth.stop();
+                self.midi_processor.stop_all_notes(0);
+            }
+            self.was_seq_playing = seq_playing;
+
             let midi_mode = MidiInputMode::from_index(
                 self.ui_state.midi_mode.load(std::sync::atomic::Ordering::Relaxed),
             );
@@ -551,6 +648,42 @@ impl Plugin for PhaseBurn {
                 tempo,
             );
 
+            let transport_out_enabled = self.ui_state.midi_transport_out.load(std::sync::atomic::Ordering::Relaxed);
+            let clock_out_enabled = self.ui_state.midi_clock_out.load(std::sync::atomic::Ordering::Relaxed);
+
+            if transport_out_enabled {
+                let seq_just_started = seq_playing && !prev_seq_playing;
+                let seq_just_stopped = !seq_playing && prev_seq_playing;
+                if seq_just_started {
+                    if let Ok(mut q) = self.ui_state.midi_device_output_queue.try_lock() {
+                        q.push_back(midi_devices::RawMidiMessage { data: [0xFA, 0, 0], len: 1 });
+                    }
+                    self.midi_clock_out_phase = 0.0;
+                }
+                if seq_just_stopped {
+                    if let Ok(mut q) = self.ui_state.midi_device_output_queue.try_lock() {
+                        q.push_back(midi_devices::RawMidiMessage { data: [0xFC, 0, 0], len: 1 });
+                    }
+                }
+            }
+
+            if clock_out_enabled && seq_playing {
+                let ticks_per_second = tempo / 60.0 * 24.0;
+                let block_ticks = ticks_per_second * (num_samples as f64 / self.sample_rate as f64);
+                let prev_phase = self.midi_clock_out_phase;
+                self.midi_clock_out_phase += block_ticks;
+                let ticks_to_send = self.midi_clock_out_phase.floor() as u32 - prev_phase.floor() as u32;
+                if ticks_to_send > 0 {
+                    if let Ok(mut q) = self.ui_state.midi_device_output_queue.try_lock() {
+                        for _ in 0..ticks_to_send.min(24) {
+                            q.push_back(midi_devices::RawMidiMessage { data: [0xF8, 0, 0], len: 1 });
+                        }
+                    }
+                }
+            } else if !seq_playing {
+                self.midi_clock_out_phase = 0.0;
+            }
+
             if let Some(start) = start_time {
                 let elapsed = start.elapsed();
                 let buf_time = buffer.samples() as f32 / self.sample_rate;
@@ -586,8 +719,9 @@ impl Plugin for PhaseBurn {
             self.brilliance.set_drive(self.params.brilliance_drive.modulated_plain_value() as f64);
             self.brilliance.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
 
-            let target_volume = self.params.global_volume.modulated_plain_value();
-            let slew_coeff = 1.0 - (-1.0 / (self.sample_rate * 0.01)).exp();
+            let linear_volume = self.params.global_volume.modulated_plain_value();
+            let target_volume = linear_volume * linear_volume * linear_volume;
+            let slew_coeff = 1.0 - (-1.0 / (self.sample_rate * 0.04)).exp();
 
             for i in 0..num_samples {
                 self.volume_slew += (target_volume - self.volume_slew) * slew_coeff;
@@ -595,7 +729,15 @@ impl Plugin for PhaseBurn {
                 self.output_buffer_r[i] *= self.volume_slew;
             }
 
-            self.limiter.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+            if self.params.limiter_enable.value() {
+                self.limiter.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+                self.ui_state.limiter_latency_samples.store(
+                    self.limiter.lookahead_samples() as u32,
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+            } else {
+                self.ui_state.limiter_latency_samples.store(0, std::sync::atomic::Ordering::Relaxed);
+            }
 
             let mut peak: f32 = 0.0;
             for (i, channel_samples) in buffer.iter_samples().enumerate() {
@@ -628,6 +770,136 @@ impl Plugin for PhaseBurn {
         }
 
         ProcessStatus::Normal
+    }
+}
+
+fn apply_midi_learn(
+    params: &Arc<DeviceParams>,
+    setter: &nih_plug::prelude::ParamSetter,
+    ui_state: &Arc<SharedUiState>,
+) {
+    let midi_learn = &ui_state.midi_learn;
+
+    let learn_mode = midi_learn.learn_mode.load(std::sync::atomic::Ordering::Relaxed);
+    if learn_mode == 1 {
+        for cc in 0u8..128 {
+            if midi_learn.take_changed(cc) {
+                midi_learn.selector_cc.store(cc, std::sync::atomic::Ordering::Relaxed);
+                midi_learn.learn_mode.store(0, std::sync::atomic::Ordering::Relaxed);
+                save_selector_value_ccs(ui_state);
+                return;
+            }
+        }
+    } else if learn_mode == 2 {
+        for cc in 0u8..128 {
+            if midi_learn.take_changed(cc) {
+                midi_learn.value_cc.store(cc, std::sync::atomic::Ordering::Relaxed);
+                midi_learn.learn_mode.store(0, std::sync::atomic::Ordering::Relaxed);
+                save_selector_value_ccs(ui_state);
+                return;
+            }
+        }
+    }
+
+    let learn_active = midi_learn.learn_active.load(std::sync::atomic::Ordering::Relaxed);
+
+    if learn_active {
+        if let Ok(awaiting) = midi_learn.awaiting_param.try_lock() {
+            if awaiting.is_some() {
+                for cc in 0u8..128 {
+                    if midi_learn.take_changed(cc) {
+                        let param_id = awaiting.as_ref().unwrap().clone();
+                        drop(awaiting);
+                        if let Ok(mut mappings) = midi_learn.mappings.try_lock() {
+                            mappings.add(cc, param_id);
+                        }
+                        if let Ok(mut awaiting) = midi_learn.awaiting_param.try_lock() {
+                            *awaiting = None;
+                        }
+                        save_midi_learn_mappings(ui_state);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    let selector_cc = midi_learn.selector_cc.load(std::sync::atomic::Ordering::Relaxed);
+    let value_cc = midi_learn.value_cc.load(std::sync::atomic::Ordering::Relaxed);
+
+    let soft_takeover_enabled = ui_state.soft_takeover.load(std::sync::atomic::Ordering::Relaxed);
+
+    if selector_cc < 128 && midi_learn.take_changed(selector_cc) {
+        let val = midi_learn.read_cc(selector_cc);
+        let idx = (val * (midi_learn::SOUND_PARAMS.len() - 1) as f32).round() as u8;
+        let prev_idx = midi_learn.selected_param_idx.swap(idx, std::sync::atomic::Ordering::Relaxed);
+        if idx != prev_idx {
+            midi_learn.value_cc_picked_up.store(false, std::sync::atomic::Ordering::Relaxed);
+            if value_cc < 128 {
+                if let Some(current_val) = params.read_normalized_value(
+                    midi_learn::SOUND_PARAMS.get(idx as usize).copied().unwrap_or(""),
+                ) {
+                    let cc_value = (current_val * 127.0).round() as u8;
+                    let out_channel = ui_state.midi_device_manager.try_lock()
+                        .map(|mgr| mgr.output_channel())
+                        .unwrap_or(0);
+                    let msg = midi_devices::RawMidiMessage {
+                        data: [0xB0 | out_channel, value_cc, cc_value],
+                        len: 3,
+                    };
+                    if let Ok(mut q) = ui_state.midi_device_output_queue.try_lock() {
+                        q.push_back(msg);
+                    }
+                }
+            }
+        }
+    }
+
+    if value_cc < 128 && midi_learn.take_changed(value_cc) {
+        let cc_val = midi_learn.read_cc(value_cc);
+        let idx = midi_learn.selected_param_idx.load(std::sync::atomic::Ordering::Relaxed) as usize;
+        if idx < midi_learn::SOUND_PARAMS.len() {
+            let param_id = midi_learn::SOUND_PARAMS[idx];
+            if !soft_takeover_enabled {
+                params.apply_normalized_cc(setter, param_id, cc_val);
+            } else if midi_learn.value_cc_picked_up.load(std::sync::atomic::Ordering::Relaxed) {
+                params.apply_normalized_cc(setter, param_id, cc_val);
+            } else if let Some(current) = params.read_normalized_value(param_id) {
+                if (cc_val - current).abs() < 0.05 {
+                    midi_learn.value_cc_picked_up.store(true, std::sync::atomic::Ordering::Relaxed);
+                    params.apply_normalized_cc(setter, param_id, cc_val);
+                }
+            }
+        }
+    }
+
+    if let Ok(mappings) = midi_learn.mappings.try_lock() {
+        for mapping in &mappings.mappings {
+            let cc = mapping.cc_number;
+            if midi_learn.take_changed(cc) {
+                let value = midi_learn.read_cc(cc);
+                params.apply_normalized_cc(setter, &mapping.param_id, value);
+            }
+        }
+    }
+}
+
+fn save_midi_learn_mappings(ui_state: &Arc<SharedUiState>) {
+    if let Ok(mappings) = ui_state.midi_learn.mappings.try_lock() {
+        if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+            mgr.set_midi_learn_mappings(mappings.mappings.clone());
+            mgr.save_config();
+        }
+    }
+}
+
+fn save_selector_value_ccs(ui_state: &Arc<SharedUiState>) {
+    let sel = ui_state.midi_learn.selector_cc.load(std::sync::atomic::Ordering::Relaxed);
+    let val = ui_state.midi_learn.value_cc.load(std::sync::atomic::Ordering::Relaxed);
+    if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+        mgr.set_selector_cc(if sel < 128 { Some(sel) } else { None });
+        mgr.set_value_cc(if val < 128 { Some(val) } else { None });
+        mgr.save_config();
     }
 }
 

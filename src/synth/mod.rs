@@ -20,12 +20,29 @@ use crate::params::DeviceParams;
 use crate::midi::ExternalNoteEvent;
 use mod_sequencer::ModSequencer;
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum NotePriority {
+    Last,
+    Low,
+    High,
+}
+
+struct NoteEntry {
+    note: u8,
+    frequency: f64,
+    velocity: u8,
+}
+
 pub struct SynthEngine {
     voice: Voice,
     sequencer: Sequencer,
     pll_feedback: f64,
     pub lfo_bank: LfoBank,
     pub mod_sequencer: ModSequencer,
+    note_stack: Vec<NoteEntry>,
+    note_priority: NotePriority,
+    active_seq_note: Option<u8>,
+    vca_mode: bool,
 }
 
 impl SynthEngine {
@@ -40,6 +57,10 @@ impl SynthEngine {
             pll_feedback: 0.0,
             lfo_bank: LfoBank::new(sample_rate_f64),
             mod_sequencer: ModSequencer::new(sample_rate_f64),
+            note_stack: Vec::with_capacity(16),
+            note_priority: NotePriority::Last,
+            active_seq_note: None,
+            vca_mode: false,
         }
     }
 
@@ -54,12 +75,16 @@ impl SynthEngine {
     pub fn stop(&mut self) {
         self.voice.stop();
         self.sequencer.release_current_note();
+        self.note_stack.clear();
+        self.active_seq_note = None;
     }
 
     pub fn reset(&mut self) {
         self.voice.reset();
         self.sequencer.reset();
         self.pll_feedback = 0.0;
+        self.note_stack.clear();
+        self.active_seq_note = None;
     }
 
     #[allow(dead_code)]
@@ -130,6 +155,23 @@ impl SynthEngine {
 
     pub fn set_legato_time(&mut self, time_ms: f32) {
         self.voice.set_glide_time(time_ms as f64);
+    }
+
+    pub fn set_legato_velocity_lock(&mut self, enabled: bool) {
+        self.voice.set_legato_velocity_lock(enabled);
+    }
+
+    pub fn set_vca_mode(&mut self, enabled: bool) {
+        self.vca_mode = enabled;
+        self.voice.set_vca_mode(enabled);
+    }
+
+    pub fn set_note_priority(&mut self, priority: i32) {
+        self.note_priority = match priority {
+            1 => NotePriority::Low,
+            2 => NotePriority::High,
+            _ => NotePriority::Last,
+        };
     }
 
     pub fn set_pll_fm_params(&mut self, amount: f32, ratio_float: f32, expand: bool) {
@@ -353,6 +395,18 @@ impl SynthEngine {
         self.lfo_bank.get_lfo_output(idx) as f32
     }
 
+    fn select_note_from_stack(&self) -> Option<(u8, f64, u8)> {
+        if self.note_stack.is_empty() {
+            return None;
+        }
+        let entry = match self.note_priority {
+            NotePriority::Last => self.note_stack.last().unwrap(),
+            NotePriority::Low => self.note_stack.iter().min_by_key(|e| e.note).unwrap(),
+            NotePriority::High => self.note_stack.iter().max_by_key(|e| e.note).unwrap(),
+        };
+        Some((entry.note, entry.frequency, entry.velocity))
+    }
+
     pub fn process_block(
         &mut self,
         output_l: &mut [f32],
@@ -382,17 +436,39 @@ impl SynthEngine {
                 let event = &external_notes[ext_idx];
                 if event.timing as usize == sample_idx {
                     if event.is_note_on {
-                        self.voice.set_frequency(
-                            event.frequency,
-                            self.pll_feedback,
-                            feedback_amount as f64,
-                        );
-                        self.voice.set_velocity(event.velocity);
-                        self.voice.trigger();
-                        midi_events.push((true, false, event.note, event.velocity, sample_idx));
+                        self.note_stack.push(NoteEntry {
+                            note: event.note,
+                            frequency: event.frequency,
+                            velocity: event.velocity,
+                        });
+                        if let Some((note, freq, vel)) = self.select_note_from_stack() {
+                            self.voice.set_frequency(
+                                freq,
+                                self.pll_feedback,
+                                feedback_amount as f64,
+                            );
+                            self.voice.set_velocity(vel);
+                            self.voice.trigger();
+                            midi_events.push((true, false, note, vel, sample_idx));
+                        }
                     } else {
-                        self.voice.release();
-                        midi_events.push((false, true, event.note, 0, sample_idx));
+                        let was_active = self.select_note_from_stack().map(|(n, _, _)| n);
+                        self.note_stack.retain(|e| e.note != event.note);
+                        if self.note_stack.is_empty() {
+                            self.voice.release();
+                            midi_events.push((false, true, event.note, 0, sample_idx));
+                        } else if was_active == Some(event.note) {
+                            if let Some((note, freq, vel)) = self.select_note_from_stack() {
+                                self.voice.set_frequency(
+                                    freq,
+                                    self.pll_feedback,
+                                    feedback_amount as f64,
+                                );
+                                self.voice.set_velocity(vel);
+                                self.voice.trigger();
+                                midi_events.push((true, false, note, vel, sample_idx));
+                            }
+                        }
                     }
                 }
                 ext_idx += 1;
@@ -401,16 +477,30 @@ impl SynthEngine {
             if seq_playing {
                 let (should_trigger, should_release, frequency, velocity, midi_note) = self.sequencer.update();
 
-                if should_trigger {
-                    self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
-                    self.voice.set_velocity(velocity);
-                    self.voice.trigger();
-                    midi_events.push((true, false, midi_note, velocity, sample_idx));
+                if should_release && !should_trigger {
+                    self.voice.release();
+                    self.active_seq_note = None;
+                    midi_events.push((false, true, midi_note, velocity, sample_idx));
                 }
 
-                if should_release {
-                    self.voice.release();
-                    midi_events.push((false, true, midi_note, velocity, sample_idx));
+                if should_trigger {
+                    if self.vca_mode && self.active_seq_note.is_some() {
+                        self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
+                        self.voice.set_velocity(velocity);
+                    } else {
+                        if let Some(old_note) = self.active_seq_note {
+                            midi_events.push((false, true, old_note, 0, sample_idx));
+                        }
+                        self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
+                        self.voice.set_velocity(velocity);
+                        if self.active_seq_note.is_some() {
+                            self.voice.trigger_articulated();
+                        } else {
+                            self.voice.trigger();
+                        }
+                    }
+                    self.active_seq_note = Some(midi_note);
+                    midi_events.push((true, false, midi_note, velocity, sample_idx));
                 }
             }
 
