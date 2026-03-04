@@ -349,6 +349,9 @@ impl Plugin for PhaseBurn {
                 if let Ok(melodic) = self.ui_state.melodic_config.try_lock() {
                     synth.update_melodic_config(melodic.clone());
                 }
+                if let Ok(links) = self.ui_state.beat_links.try_lock() {
+                    synth.update_beat_links(links.clone());
+                }
             }
 
             if self.ui_state.ml_dataset_dirty.swap(false, std::sync::atomic::Ordering::AcqRel) {

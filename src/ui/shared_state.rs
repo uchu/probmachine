@@ -7,6 +7,7 @@ use crate::sequencer::styles::StyleConfig;
 use crate::sequencer::multi_bar::MultiBarConfig;
 use crate::sequencer::melodic_engine::MelodicConfig;
 use crate::sequencer::ml_dataset::MlDataset;
+use crate::sequencer::BeatLinks;
 use crate::preset::PresetManager;
 use crate::midi_modes::MidiModeDisplay;
 use crate::midi_devices::{MidiDeviceManager, MidiInputQueue, MidiOutputQueue};
@@ -46,6 +47,7 @@ pub struct SharedUiState {
     pub midi_transport_start: Arc<AtomicBool>,
     pub midi_transport_stop: Arc<AtomicBool>,
     pub soft_takeover: Arc<AtomicBool>,
+    pub beat_links: Arc<Mutex<BeatLinks>>,
 }
 
 impl SharedUiState {
@@ -102,6 +104,7 @@ impl SharedUiState {
             midi_transport_start: Arc::new(AtomicBool::new(false)),
             midi_transport_stop: Arc::new(AtomicBool::new(false)),
             soft_takeover: Arc::new(AtomicBool::new(cfg.soft_takeover)),
+            beat_links: Arc::new(Mutex::new(BeatLinks::new())),
         }
     }
 

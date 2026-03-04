@@ -6,7 +6,8 @@ use nih_plug_egui::egui::style::HandleShape;
 use std::sync::Arc;
 use crate::params::{BeatMode, DeviceParams};
 use crate::ui::SharedUiState;
-use crate::sequencer::ml_suggest::{flat_index, apply_pitch_suggestion, suggest_linked_filtered, rescale_beat_suggestion, rescale_pitch_suggestion, BeatSuggestion, PitchSuggestion, StyleFilter};
+use crate::sequencer::ml_suggest::{flat_index, reverse_flat_index, apply_pitch_suggestion, suggest_linked_filtered, rescale_beat_suggestion, rescale_pitch_suggestion, BeatSuggestion, PitchSuggestion, StyleFilter};
+use crate::sequencer::algo_suggest;
 use crate::sequencer::ml_dataset::{self, PerformanceParams};
 use crate::sequencer::multi_bar::NoteSlotData;
 
@@ -118,6 +119,8 @@ pub fn render(
                         apply_performance_params(perf, params, setter);
                     }
                 }
+                if let Ok(mut links) = ui_state.beat_links.lock() { links.clear(); }
+                ui.memory_mut(|mem| mem.data.remove::<u8>(egui::Id::new("beat_link_source")));
             }
 
             ui.add_space(4.0);
@@ -157,6 +160,31 @@ pub fn render(
                     }
                     ui_state.mark_seq_dirty();
                 }
+                if let Ok(mut links) = ui_state.beat_links.lock() { links.clear(); }
+                ui.memory_mut(|mem| mem.data.remove::<u8>(egui::Id::new("beat_link_source")));
+            }
+
+            ui.add_space(4.0);
+
+            let groove_button = egui::Button::new(egui::RichText::new("Groove").size(14.0))
+                .min_size(egui::vec2(72.0, 28.0));
+            if ui.add(groove_button).clicked() {
+                let mut rng = rand::thread_rng();
+                let (suggestion, link_pairs) = algo_suggest::generate_groove(density, &mut rng);
+                ui.memory_mut(|mem| {
+                    mem.data.insert_temp(stored_beat_id, suggestion.clone());
+                    mem.data.remove::<Vec<PitchSuggestion>>(stored_pitches_id);
+                });
+                apply_beat_suggestion(&suggestion, params, setter);
+                apply_strength_suggestion(&suggestion, ui_state);
+                if let Ok(mut links) = ui_state.beat_links.lock() {
+                    links.clear();
+                    for (src, tgt) in &link_pairs {
+                        links.add(*src, *tgt);
+                    }
+                }
+                ui.memory_mut(|mem| mem.data.remove::<u8>(egui::Id::new("beat_link_source")));
+                ui_state.mark_seq_dirty();
             }
 
             if density_changed || spread_changed {
@@ -199,6 +227,10 @@ pub fn render(
                         bar.swing = None;
                     }
                 }
+                if let Ok(mut links) = ui_state.beat_links.lock() {
+                    links.clear();
+                }
+                ui.memory_mut(|mem| mem.data.remove::<u8>(egui::Id::new("beat_link_source")));
             }
 
             ui.add_space(16.0);
@@ -215,11 +247,15 @@ pub fn render(
         ..Default::default()
     })
     .ui(|ui| {
-        render_grid_container(ui, params, setter, beat_mode, num_sliders);
+        render_grid_container(ui, params, setter, beat_mode, num_sliders, ui_state);
     });
 
     tui.ui(|ui| {
-        ui.add_space(16.0);
+        render_link_row(ui, beat_mode, num_sliders, ui_state, params);
+    });
+
+    tui.ui(|ui| {
+        ui.add_space(8.0);
         render_controls(ui, params, setter, beat_mode, num_sliders);
     });
 }
@@ -333,6 +369,7 @@ fn render_grid_container(
     setter: &nih_plug::prelude::ParamSetter,
     beat_mode: BeatMode,
     num_sliders: usize,
+    ui_state: &Arc<SharedUiState>,
 ) {
     let container_height = 420.0;
     ui.set_min_size(egui::vec2(1220.0, container_height));
@@ -347,7 +384,7 @@ fn render_grid_container(
         .show(ui, |ui| {
             render_grid_lines(ui, beat_mode, num_sliders, container_height, swing);
             render_occupied_space(ui, params, beat_mode, num_sliders, container_height);
-            render_sliders(ui, params, setter, beat_mode, num_sliders, container_height, swing);
+            render_sliders(ui, params, setter, beat_mode, num_sliders, container_height, swing, ui_state);
         });
 }
 
@@ -559,6 +596,7 @@ fn render_sliders(
     num_sliders: usize,
     container_height: f32,
     swing: f32,
+    ui_state: &Arc<SharedUiState>,
 ) {
     let container_width = 1216.0;
     let grid_padding = 16.0;
@@ -661,6 +699,46 @@ fn render_sliders(
                 }).inner;
 
                 if let Some(slider_resp) = slider_response {
+                    let this_flat = flat_index(beat_mode, num_sliders, i) as u8;
+
+                    if slider_resp.drag_started() {
+                        let source_id = egui::Id::new("beat_link_source");
+                        ui.memory_mut(|mem| {
+                            mem.data.insert_temp(source_id, this_flat);
+                        });
+                    }
+
+                    let source_id = egui::Id::new("beat_link_source");
+                    let current_source: Option<u8> = ui.memory(|mem| mem.data.get_temp(source_id));
+                    let is_source = current_source == Some(this_flat);
+                    let is_link_target = current_source
+                        .map(|src| {
+                            if let Ok(links) = ui_state.beat_links.try_lock() {
+                                links.has_link(src, this_flat)
+                            } else {
+                                false
+                            }
+                        })
+                        .unwrap_or(false);
+
+                    if is_source {
+                        let highlight_rect = slider_resp.rect.expand2(egui::vec2(3.0, 0.0));
+                        let color = get_division_color(beat_mode, num_sliders, 40);
+                        ui.painter().rect_filled(highlight_rect, 2.0, color);
+                        let dot_center = egui::pos2(
+                            slider_resp.rect.center().x,
+                            slider_resp.rect.max.y + 6.0,
+                        );
+                        let dot_color = get_division_color(beat_mode, num_sliders, 220);
+                        ui.painter().circle_filled(dot_center, 5.0, dot_color);
+                    } else if is_link_target {
+                        let dot_center = egui::pos2(
+                            slider_resp.rect.center().x,
+                            slider_resp.rect.max.y + 6.0,
+                        );
+                        ui.painter().circle_filled(dot_center, 4.0, Color32::from_rgb(100, 200, 255));
+                    }
+
                     if slider_resp.dragged() {
                         let (beat_start, beat_end) = DeviceParams::get_beat_time_span(beat_mode, num_sliders, i);
                         let slider_center_x = slider_resp.rect.center().x;
@@ -700,6 +778,133 @@ fn render_sliders(
             }
         });
     });
+}
+
+fn render_link_row(
+    ui: &mut egui::Ui,
+    beat_mode: BeatMode,
+    num_sliders: usize,
+    ui_state: &Arc<SharedUiState>,
+    params: &Arc<DeviceParams>,
+) {
+    let source_id = egui::Id::new("beat_link_source");
+    let current_source: Option<u8> = ui.memory(|mem| mem.data.get_temp(source_id));
+
+    let source_fi = match current_source {
+        Some(fi) => fi,
+        None => return,
+    };
+
+    let (source_mode, source_count, source_index) = reverse_flat_index(source_fi as usize);
+    let (source_start, _) = DeviceParams::get_beat_time_span(source_mode, source_count, source_index);
+
+    let container_width = 1216.0;
+    let grid_padding = 16.0;
+    let grid_width = container_width - (grid_padding * 2.0);
+    let swing = params.swing_amount.modulated_plain_value();
+    let row_height = 28.0;
+
+    let (row_rect, _) = ui.allocate_exact_size(egui::vec2(container_width, row_height), egui::Sense::hover());
+    let row_left = row_rect.min.x;
+    let row_center_y = row_rect.center().y;
+    let painter = ui.painter();
+
+    let source_color = get_division_color(source_mode, source_count, 200);
+
+    let source_label = format!("Link from: {}/{}", source_count, source_index + 1);
+    painter.text(
+        egui::pos2(row_left + 4.0, row_center_y),
+        egui::Align2::LEFT_CENTER,
+        &source_label,
+        egui::FontId::proportional(11.0),
+        source_color,
+    );
+
+    let close_rect = egui::Rect::from_min_size(
+        egui::pos2(row_left + 4.0 + 90.0, row_rect.min.y + 2.0),
+        egui::vec2(24.0, 24.0),
+    );
+    let close_resp = ui.interact(close_rect, source_id.with("close"), egui::Sense::click());
+    painter.text(
+        close_rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "×",
+        egui::FontId::proportional(16.0),
+        if close_resp.hovered() { Color32::WHITE } else { Color32::from_gray(120) },
+    );
+    if close_resp.clicked() {
+        ui.memory_mut(|mem| mem.data.remove::<u8>(source_id));
+        return;
+    }
+
+    let grid_base = match beat_mode {
+        BeatMode::Straight | BeatMode::Dotted => 32.0,
+        BeatMode::Triplet => 24.0,
+    };
+
+    for i in 0..num_sliders {
+        let (beat_start, _) = DeviceParams::get_beat_time_span(beat_mode, num_sliders, i);
+        if beat_start <= source_start + 0.0001 {
+            continue;
+        }
+
+        let target_fi = flat_index(beat_mode, num_sliders, i) as u8;
+
+        let normalized_pos = match beat_mode {
+            BeatMode::Straight | BeatMode::Triplet => i as f32 / num_sliders as f32,
+            BeatMode::Dotted => {
+                let dotted_duration = match num_sliders {
+                    2 => 24.0,
+                    3 => 12.0,
+                    6 => 6.0,
+                    11 => 3.0,
+                    22 => 1.5,
+                    _ => continue,
+                };
+                (i as f32 * dotted_duration) / 32.0
+            }
+        };
+
+        let swung_pos = DeviceParams::apply_swing(normalized_pos, swing);
+        let grid_pos = swung_pos * grid_base;
+        let grid_spaces = match beat_mode {
+            BeatMode::Straight | BeatMode::Dotted => 32.0,
+            BeatMode::Triplet => 24.0,
+        };
+        let slot_width = grid_width / grid_spaces;
+        let center_x = row_left + grid_padding + grid_pos * slot_width + 8.0;
+
+        let is_linked = if let Ok(links) = ui_state.beat_links.try_lock() {
+            links.has_link(source_fi, target_fi)
+        } else {
+            false
+        };
+
+        let btn_rect = egui::Rect::from_center_size(
+            egui::pos2(center_x, row_center_y),
+            egui::vec2(20.0, 24.0),
+        );
+        let btn_resp = ui.interact(btn_rect, source_id.with(("link_btn", i)), egui::Sense::click());
+
+        let div_color = get_division_color(beat_mode, num_sliders, 180);
+        if is_linked {
+            painter.circle_filled(btn_rect.center(), 8.0, div_color);
+        } else {
+            let stroke_color = if btn_resp.hovered() { Color32::from_gray(100) } else { Color32::from_gray(50) };
+            painter.circle_stroke(btn_rect.center(), 7.0, egui::Stroke::new(1.5, stroke_color));
+        }
+
+        if btn_resp.clicked() {
+            if let Ok(mut links) = ui_state.beat_links.try_lock() {
+                if is_linked {
+                    links.remove(source_fi, target_fi);
+                } else {
+                    links.add(source_fi, target_fi);
+                }
+            }
+            ui_state.mark_seq_dirty();
+        }
+    }
 }
 
 fn render_controls(ui: &mut egui::Ui, params: &Arc<DeviceParams>, setter: &nih_plug::prelude::ParamSetter, beat_mode: BeatMode, num_sliders: usize) {

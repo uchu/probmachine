@@ -93,6 +93,8 @@ pub struct BarSlotPresetData {
     pub swing: Option<f32>,
     #[serde(default)]
     pub melodic_fragment_index: Option<usize>,
+    #[serde(default)]
+    pub beat_links: Vec<(u8, u8)>,
 }
 
 fn default_bar_weight() -> u8 { 64 }
@@ -183,6 +185,8 @@ pub struct PresetData {
     pub multi_bar: Option<MultiBarPresetData>,
     #[serde(default)]
     pub melodic_config: Option<MelodicConfigPresetData>,
+    #[serde(default)]
+    pub beat_links: Vec<(u8, u8)>,
 
     pub synth_pll_track_speed: f32,
     pub synth_pll_damping: f32,
@@ -558,6 +562,7 @@ impl Default for PresetData {
             style_config: StyleConfigPresetData::default(),
             multi_bar: None,
             melodic_config: None,
+            beat_links: Vec::new(),
 
             synth_pll_track_speed: 0.5,
             synth_pll_damping: 0.3,

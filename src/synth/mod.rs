@@ -345,6 +345,10 @@ impl SynthEngine {
         self.sequencer.dataset = dataset;
     }
 
+    pub fn update_beat_links(&mut self, links: crate::sequencer::BeatLinks) {
+        self.sequencer.beat_links = links;
+    }
+
     pub fn set_lfo_params(
         &mut self,
         lfo_idx: usize,

@@ -989,6 +989,10 @@ fn load_preset_to_params(
         }
     }
 
+    if let Ok(mut links) = ui_state.beat_links.lock() {
+        *links = crate::sequencer::BeatLinks::from_pairs(data.beat_links.clone());
+    }
+
     ui_state.increment_preset_version();
     ui_state.mark_seq_dirty();
     ui_state.request_dsp_reset();
@@ -1462,6 +1466,7 @@ fn save_params_to_preset_data(
                         beat_values,
                         swing: slot.swing,
                         melodic_fragment_index: slot.melodic_fragment_index,
+                        beat_links: Vec::new(),
                     }
                 })
                 .collect();
@@ -1486,6 +1491,10 @@ fn save_params_to_preset_data(
                 fragment_index: melodic.fragment_index,
             });
         }
+    }
+
+    if let Ok(links) = ui_state.beat_links.lock() {
+        data.beat_links = links.as_pairs().to_vec();
     }
 
     data

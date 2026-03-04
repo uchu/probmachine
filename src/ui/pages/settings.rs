@@ -11,7 +11,10 @@ use std::sync::atomic::Ordering;
 
 const HEADER_FONT: f32 = 18.0;
 const UI_FONT: f32 = 16.0;
-const SECTION_SPACING: f32 = 16.0;
+const HINT_FONT: f32 = 13.0;
+const SECTION_GAP: f32 = 12.0;
+const COL_GAP: f32 = 32.0;
+const MARGIN: f32 = 20.0;
 
 pub fn render(
     tui: &mut egui_taffy::Tui,
@@ -19,31 +22,62 @@ pub fn render(
     setter: &ParamSetter,
     ui_state: &Arc<SharedUiState>,
 ) {
-    tui.ui(|ui| {
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::same(16))
-            .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    render_midi_devices_section(ui, ui_state);
-                    ui.add_space(SECTION_SPACING);
-                    ui.separator();
-                    ui.add_space(SECTION_SPACING);
-                    render_midi_section(ui, ui_state);
-                    ui.add_space(SECTION_SPACING);
-                    ui.separator();
-                    ui.add_space(SECTION_SPACING);
-                    render_midi_learn_section(ui, ui_state);
-                    ui.add_space(SECTION_SPACING);
-                    ui.separator();
-                    ui.add_space(SECTION_SPACING);
-                    render_midi_sync_section(ui, ui_state);
-                    ui.add_space(SECTION_SPACING);
-                    ui.separator();
-                    ui.add_space(SECTION_SPACING);
-                    render_performance_section(ui, params, setter, ui_state);
-                });
-            });
+    use egui_taffy::taffy::{prelude::*, style::AlignItems};
+
+    tui.style(Style {
+        flex_grow: 1.0,
+        align_items: Some(AlignItems::Stretch),
+        ..Default::default()
+    })
+    .ui(|ui| {
+        let screen_rect = ui.ctx().screen_rect();
+        let top_y = ui.cursor().min.y;
+
+        let content_rect = egui::Rect::from_min_max(
+            egui::pos2(screen_rect.left() + MARGIN, top_y + MARGIN),
+            egui::pos2(screen_rect.right() - MARGIN, screen_rect.bottom() - MARGIN),
+        );
+
+        let col_w = (content_rect.width() - COL_GAP) / 2.0;
+
+        let left_rect = egui::Rect::from_min_size(
+            content_rect.min,
+            egui::vec2(col_w, content_rect.height()),
+        );
+        let right_rect = egui::Rect::from_min_size(
+            egui::pos2(content_rect.min.x + col_w + COL_GAP, content_rect.min.y),
+            egui::vec2(col_w, content_rect.height()),
+        );
+
+        let sep_x = content_rect.min.x + col_w + COL_GAP / 2.0;
+        ui.painter().line_segment(
+            [
+                egui::pos2(sep_x, content_rect.top() + 4.0),
+                egui::pos2(sep_x, content_rect.bottom() - 4.0),
+            ],
+            egui::Stroke::new(1.0, Color32::from_gray(50)),
+        );
+
+        ui.allocate_new_ui(egui::UiBuilder::new().max_rect(left_rect), |ui| {
+            render_midi_devices_section(ui, ui_state);
+            section_separator(ui);
+            render_midi_input_section(ui, ui_state);
+            section_separator(ui);
+            render_midi_sync_section(ui, ui_state);
+        });
+
+        ui.allocate_new_ui(egui::UiBuilder::new().max_rect(right_rect), |ui| {
+            render_midi_learn_section(ui, ui_state);
+            section_separator(ui);
+            render_performance_section(ui, params, setter, ui_state);
+        });
     });
+}
+
+fn section_separator(ui: &mut egui::Ui) {
+    ui.add_space(SECTION_GAP);
+    ui.separator();
+    ui.add_space(SECTION_GAP);
 }
 
 fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
@@ -76,11 +110,11 @@ fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>)
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Input:").size(UI_FONT));
         egui::ComboBox::from_id_salt("midi_input_device")
-            .width(280.0)
+            .width(260.0)
             .selected_text(egui::RichText::new(input_label).size(UI_FONT))
             .show_ui(ui, |ui| {
                 let none_btn = egui::Button::new(egui::RichText::new("None").size(UI_FONT))
-                    .min_size(egui::vec2(260.0, 36.0))
+                    .min_size(egui::vec2(240.0, 36.0))
                     .selected(current_input.is_none());
                 if ui.add(none_btn).clicked() {
                     mgr.disconnect_input();
@@ -90,7 +124,7 @@ fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>)
                 for name in &input_devices {
                     let selected = current_input.as_deref() == Some(name.as_str());
                     let btn = egui::Button::new(egui::RichText::new(name).size(UI_FONT))
-                        .min_size(egui::vec2(260.0, 36.0))
+                        .min_size(egui::vec2(240.0, 36.0))
                         .selected(selected);
                     if ui.add(btn).clicked() {
                         mgr.connect_input(name);
@@ -99,12 +133,10 @@ fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>)
                     }
                 }
             });
-    });
-
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("In Ch:").size(UI_FONT));
+        ui.add_space(12.0);
+        ui.label(egui::RichText::new("Ch:").size(UI_FONT));
         egui::ComboBox::from_id_salt("midi_input_channel")
-            .width(90.0)
+            .width(80.0)
             .selected_text(egui::RichText::new(current_in_channel.label()).size(UI_FONT))
             .show_ui(ui, |ui| {
                 for ch in MidiChannel::all_options() {
@@ -127,11 +159,11 @@ fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>)
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Output:").size(UI_FONT));
         egui::ComboBox::from_id_salt("midi_output_device")
-            .width(280.0)
+            .width(260.0)
             .selected_text(egui::RichText::new(output_label).size(UI_FONT))
             .show_ui(ui, |ui| {
                 let none_btn = egui::Button::new(egui::RichText::new("None").size(UI_FONT))
-                    .min_size(egui::vec2(260.0, 36.0))
+                    .min_size(egui::vec2(240.0, 36.0))
                     .selected(current_output.is_none());
                 if ui.add(none_btn).clicked() {
                     mgr.disconnect_output();
@@ -141,7 +173,7 @@ fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>)
                 for name in &output_devices {
                     let selected = current_output.as_deref() == Some(name.as_str());
                     let btn = egui::Button::new(egui::RichText::new(name).size(UI_FONT))
-                        .min_size(egui::vec2(260.0, 36.0))
+                        .min_size(egui::vec2(240.0, 36.0))
                         .selected(selected);
                     if ui.add(btn).clicked() {
                         mgr.connect_output(name);
@@ -150,12 +182,10 @@ fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>)
                     }
                 }
             });
-    });
-
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Out Ch:").size(UI_FONT));
+        ui.add_space(12.0);
+        ui.label(egui::RichText::new("Ch:").size(UI_FONT));
         egui::ComboBox::from_id_salt("midi_output_channel")
-            .width(90.0)
+            .width(80.0)
             .selected_text(egui::RichText::new(format!("{}", current_out_channel + 1)).size(UI_FONT))
             .show_ui(ui, |ui| {
                 for ch in 0u8..16 {
@@ -181,7 +211,7 @@ fn render_midi_devices_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>)
     }
 }
 
-fn render_midi_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
+fn render_midi_input_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
     ui.label(egui::RichText::new("MIDI INPUT").size(HEADER_FONT).strong());
     ui.add_space(8.0);
 
@@ -286,6 +316,84 @@ fn render_midi_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
             }
         }
     }
+}
+
+fn render_midi_sync_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
+    ui.label(egui::RichText::new("MIDI SYNC").size(HEADER_FONT).strong());
+    ui.add_space(8.0);
+
+    let mut soft_takeover = ui_state.soft_takeover.load(Ordering::Relaxed);
+    ui.horizontal(|ui| {
+        let resp = ui.checkbox(&mut soft_takeover, egui::RichText::new("Soft Takeover").size(UI_FONT));
+        ui.label(egui::RichText::new("Knob picks up before changing").size(HINT_FONT).weak());
+        if resp.changed() {
+            ui_state.soft_takeover.store(soft_takeover, Ordering::Relaxed);
+            if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+                mgr.set_soft_takeover(soft_takeover);
+                mgr.save_config();
+            }
+        }
+    });
+
+    ui.add_space(4.0);
+
+    let mut clock_in = ui_state.midi_clock_in.load(Ordering::Relaxed);
+    ui.horizontal(|ui| {
+        let resp = ui.checkbox(&mut clock_in, egui::RichText::new("Clock In").size(UI_FONT));
+        ui.label(egui::RichText::new("Sync from external clock").size(HINT_FONT).weak());
+        if resp.changed() {
+            ui_state.midi_clock_in.store(clock_in, Ordering::Relaxed);
+            if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+                mgr.set_midi_clock_in(clock_in);
+                mgr.save_config();
+            }
+        }
+    });
+
+    ui.add_space(4.0);
+
+    let mut clock_out = ui_state.midi_clock_out.load(Ordering::Relaxed);
+    ui.horizontal(|ui| {
+        let resp = ui.checkbox(&mut clock_out, egui::RichText::new("Clock Out").size(UI_FONT));
+        ui.label(egui::RichText::new("Send clock to output").size(HINT_FONT).weak());
+        if resp.changed() {
+            ui_state.midi_clock_out.store(clock_out, Ordering::Relaxed);
+            if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+                mgr.set_midi_clock_out(clock_out);
+                mgr.save_config();
+            }
+        }
+    });
+
+    ui.add_space(4.0);
+
+    let mut transport_in = ui_state.midi_transport_in.load(Ordering::Relaxed);
+    ui.horizontal(|ui| {
+        let resp = ui.checkbox(&mut transport_in, egui::RichText::new("Transport In").size(UI_FONT));
+        ui.label(egui::RichText::new("Start/stop from MIDI").size(HINT_FONT).weak());
+        if resp.changed() {
+            ui_state.midi_transport_in.store(transport_in, Ordering::Relaxed);
+            if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+                mgr.set_midi_transport_in(transport_in);
+                mgr.save_config();
+            }
+        }
+    });
+
+    ui.add_space(4.0);
+
+    let mut transport_out = ui_state.midi_transport_out.load(Ordering::Relaxed);
+    ui.horizontal(|ui| {
+        let resp = ui.checkbox(&mut transport_out, egui::RichText::new("Transport Out").size(UI_FONT));
+        ui.label(egui::RichText::new("Send start/stop to output").size(HINT_FONT).weak());
+        if resp.changed() {
+            ui_state.midi_transport_out.store(transport_out, Ordering::Relaxed);
+            if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+                mgr.set_midi_transport_out(transport_out);
+                mgr.save_config();
+            }
+        }
+    });
 }
 
 fn render_midi_learn_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
@@ -444,69 +552,6 @@ fn save_midi_learn(ui_state: &Arc<SharedUiState>) {
             mgr.save_config();
         }
     }
-}
-
-fn render_midi_sync_section(ui: &mut egui::Ui, ui_state: &Arc<SharedUiState>) {
-    ui.label(egui::RichText::new("MIDI SYNC").size(HEADER_FONT).strong());
-    ui.add_space(8.0);
-
-    let mut soft_takeover = ui_state.soft_takeover.load(Ordering::Relaxed);
-    if ui.checkbox(&mut soft_takeover, egui::RichText::new("Soft Takeover").size(UI_FONT)).changed() {
-        ui_state.soft_takeover.store(soft_takeover, Ordering::Relaxed);
-        if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
-            mgr.set_soft_takeover(soft_takeover);
-            mgr.save_config();
-        }
-    }
-    ui.label(egui::RichText::new("Value knob picks up before changing").size(13.0).weak());
-
-    ui.add_space(4.0);
-
-    let mut clock_in = ui_state.midi_clock_in.load(Ordering::Relaxed);
-    if ui.checkbox(&mut clock_in, egui::RichText::new("Clock In").size(UI_FONT)).changed() {
-        ui_state.midi_clock_in.store(clock_in, Ordering::Relaxed);
-        if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
-            mgr.set_midi_clock_in(clock_in);
-            mgr.save_config();
-        }
-    }
-    ui.label(egui::RichText::new("Sync tempo from external MIDI clock").size(13.0).weak());
-
-    ui.add_space(4.0);
-
-    let mut clock_out = ui_state.midi_clock_out.load(Ordering::Relaxed);
-    if ui.checkbox(&mut clock_out, egui::RichText::new("Clock Out").size(UI_FONT)).changed() {
-        ui_state.midi_clock_out.store(clock_out, Ordering::Relaxed);
-        if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
-            mgr.set_midi_clock_out(clock_out);
-            mgr.save_config();
-        }
-    }
-    ui.label(egui::RichText::new("Send MIDI clock to output").size(13.0).weak());
-
-    ui.add_space(4.0);
-
-    let mut transport_in = ui_state.midi_transport_in.load(Ordering::Relaxed);
-    if ui.checkbox(&mut transport_in, egui::RichText::new("Transport In").size(UI_FONT)).changed() {
-        ui_state.midi_transport_in.store(transport_in, Ordering::Relaxed);
-        if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
-            mgr.set_midi_transport_in(transport_in);
-            mgr.save_config();
-        }
-    }
-    ui.label(egui::RichText::new("Start/stop from MIDI messages").size(13.0).weak());
-
-    ui.add_space(4.0);
-
-    let mut transport_out = ui_state.midi_transport_out.load(Ordering::Relaxed);
-    if ui.checkbox(&mut transport_out, egui::RichText::new("Transport Out").size(UI_FONT)).changed() {
-        ui_state.midi_transport_out.store(transport_out, Ordering::Relaxed);
-        if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
-            mgr.set_midi_transport_out(transport_out);
-            mgr.save_config();
-        }
-    }
-    ui.label(egui::RichText::new("Send start/stop to output").size(13.0).weak());
 }
 
 fn render_performance_section(

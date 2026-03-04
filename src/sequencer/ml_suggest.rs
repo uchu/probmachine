@@ -22,7 +22,7 @@ struct DistributionMeta {
     strong_ratio: f32,
 }
 
-const DIVISIONS: [(BeatMode, usize); 15] = [
+pub const DIVISIONS: [(BeatMode, usize); 15] = [
     (BeatMode::Straight, 1),
     (BeatMode::Straight, 2),
     (BeatMode::Straight, 4),
@@ -51,6 +51,17 @@ pub fn flat_index(mode: BeatMode, beat_count: usize, beat_index: usize) -> usize
     panic!("Invalid division: {:?} count={}", mode, beat_count);
 }
 
+pub fn reverse_flat_index(flat: usize) -> (BeatMode, usize, usize) {
+    let mut offset = 0;
+    for &(mode, count) in &DIVISIONS {
+        if flat < offset + count {
+            return (mode, count, flat - offset);
+        }
+        offset += count;
+    }
+    panic!("Invalid flat index: {}", flat);
+}
+
 struct BeatSlotSpan {
     flat_index: usize,
     start: f32,
@@ -70,7 +81,7 @@ fn build_slot_spans() -> Vec<BeatSlotSpan> {
     spans
 }
 
-fn normalize_beat_constraints(result: &mut [f32; SLOT_COUNT]) {
+pub fn normalize_beat_constraints(result: &mut [f32; SLOT_COUNT]) {
     let spans = build_slot_spans();
 
     let mut time_points: Vec<f32> = Vec::with_capacity(SLOT_COUNT * 2);

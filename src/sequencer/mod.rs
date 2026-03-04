@@ -1,4 +1,5 @@
 mod note_utils;
+pub mod algo_suggest;
 pub mod melodic_engine;
 pub mod ml_dataset;
 pub mod ml_suggest;
@@ -17,6 +18,75 @@ pub use scales::{Scale, StabilityPattern, OctaveRandomization, OctaveDirection};
 pub use styles::{StylePattern, StyleConfig, build_pitch_sequence};
 pub use multi_bar::MultiBarConfig;
 pub use melodic_engine::MelodicConfig;
+
+#[derive(Clone, Debug)]
+pub struct BeatLinks {
+    links: Vec<(u8, u8)>,
+}
+
+impl BeatLinks {
+    pub fn new() -> Self {
+        Self { links: Vec::new() }
+    }
+
+    pub fn add(&mut self, source: u8, target: u8) {
+        if !self.has_link(source, target) {
+            self.links.push((source, target));
+        }
+    }
+
+    pub fn remove(&mut self, source: u8, target: u8) {
+        self.links.retain(|&(s, t)| s != source || t != target);
+    }
+
+    pub fn has_link(&self, source: u8, target: u8) -> bool {
+        self.links.iter().any(|&(s, t)| s == source && t == target)
+    }
+
+    #[allow(dead_code)]
+    pub fn targets_for(&self, source: u8) -> Vec<u8> {
+        self.links.iter()
+            .filter(|&&(s, _)| s == source)
+            .map(|&(_, t)| t)
+            .collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.links.clear();
+    }
+
+    pub fn resolve_forced(&self, winners: &[u8]) -> Vec<u8> {
+        let mut forced = Vec::new();
+        let mut visited = Vec::new();
+        let mut stack: Vec<u8> = winners.to_vec();
+
+        while let Some(node) = stack.pop() {
+            for &(src, tgt) in &self.links {
+                if src == node && !visited.contains(&tgt) {
+                    visited.push(tgt);
+                    forced.push(tgt);
+                    stack.push(tgt);
+                }
+            }
+        }
+
+        forced
+    }
+
+    pub fn as_pairs(&self) -> &[(u8, u8)] {
+        &self.links
+    }
+
+    pub fn from_pairs(pairs: Vec<(u8, u8)>) -> Self {
+        Self { links: pairs }
+    }
+}
+
+impl Default for BeatLinks {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Clone, Debug)]
 struct NoteEvent {
@@ -55,6 +125,7 @@ pub struct Sequencer {
     next_event_idx: usize,
     beat_overrides: Option<[f32; 152]>,
     swing_override: Option<f32>,
+    pub beat_links: BeatLinks,
 }
 
 impl Sequencer {
@@ -92,6 +163,7 @@ impl Sequencer {
             next_event_idx: 0,
             beat_overrides: None,
             swing_override: None,
+            beat_links: BeatLinks::new(),
         }
     }
 
@@ -271,13 +343,92 @@ impl Sequencer {
         Some(midi.clamp(0, 127) as u8)
     }
 
+    fn create_note_event(
+        &self,
+        mode: BeatMode,
+        count: usize,
+        index: usize,
+        params: &DeviceParams,
+        strength_range: (f32, f32),
+        length_range: (f32, f32),
+        rng: &mut impl Rng,
+    ) -> NoteEvent {
+        let total_samples = self.bar_length_samples;
+        let (start, end) = DeviceParams::get_beat_time_span(mode, count, index);
+        let start_time = start;
+        let duration_normalized = end - start;
+
+        let strength = self.get_strength_at_position(start_time);
+
+        let note_length_percent = params.note_length_percent.modulated_plain_value();
+        let base_multiplier = note_length_percent / 100.0;
+
+        let length_mod_multiplier = params.calculate_length_multiplier(strength, rng);
+        let final_multiplier = base_multiplier * length_mod_multiplier;
+
+        let capped_multiplier = final_multiplier.min(2.0);
+        let duration_samples = ((duration_normalized * total_samples as f32) * capped_multiplier) as usize;
+
+        let position_shift = params.calculate_position_shift(strength, duration_normalized, rng);
+        let shifted_time = (start_time + position_shift).clamp(0.0, 1.0);
+
+        let swing_amount = self.swing_override
+            .unwrap_or_else(|| params.swing_amount.modulated_plain_value());
+        let swung_start_time = DeviceParams::apply_swing(shifted_time, swing_amount);
+        let sample_position = (swung_start_time * total_samples as f32) as usize;
+
+        let length_value = (capped_multiplier / 2.0).clamp(0.0, 1.0);
+
+        let midi_note = if self.melodic_config.enabled
+            && self.melodic_config.blend < 1.0
+            && rng.gen::<f32>() > self.melodic_config.blend
+        {
+            let root = self.note_pool.root_note.unwrap_or(48);
+            self.nearest_melodic_midi_note(start_time, root)
+                .unwrap_or_else(|| {
+                    self.note_pool.select_midi_note_with_length(strength, length_value, rng)
+                        .or(self.note_pool.root_note)
+                        .unwrap_or(48)
+                })
+        } else {
+            self.note_pool.select_midi_note_with_length(strength, length_value, rng)
+                .or(self.note_pool.root_note)
+                .unwrap_or(48)
+        };
+
+        let final_midi_note = if let Some(shift) = self.octave_randomization.should_shift(strength, length_value, rng) {
+            (midi_note as i16 + shift as i16 * 12).clamp(0, 127) as u8
+        } else {
+            midi_note
+        };
+
+        let frequency = midi_to_frequency(final_midi_note) as f64;
+
+        let abs_beat_length = ((duration_normalized.log2() + 5.0) / 5.0).clamp(0.0, 1.0);
+
+        let relative_strength = Self::normalize_to_range(strength, strength_range.0, strength_range.1);
+        let relative_length = Self::normalize_to_range(abs_beat_length, length_range.0, length_range.1);
+
+        let velocity = params.calculate_velocity_relative(
+            relative_strength,
+            relative_length,
+            rng,
+        );
+
+        NoteEvent {
+            sample_position,
+            frequency,
+            duration_samples,
+            velocity,
+            midi_note: final_midi_note,
+        }
+    }
+
     fn generate_bar_into(&mut self, params: &DeviceParams) {
         self.scratch_events.clear();
         self.scratch_start_times.clear();
         self.scratch_lost_beats.clear();
         let mut rng = rand::thread_rng();
-
-        let total_samples = self.bar_length_samples;
 
         let strength_range = self.get_strength_range();
         let length_range = self.get_enabled_length_range(params);
@@ -298,6 +449,7 @@ impl Sequencer {
         self.scratch_start_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let mut occupied_until: f32 = 0.0;
+        let mut won_flat_indices: Vec<u8> = Vec::new();
 
         for st_idx in 0..self.scratch_start_times.len() {
             let start_time = self.scratch_start_times[st_idx];
@@ -352,76 +504,16 @@ impl Sequencer {
                         let (mode, count, index, probability) = self.scratch_candidates[idx];
                         cumulative += probability;
                         if random_value < cumulative {
-                            let (start, end) = DeviceParams::get_beat_time_span(mode, count, index);
-                            let duration_normalized = end - start;
-
-                            let strength = self.get_strength_at_position(start_time);
-
-                            let note_length_percent = params.note_length_percent.modulated_plain_value();
-                            let base_multiplier = note_length_percent / 100.0;
-
-                            let length_mod_multiplier = params.calculate_length_multiplier(strength, &mut rng);
-                            let final_multiplier = base_multiplier * length_mod_multiplier;
-
-                            let capped_multiplier = final_multiplier.min(2.0);
-                            let duration_samples = ((duration_normalized * total_samples as f32) * capped_multiplier) as usize;
-
-                            let position_shift = params.calculate_position_shift(strength, duration_normalized, &mut rng);
-                            let shifted_time = (start_time + position_shift).clamp(0.0, 1.0);
-
-                            let swing_amount = self.swing_override
-                                .unwrap_or_else(|| params.swing_amount.modulated_plain_value());
-                            let swung_start_time = DeviceParams::apply_swing(shifted_time, swing_amount);
-                            let sample_position = (swung_start_time * total_samples as f32) as usize;
-
-                            let length_value = (capped_multiplier / 2.0).clamp(0.0, 1.0);
-
-                            let midi_note = if self.melodic_config.enabled
-                                && self.melodic_config.blend < 1.0
-                                && rng.gen::<f32>() > self.melodic_config.blend
-                            {
-                                let root = self.note_pool.root_note.unwrap_or(48);
-                                self.nearest_melodic_midi_note(start_time, root)
-                                    .unwrap_or_else(|| {
-                                        self.note_pool.select_midi_note_with_length(strength, length_value, &mut rng)
-                                            .or(self.note_pool.root_note)
-                                            .unwrap_or(48)
-                                    })
-                            } else {
-                                self.note_pool.select_midi_note_with_length(strength, length_value, &mut rng)
-                                    .or(self.note_pool.root_note)
-                                    .unwrap_or(48)
-                            };
-
-                            let final_midi_note = if let Some(shift) = self.octave_randomization.should_shift(strength, length_value, &mut rng) {
-                                (midi_note as i16 + shift as i16 * 12).clamp(0, 127) as u8
-                            } else {
-                                midi_note
-                            };
-
-                            let frequency = midi_to_frequency(final_midi_note) as f64;
-
-                            let abs_beat_length = ((duration_normalized.log2() + 5.0) / 5.0).clamp(0.0, 1.0);
-
-                            let relative_strength = Self::normalize_to_range(strength, strength_range.0, strength_range.1);
-                            let relative_length = Self::normalize_to_range(abs_beat_length, length_range.0, length_range.1);
-
-                            let velocity = params.calculate_velocity_relative(
-                                relative_strength,
-                                relative_length,
-                                &mut rng
+                            let event = self.create_note_event(
+                                mode, count, index, params,
+                                strength_range, length_range, &mut rng,
                             );
+                            self.scratch_events.push(event);
 
-                            self.scratch_events.push(NoteEvent {
-                                sample_position,
-                                frequency,
-                                duration_samples,
-                                velocity,
-                                midi_note: final_midi_note,
-                            });
-
+                            let (_, end) = DeviceParams::get_beat_time_span(mode, count, index);
                             occupied_until = end;
                             winner_idx = Some(idx);
+                            won_flat_indices.push(flat_index(mode, count, index) as u8);
                             break;
                         }
                     }
@@ -440,6 +532,21 @@ impl Sequencer {
                         self.scratch_lost_beats.push((end, probability));
                     }
                 }
+            }
+        }
+
+        if !won_flat_indices.is_empty() {
+            let forced = self.beat_links.resolve_forced(&won_flat_indices);
+            for forced_fi in forced {
+                if won_flat_indices.contains(&forced_fi) {
+                    continue;
+                }
+                let (mode, count, index) = ml_suggest::reverse_flat_index(forced_fi as usize);
+                let event = self.create_note_event(
+                    mode, count, index, params,
+                    strength_range, length_range, &mut rng,
+                );
+                self.scratch_events.push(event);
             }
         }
 
