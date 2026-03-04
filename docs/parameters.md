@@ -1,316 +1,194 @@
-# PhaseBurn - Parameter Reference
-
-Complete reference of all parameters and UI controls.
-
-## UI Pages Overview
-
-| Page | Purpose |
-|------|---------|
-| Beats | Beat probability sliders (91 params) |
-| Length | Note duration and modifiers |
-| Notes | Piano roll note selection |
-| Strength | 96-position beat strength grid |
-| Synth | Sound design controls (SOUND / ENV & FX / MOD / STEP MOD tabs) |
-| Presets | Save/load presets |
-
-## Synth Page - Tab A
-
-### PLL Reference (Yellow Group)
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_pll_ref_octave | Oct | -3 to +3 | 0 | Reference octave |
-| synth_pll_ref_tune | Tune | -12 to +12 | 0 | Semitone offset |
-| synth_pll_ref_fine_tune | Fine | -1.0 to +1.0 | 0.0 | Fine tune (cents-like) |
-| synth_pll_ref_pulse_width | PW | 0.01-0.99 | 0.5 | Reference pulse width |
-
-### PLL Loop (Blue Group)
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_pll_track_speed | Trk | 0.0-1.0 | 0.5 | Tracking speed |
-| synth_pll_damping | Dmp | 0.0-1.0 | 0.3 | Loop filter damping |
-| synth_pll_influence | Inf | 0.0-1.0 | 0.5 | Phase influence |
-| synth_pll_mult | Mlt | 1,2,4,8,16,32,64 | 1 | Frequency multiplier |
-| synth_pll_feedback | FB | 0.0-1.0 | 0.0 | Output feedback |
-
-### PLL Stereo (Purple Group)
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_pll_stereo_damp_offset | StΔ | 0.0-0.5 | 0.0 | Damping L/R offset |
-| synth_pll_stereo_track_offset | StTrkΔ | 0.0-0.5 | 0.0 | Track speed L/R offset |
-| synth_pll_stereo_phase | StPh | 0.0-1.0 | 0.0 | Phase L/R offset |
-| synth_pll_cross_feedback | XFB | 0.0-1.0 | 0.0 | Cross-channel feedback |
-
-### PLL FM
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_pll_fm_amount | FM | 0.0-1.0 | 0.0 | FM modulation depth |
-| synth_pll_fm_ratio | Ratio | 1-16 | 1 | FM frequency ratio |
-| synth_pll_fm_env_amount | FMEnv | 0.0-1.0 | 0.0 | Filter env to FM |
-
-### PLL Advanced
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_pll_retrigger | Retrig | 0.0-1.0 | 0.05 | Note retrigger behavior |
-| synth_pll_burst_threshold | BstTh | 0.0-1.0 | 0.7 | Overtrack threshold |
-| synth_pll_burst_amount | BstAmt | 0.0-10.0 | 3.3 | Overtrack intensity |
-| synth_pll_loop_saturation | LoopSat | 1-500 | 100 | Integrator limit |
-| synth_pll_color_amount | ColorAmt | 0.0-1.0 | 0.25 | Harmonic saturation |
-| synth_pll_edge_sensitivity | EdgeSns | 0.001-0.2 | 0.02 | PFD edge threshold |
-| synth_pll_range | Rng | 0.0-1.0 | 1.0 | PLL lock bandwidth (slow→fast) |
-
-### PLL Output
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_pll_volume | Vol | 0.0-1.0 | 0.0 | PLL output level |
-| synth_pll_glide | Glide | 0-500 ms | 0 | Portamento time |
-
-### PLL Modes (Switches)
-
-| ID | Name | Description |
-|----|------|-------------|
-| synth_pll_colored | Color | Enable harmonic coloration |
-| synth_pll_mode | Mode | false=AnalogLikePD, true=EdgePFD |
-| synth_pll_mult_slew | FAST/SLOW | Tempo-synced multiplier slew: FAST=1/16 note, SLOW=1/1 note |
-| synth_pll_precision | PREC | Precision mode: ON=ωn/ζ-based loop coefficients with cubic speed curve, OFF=legacy ad-hoc loop |
-| synth_pll_enable | Enable | Bypass PLL oscillator |
-
-### VPS Oscillator
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_osc_d | D | 0.0-1.0 | 0.5 | Phase distortion |
-| synth_osc_v | V | 0.0-1.0 | 0.5 | Shape/timbre |
-| synth_osc_stereo_v_offset | VΔ | 0.0-0.3 | 0.0 | V offset L/R |
-| synth_osc_stereo_d_offset | DΔ | 0.0-0.3 | 0.0 | D offset L/R |
-| synth_osc_octave | Oct | -3 to +3 | 0 | Octave shift |
-| synth_osc_tune | Tune | -12 to +12 | 0 | Semitone offset |
-| synth_osc_fine | Fine | -1.0 to +1.0 | 0.0 | Fine tune (cents) |
-| synth_osc_fold | Fold | 0.0-1.0 | 0.0 | Wavefold amount |
-| synth_vps_shape_type | SHP | 0-1 | 0 | Waveshaper type (0=Soft, 1=Foldback) |
-| synth_vps_shape_amount | SHP | 0.0-1.0 | 0.0 | Waveshaper intensity |
-| synth_vps_phase_mode | Phase | 0-1 | 0 | Phase mode (0=Free, 1=PLL Sync) |
-| synth_osc_volume | Vol | 0.0-1.0 | 1.0 | VPS output level |
-| synth_vps_enable | Enable | - | true | Bypass VPS oscillator |
-
-### Sub Oscillator
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_sub_volume | Sub | 0.0-1.0 | 0.0 | Sub level (-1 oct, sine) |
-
-### SAW Oscillator
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_saw_enable | Enable | bool | false | Enable SAW oscillator |
-| synth_saw_volume | Vol | 0.0-1.0 | 0.0 | SAW output level |
-| synth_saw_octave | Oct | -3 to +3 | 0 | Octave shift |
-| synth_saw_tune | Tune | -12 to +12 | 0 | Semitone offset |
-| synth_saw_fold | Fold | 0.0-1.0 | 0.0 | Wavefold amount |
-| synth_saw_fold_range | Fold Range | 0-1 | 0 | Fold mode (0=1X sin(x), 1=PI sin(x*PI)) |
-| synth_saw_shape_type | Shape | 0-2 | 0 | Waveshaper type |
-| synth_saw_shape_amount | SHP | 0.0-1.0 | 0.0 | Waveshaper intensity |
-
-## Synth Page - Tab B
-
-### Coloration
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_ring_mod | Ring | 0.0-1.0 | 0.0 | VPS×PLL ring mod |
-| synth_wavefold | Fold | 0.0-1.0 | 0.0 | Wavefolder amount |
-| synth_drift_amount | Drift | 0.0-1.0 | 0.0 | Pitch drift depth |
-| synth_drift_rate | Rate | 0.0-1.0 | 0.3 | Drift LFO speed |
-| synth_noise_amount | Noise | 0.0-1.0 | 0.0 | White noise level |
-| synth_tube_drive | Tube | 0.0-1.0 | 0.0 | Tube saturation |
-| synth_color_distortion_amount | Dist | 0.0-1.0 | 0.0 | Distortion drive amount |
-| synth_color_distortion_threshold | Thr | 0.1-1.0 | 0.7 | Soft clipping threshold |
-| synth_coloration_enable | Enable | - | true | Bypass coloration |
-
-### Formant
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_formant_mix | Mix | 0.0-1.0 | 0.0 | Dry/formant blend |
-| synth_formant_vowel | Vowel | 0.0-1.0 | 0.0 | A→E→I→O→U morph |
-| synth_formant_shift | Shift | -2.0 to +2.0 | 0.0 | Frequency shift (oct) |
-| synth_formant_enable | Enable | - | true | Bypass formant |
-
-### Volume Envelope
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_vol_attack | Atk | 1-5000 ms | 1 | Attack time |
-| synth_vol_attack_shape | AtkSh | -5 to +5 | 0 | Attack curve |
-| synth_vol_decay | Dec | 1-10000 ms | 20 | Decay time |
-| synth_vol_decay_shape | DecSh | -5 to +5 | 0 | Decay curve |
-| synth_vol_sustain | Sus | 0.0-1.0 | 1.0 | Sustain level |
-| synth_vol_release | Rel | 1-10000 ms | 5 | Release time |
-| synth_vol_release_shape | RelSh | -5 to +5 | 0 | Release curve |
-
-### Master HPF
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| master_hpf | HPF | 0-4 | 0 | Master highpass filter (0=Off, 1=35Hz, 2=80Hz, 3=120Hz, 4=220Hz) |
-| master_hpf_boost | Boost | 0-2 | 0 | HPF resonance boost (0=Flat, 1=Medium Q=2.0, 2=High Q=4.0) |
-| master_hpf_sub | Sub | 0-1 | 0 | Sub routing (0=OUT bypasses HPF, 1=IN through HPF) |
-
-### Brilliance
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| brilliance_amount | AMT | 0.0-1.0 | 0.0 | High-shelf boost amount (0=off) |
-| brilliance_drive | DRV | 0.0-1.0 | 0.0 | Saturation intensity on extracted highs |
-
-### Master
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| synth_volume | Vol | 0.0-1.0 | 0.8 | Master output |
-
-### Quality Settings
-
-| ID | Name | Options | Default | Description |
-|----|------|---------|---------|-------------|
-| synth_oversampling_factor | OS | 0=1x, 1=2x, 2=4x, 3=8x, 4=16x, 5=32x, 6=64x, 7=128x | 0 | Oversampling factor |
-
-**How it works:**
-- Base rate = DAW/system sample rate (automatic)
-- Processing rate = Base rate × Oversampling factor
-
-**Examples:**
-- DAW at 48k, OS=1x → processes at 48k
-- DAW at 48k, OS=4x → processes at 192k, 4x downsampling
-- DAW at 192k, OS=1x → processes at 192k (recommended for high sample rates)
-- DAW at 192k, OS=2x → processes at 384k (very CPU intensive)
-
-## Synth Page - MOD Tab
-
-### LFO 1/2/3 (identical structure)
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| lfo[N]_rate | Rate | 0.01-50 Hz | 1.0 | Free-run frequency |
-| lfo[N]_waveform | Wave | 0-4 | 0 | Shape (see below) |
-| lfo[N]_tempo_sync | Sync | bool | false | Lock to tempo |
-| lfo[N]_sync_division | Div | 0-13 | 2 | Sync division |
-| lfo[N]_sync_source | Src | -1 to 2 | -1 | Cross-mod source |
-| lfo[N]_phase_mod | PhMod | 0.0-1.0 | 0.0 | Phase mod amount |
-| lfo[N]_dest1 | Dst1 | 0-25 | 0 | First destination |
-| lfo[N]_amount1 | Amt1 | -1.0 to +1.0 | 0.0 | First mod amount |
-| lfo[N]_dest2 | Dst2 | 0-25 | 0 | Second destination |
-| lfo[N]_amount2 | Amt2 | -1.0 to +1.0 | 0.0 | Second mod amount |
-
-**Waveforms:** 0=Sine, 1=Triangle, 2=Saw, 3=Square, 4=Sample&Hold
-
-**Sync Divisions:**
-0=1/1, 1=1/2, 2=1/4, 3=1/8, 4=1/16, 5=1/32,
-6=1/2D, 7=1/4D, 8=1/8D, 9=1/16D,
-10=1/2T, 11=1/4T, 12=1/8T, 13=1/16T
-
-**Mod Destinations** (indices preserved for preset compatibility, UI sorted by group):
-0=None |
-PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult (discrete), 21=Mult D (continuous) |
-Sub: 19=Vol |
-VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol |
-SAW: 28=Fold, 29=SHP, 30=Vol |
-Coloration: 13=Drift, 14=Tube
-
-## Synth Page - STEP MOD Tab
-
-### Modulation Step Sequencer
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| mseq_step_[1-16] | Step N | -1.0 to +1.0 | 0.0 | Bipolar step value |
-| mseq_ties | Ties | 0-65535 | 0 | Bitmask: bit N = step N tied to N+1 |
-| mseq_division | Rate | 0-13 | 3 (1/8) | Step rate division (same as LFO) |
-| mseq_slew | Slew | 0-200 ms | 5.0 | Transition smoothing for non-tied steps |
-| mseq_dest1 | Dst1 | 0-25 | 0 | First destination |
-| mseq_amount1 | Amt1 | -1.0 to +1.0 | 0.0 | First mod amount |
-| mseq_dest2 | Dst2 | 0-25 | 0 | Second destination |
-| mseq_amount2 | Amt2 | -1.0 to +1.0 | 0.0 | Second mod amount |
-
-**Tie behavior:** When a step's tie flag is set, the output linearly interpolates from the current step value to the next step value over the step duration (303-style glide). Non-tied steps use the slew parameter for smooth transitions.
-
-## Length Page
-
-### Base Length
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| note_length_percent | Length | 1-200% | 100 | Base note duration |
-
-### Length Modifiers (×2)
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| len_mod_[N]_target | Target | -100 to +100 | 0 | Beat strength target |
-| len_mod_[N]_amount | Amount | -100 to +100 | 0 | Duration modifier (-100=shortest, +100=2×) |
-| len_mod_[N]_prob | Prob | 0-127 | 0 | Chance of applying |
-
-### Decay Modifiers (×2)
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| decay_mod_[N]_target | Target | -100 to +100 | 0 | Beat strength target |
-| decay_mod_[N]_amount | Amount | -100 to +100 | 0 | Decay modifier (-100=shortest, +100=2×) |
-| decay_mod_[N]_prob | Prob | 0-127 | 0 | Chance of applying |
-
-### Position Modifiers (×2)
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| pos_mod_[N]_target | Target | -100 to +100 | 0 | Beat strength target |
-| pos_mod_[N]_shift | Shift | -50% to +50% | 0 | Time shift |
-| pos_mod_[N]_prob | Prob | 0-127 | 0 | Chance of applying |
-
-## Beats Page
-
-### Swing
-
-| ID | Name | Range | Default | Description |
-|----|------|-------|---------|-------------|
-| swing_amount | Swing | 50-75% | 50 | Eighth-note swing |
-
-### Beat Probabilities (152 total)
-
-### Straight (63 params)
-div1_beat1 (1), div2_beat[1-2] (2), div4_beat[1-4] (4), div8_beat[1-8] (8), div16_beat[1-16] (16), div32_beat[1-32] (32)
-
-### Triplet (45 params)
-div3t_beat[1-3] (3), div6t_beat[1-6] (6), div12t_beat[1-12] (12), div24t_beat[1-24] (24)
-
-### Dotted (44 params)
-div2d_beat[1-2] (2), div3d_beat[1-3] (3), div6d_beat[1-6] (6), div11d_beat[1-11] (11), div22d_beat[1-22] (22)
-
-All beat params: Range 0-127, Default 0
-
-## Notes Page (UI State)
-
-Settings stored in SharedUiState, not plugin params:
-
-| Setting | Description |
-|---------|-------------|
-| note_pool | List of NoteSelection with chance and bias |
-| root_note | MIDI note number of root |
-
-## Strength Page (UI State)
-
-| Setting | Description |
-|---------|-------------|
-| strength_values | 96-position array (0.0-1.0) |
-
-## MIDI CC Support
-
-MIDI CCs are received but currently not mapped to parameters. The infrastructure exists in `midi.rs` for:
-- Standard 7-bit CCs (0-127)
-- 14-bit CCs via MSB/LSB pairs
-- NRPN addressing
+# Parameter Reference
+
+## PLL Reference
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_pll_ref_octave | Oct | -3..+3 | 0 |
+| synth_pll_ref_tune | Tune | -12..+12 | 0 |
+| synth_pll_ref_fine_tune | Fine | -1.0..+1.0 | 0.0 |
+| synth_pll_ref_pulse_width | PW | 0.01–0.99 | 0.5 |
+
+## PLL Loop
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_pll_track_speed | Trk | 0.0–1.0 | 0.5 |
+| synth_pll_damping | Dmp | 0.0–1.0 | 0.3 |
+| synth_pll_influence | Inf | 0.0–1.0 | 0.5 |
+| synth_pll_mult | Mlt | 1,2,4,8,16,32,64 | 1 |
+| synth_pll_feedback | FB | 0.0–1.0 | 0.0 |
+
+## PLL Stereo
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_pll_stereo_damp_offset | StΔ | 0.0–0.5 | 0.0 |
+| synth_pll_stereo_track_offset | StTrkΔ | 0.0–0.5 | 0.0 |
+| synth_pll_stereo_phase | StPh | 0.0–1.0 | 0.0 |
+| synth_pll_cross_feedback | XFB | 0.0–1.0 | 0.0 |
+
+## PLL FM
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_pll_fm_amount | FM | 0.0–1.0 | 0.0 |
+| synth_pll_fm_ratio | Ratio | 1–16 | 1 |
+| synth_pll_fm_env_amount | FMEnv | 0.0–1.0 | 0.0 |
+
+## PLL Advanced
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_pll_retrigger | Retrig | 0.0–1.0 | 0.05 |
+| synth_pll_burst_threshold | BstTh | 0.0–1.0 | 0.7 |
+| synth_pll_burst_amount | BstAmt | 0.0–10.0 | 3.3 |
+| synth_pll_loop_saturation | LoopSat | 1–500 | 100 |
+| synth_pll_color_amount | ColorAmt | 0.0–1.0 | 0.25 |
+| synth_pll_edge_sensitivity | EdgeSns | 0.001–0.2 | 0.02 |
+| synth_pll_range | Rng | 0.0–1.0 | 1.0 |
+
+## PLL Output & Modes
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_pll_volume | Vol | 0.0–1.0 | 0.0 |
+| synth_pll_glide | Glide | 0–500ms | 0 |
+| synth_pll_colored | Color | bool | - |
+| synth_pll_mode | Mode | false=AnalogPD, true=EdgePFD | false |
+| synth_pll_mult_slew | FAST/SLOW | FAST=1/16, SLOW=1/1 | - |
+| synth_pll_precision | PREC | bool | true |
+| synth_pll_enable | Enable | bool | - |
+
+## VPS
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_osc_d | D | 0.0–1.0 | 0.5 |
+| synth_osc_v | V | 0.0–1.0 | 0.5 |
+| synth_osc_stereo_v_offset | VΔ | 0.0–0.3 | 0.0 |
+| synth_osc_stereo_d_offset | DΔ | 0.0–0.3 | 0.0 |
+| synth_osc_octave | Oct | -3..+3 | 0 |
+| synth_osc_tune | Tune | -12..+12 | 0 |
+| synth_osc_fine | Fine | -1.0..+1.0 | 0.0 |
+| synth_osc_fold | Fold | 0.0–1.0 | 0.0 |
+| synth_vps_shape_type | SHP | 0=Soft, 1=Foldback | 0 |
+| synth_vps_shape_amount | SHP | 0.0–1.0 | 0.0 |
+| synth_vps_phase_mode | Phase | 0=Free, 1=PLL Sync | 0 |
+| synth_osc_volume | Vol | 0.0–1.0 | 1.0 |
+| synth_vps_enable | Enable | bool | true |
+
+## SAW
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_saw_enable | Enable | bool | false |
+| synth_saw_volume | Vol | 0.0–1.0 | 0.0 |
+| synth_saw_octave | Oct | -3..+3 | 0 |
+| synth_saw_tune | Tune | -12..+12 | 0 |
+| synth_saw_fold | Fold | 0.0–1.0 | 0.0 |
+| synth_saw_fold_range | Fold Range | 0=1X, 1=PI | 0 |
+| synth_saw_shape_type | Shape | 0–2 | 0 |
+| synth_saw_shape_amount | SHP | 0.0–1.0 | 0.0 |
+
+## Sub
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_sub_volume | Sub | 0.0–1.0 | 0.0 |
+
+## Coloration
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_ring_mod | Ring | 0.0–1.0 | 0.0 |
+| synth_wavefold | Fold | 0.0–1.0 | 0.0 |
+| synth_drift_amount | Drift | 0.0–1.0 | 0.0 |
+| synth_drift_rate | Rate | 0.0–1.0 | 0.3 |
+| synth_noise_amount | Noise | 0.0–1.0 | 0.0 |
+| synth_tube_drive | Tube | 0.0–1.0 | 0.0 |
+| synth_color_distortion_amount | Dist | 0.0–1.0 | 0.0 |
+| synth_color_distortion_threshold | Thr | 0.1–1.0 | 0.7 |
+| synth_coloration_enable | Enable | bool | true |
+
+## Formant
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_formant_mix | Mix | 0.0–1.0 | 0.0 |
+| synth_formant_vowel | Vowel | 0.0–1.0 | 0.0 |
+| synth_formant_shift | Shift | -2.0..+2.0 | 0.0 |
+| synth_formant_enable | Enable | bool | true |
+
+## Volume Envelope
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_vol_attack | Atk | 1–5000ms | 1 |
+| synth_vol_attack_shape | AtkSh | -5..+5 | 0 |
+| synth_vol_decay | Dec | 1–10000ms | 20 |
+| synth_vol_decay_shape | DecSh | -5..+5 | 0 |
+| synth_vol_sustain | Sus | 0.0–1.0 | 1.0 |
+| synth_vol_release | Rel | 1–10000ms | 5 |
+| synth_vol_release_shape | RelSh | -5..+5 | 0 |
+
+## Master
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| master_hpf | HPF | 0=Off, 1=35Hz, 2=80Hz, 3=120Hz, 4=220Hz | 0 |
+| master_hpf_boost | Boost | 0=Flat, 1=Med Q2, 2=High Q4 | 0 |
+| master_hpf_sub | Sub | 0=OUT, 1=IN | 0 |
+| brilliance_amount | AMT | 0.0–1.0 | 0.0 |
+| brilliance_drive | DRV | 0.0–1.0 | 0.0 |
+| synth_volume | Vol | 0.0–1.0 | 0.8 |
+| synth_oversampling_factor | OS | 0=1x..7=128x | 0 |
+
+## LFO 1/2/3
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| lfo[N]_rate | Rate | 0.01–50Hz | 1.0 |
+| lfo[N]_waveform | Wave | 0=Sin,1=Tri,2=Saw,3=Sq,4=S&H | 0 |
+| lfo[N]_tempo_sync | Sync | bool | false |
+| lfo[N]_sync_division | Div | 0–13 | 2 |
+| lfo[N]_sync_source | Src | -1..2 | -1 |
+| lfo[N]_phase_mod | PhMod | 0.0–1.0 | 0.0 |
+| lfo[N]_dest1/dest2 | Dst | 0–30 | 0 |
+| lfo[N]_amount1/amount2 | Amt | -1.0..+1.0 | 0.0 |
+
+**Sync divisions:** 0=1/1, 1=1/2, 2=1/4, 3=1/8, 4=1/16, 5=1/32, 6=1/2D, 7=1/4D, 8=1/8D, 9=1/16D, 10=1/2T, 11=1/4T, 12=1/8T, 13=1/16T
+
+**Mod destinations:** 0=None | PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult, 21=MultD | Sub: 19=Vol | VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol | SAW: 28=Fold, 29=SHP, 30=Vol | Color: 13=Drift, 14=Tube
+
+## Step Modulator
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| mseq_step_[1-16] | Step N | -1.0..+1.0 | 0.0 |
+| mseq_ties | Ties | 0–65535 bitmask | 0 |
+| mseq_division | Rate | 0–13 | 3 |
+| mseq_slew | Slew | 0–200ms | 5.0 |
+| mseq_dest1/dest2 | Dst | 0–30 | 0 |
+| mseq_amount1/amount2 | Amt | -1.0..+1.0 | 0.0 |
+
+## Sequencer
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| swing_amount | Swing | 50–75% | 50 |
+| note_length_percent | Length | 1–200% | 100 |
+
+Beat probabilities: 152 params (div[X]_beat[Y]), range 0–127, default 0. See `sequencer.md` for slot layout.
+
+**Length/Decay/Position modifiers:** 2 slots each with target (-100..+100), amount, prob (0–127).
+
+**Velocity modifiers:** Strength-based and length-based, each with target, amount (-99..+27), prob.
+
+## UI State (not plugin params)
+
+| Setting | Location |
+|---------|----------|
+| note_pool | SharedUiState |
+| root_note | SharedUiState |
+| strength_values [96] | SharedUiState |
