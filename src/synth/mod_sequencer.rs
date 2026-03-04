@@ -1,4 +1,4 @@
-use synfx_dsp::SlewValue;
+use super::dsp::SlewValue;
 use super::lfo::{LfoSyncDivision, ModDestination, ModulationValues};
 
 pub struct ModSequencer {
@@ -8,12 +8,12 @@ pub struct ModSequencer {
     sample_rate: f64,
     division: LfoSyncDivision,
     slew_time_ms: f64,
-    output_slew: SlewValue<f64>,
+    output_slew: SlewValue,
     current_step: usize,
 
     destinations: [ModDestination; 2],
     amounts: [f64; 2],
-    amount_slews: [SlewValue<f64>; 2],
+    amount_slews: [SlewValue; 2],
 }
 
 impl ModSequencer {

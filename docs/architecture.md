@@ -8,7 +8,7 @@ Monophonic synthesizer + probability sequencer. Rust, nih-plug, egui.
 |-----------|------------|
 | Language | Rust nightly (portable SIMD) |
 | Plugin | nih-plug (VST3, CLAP, Standalone) |
-| DSP | synfx-dsp v0.5 |
+| DSP | Custom f64 (oversampling, oscillators, distortion) |
 | GUI | egui + taffy layout |
 | Audio | JACK, CoreAudio, ALSA, WASAPI |
 

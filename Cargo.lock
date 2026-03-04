@@ -1997,7 +1997,6 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
- "synfx-dsp",
 ]
 
 [[package]]
@@ -2462,15 +2461,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "synfx-dsp"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a8a7afb0675c9a5d5c61db5119104c50898c4cf120ae73ac9f9e53d485ae5df"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]

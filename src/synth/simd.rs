@@ -171,7 +171,7 @@ pub fn stereo_tube_saturate(s: Stereo, drive: f64) -> Stereo {
     result * Stereo::splat(1.0 - drive * 0.3)
 }
 
-/// Bram de Jong waveshaper distortion (same as synfx_dsp::f_distort)
+/// Bram de Jong waveshaper distortion (stereo SIMD version of dsp::f_distort)
 /// f(x,a) = x*(abs(x) + a)/(x^2 + (a-1)*abs(x) + 1)
 #[inline(always)]
 pub fn stereo_distort_bram(s: Stereo, gain: f64, threshold: f64) -> Stereo {

@@ -4,7 +4,7 @@
 
 ### VPS (Variable Phase Shaping)
 
-Waveshaping oscillator using synfx-dsp's VPSOscillator. **D** controls phase distortion, **V** morphs timbre. Stereo V/D offsets create width through different L/R parameters.
+Waveshaping oscillator based on Vector Phase Shaping (Kleimola et al.). **D** controls phase distortion, **V** morphs timbre. Stereo V/D offsets create width through different L/R parameters. Custom f64 implementation for full double-precision throughout the signal path.
 
 **Phase modes:** FREE (random phase on trigger) or SYNC (resets on PLL reference cycle → hard sync character).
 

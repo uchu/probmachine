@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use synfx_dsp::{VPSOscillator, PolyBlepOscillator, rand_01};
+use super::dsp::{VPSOscillator, PolyBlepOscillator, rand_01, poly_blep_f64};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum PllMode {
@@ -16,84 +16,62 @@ pub enum VpsPhaseMode {
 
 pub struct Oscillator {
     osc: VPSOscillator,
-    sample_rate: f64,
     freq: f64,
-    d: f64,
-    v: f64,
-    phase: f64,
+    israte: f64,
 }
 
 impl Oscillator {
     pub fn new(sample_rate: f64) -> Self {
         Self {
             osc: VPSOscillator::new(rand_01() * 0.25),
-            sample_rate,
             freq: 220.0,
-            d: 0.5,
-            v: 0.5,
-            phase: 0.0,
+            israte: 1.0 / sample_rate,
         }
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: f64) {
-        self.sample_rate = sample_rate;
+        self.israte = 1.0 / sample_rate;
     }
 
     pub fn set_frequency(&mut self, freq: f64) {
         self.freq = freq;
     }
 
-    pub fn set_params(&mut self, d: f64, v: f64) {
-        self.d = d;
-        self.v = v;
-    }
-
     pub fn trigger(&mut self) {
-        self.phase = rand_01() as f64 * 0.25;
+        self.osc.set_phase(rand_01() * 0.25);
     }
 
     pub fn hard_reset(&mut self) {
-        self.phase = 0.0;
+        self.osc.set_phase(0.0);
     }
 
     pub fn sync_reset(&mut self) {
-        self.phase = 0.0;
+        self.osc.set_phase(0.0);
     }
 
     pub fn next(&mut self, d: f64, v: f64) -> f64 {
-        let israte = 1.0 / self.sample_rate;
-        let d_f32 = d as f32;
-        let v_f32 = v as f32;
-        let v_limited = VPSOscillator::limit_v(d_f32, v_f32);
-
-        self.phase += self.freq * israte;
-        if self.phase >= 1.0 {
-            self.phase -= 1.0;
-        }
-
-        self.osc.next(self.freq as f32, israte as f32, d_f32, v_limited) as f64
+        let v_limited = VPSOscillator::limit_v(d, v);
+        self.osc.next(self.freq, self.israte, d, v_limited)
     }
 }
 
 pub struct PolyBlepWrapper {
     osc: PolyBlepOscillator,
-    sample_rate: f64,
     freq: f64,
-    phase: f64,
+    israte: f64,
 }
 
 impl PolyBlepWrapper {
     pub fn new(sample_rate: f64) -> Self {
         Self {
             osc: PolyBlepOscillator::new(rand_01() * 0.25),
-            sample_rate,
             freq: 220.0,
-            phase: rand_01() as f64 * 0.25,
+            israte: 1.0 / sample_rate,
         }
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: f64) {
-        self.sample_rate = sample_rate;
+        self.israte = 1.0 / sample_rate;
     }
 
     pub fn set_frequency(&mut self, freq: f64) {
@@ -101,29 +79,19 @@ impl PolyBlepWrapper {
     }
 
     pub fn next(&mut self, pulse_width: f64) -> f64 {
-        let israte = 1.0 / self.sample_rate;
-        self.phase += self.freq * israte;
-        if self.phase >= 1.0 {
-            self.phase -= 1.0;
-        }
-        self.osc.next_pulse(self.freq as f32, israte as f32, pulse_width as f32) as f64
+        self.osc.next_pulse(self.freq, self.israte, pulse_width)
     }
 
     pub fn next_sin(&mut self) -> f64 {
-        let israte = 1.0 / self.sample_rate;
-        self.phase += self.freq * israte;
-        if self.phase >= 1.0 {
-            self.phase -= 1.0;
-        }
-        self.osc.next_sin(self.freq as f32, israte as f32) as f64
+        self.osc.next_sin(self.freq, self.israte)
     }
 
     pub fn get_phase(&self) -> f64 {
-        self.phase
+        self.osc.get_phase()
     }
 
     pub fn reset_phase(&mut self) {
-        self.phase = 0.0;
+        self.osc.set_phase(0.0);
     }
 }
 
@@ -143,7 +111,7 @@ impl SawOscillator {
 
     pub fn new(sample_rate: f64) -> Self {
         Self {
-            phase: rand_01() as f64 * 0.25,
+            phase: rand_01() * 0.25,
             sample_rate,
             freq: 220.0,
             dc_block_x1: 0.0,
@@ -165,22 +133,9 @@ impl SawOscillator {
         self.phase = 0.0;
     }
 
-    #[inline]
-    fn poly_blep(t: f64, dt: f64) -> f64 {
-        if t < dt {
-            let t = t / dt;
-            2.0 * t - t * t - 1.0
-        } else if t > 1.0 - dt {
-            let t = (t - 1.0) / dt;
-            t * t + 2.0 * t + 1.0
-        } else {
-            0.0
-        }
-    }
-
     pub fn next(&mut self) -> f64 {
         let dt = self.freq / self.sample_rate;
-        let raw = 2.0 * self.phase - 1.0 - Self::poly_blep(self.phase, dt);
+        let raw = 2.0 * self.phase - 1.0 - poly_blep_f64(self.phase, dt);
 
         self.phase += dt;
         if self.phase >= 1.0 {
@@ -522,17 +477,6 @@ impl PLLOscillator {
             (false, true, false, frac)
         } else {
             (false, false, was_high, 0.0)
-        }
-    }
-
-    fn detect_edges(_prev: f64, cur: f64, up_th: f64, dn_th: f64, was_high: bool)
-        -> (bool, bool, bool) {
-        if !was_high && cur >= up_th {
-            (true, false, true)
-        } else if was_high && cur <= dn_th {
-            (false, true, false)
-        } else {
-            (false, false, was_high)
         }
     }
 

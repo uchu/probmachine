@@ -1,6 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
-use synfx_dsp::{Oversampling, SlewValue, apply_distortion};
+use super::dsp::{Oversampling, SlewValue, apply_distortion};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, SawOscillator, VpsPhaseMode};
 use super::envelope::{Envelope, TailEnvelope};
 use super::lfo::ModulationValues;
@@ -248,53 +248,53 @@ pub struct Voice {
     pll_tail_envelope: TailEnvelope,
 
     // ===== Slew Limiters =====
-    freq_slew: SlewValue<f64>,
-    pll_volume_slew: SlewValue<f64>,
-    pll_track_slew: SlewValue<f64>,
-    pll_damping_slew: SlewValue<f64>,
-    pll_influence_slew: SlewValue<f64>,
-    pll_feedback_slew: SlewValue<f64>,
-    pll_pulse_width_slew: SlewValue<f64>,
-    pll_stereo_offset_slew: SlewValue<f64>,
-    pll_fm_amount_slew: SlewValue<f64>,
-    pll_injection_amount_slew: SlewValue<f64>,
-    pll_burst_threshold_slew: SlewValue<f64>,
-    pll_burst_amount_slew: SlewValue<f64>,
-    pll_color_amount_slew: SlewValue<f64>,
-    pll_stereo_track_slew: SlewValue<f64>,
-    pll_stereo_phase_slew: SlewValue<f64>,
-    pll_fm_env_slew: SlewValue<f64>,
-    pll_range_slew: SlewValue<f64>,
+    freq_slew: SlewValue,
+    pll_volume_slew: SlewValue,
+    pll_track_slew: SlewValue,
+    pll_damping_slew: SlewValue,
+    pll_influence_slew: SlewValue,
+    pll_feedback_slew: SlewValue,
+    pll_pulse_width_slew: SlewValue,
+    pll_stereo_offset_slew: SlewValue,
+    pll_fm_amount_slew: SlewValue,
+    pll_injection_amount_slew: SlewValue,
+    pll_burst_threshold_slew: SlewValue,
+    pll_burst_amount_slew: SlewValue,
+    pll_color_amount_slew: SlewValue,
+    pll_stereo_track_slew: SlewValue,
+    pll_stereo_phase_slew: SlewValue,
+    pll_fm_env_slew: SlewValue,
+    pll_range_slew: SlewValue,
 
     // Coloration slews
-    ring_mod_slew: SlewValue<f64>,
-    wavefold_slew: SlewValue<f64>,
-    drift_amount_slew: SlewValue<f64>,
-    drift_rate_slew: SlewValue<f64>,
-    tube_drive_slew: SlewValue<f64>,
+    ring_mod_slew: SlewValue,
+    wavefold_slew: SlewValue,
+    drift_amount_slew: SlewValue,
+    drift_rate_slew: SlewValue,
+    tube_drive_slew: SlewValue,
 
     // VPS slew limiters
-    vps_d_slew: SlewValue<f64>,
-    vps_v_slew: SlewValue<f64>,
-    vps_volume_slew: SlewValue<f64>,
-    vps_stereo_offset_slew: SlewValue<f64>,
+    vps_d_slew: SlewValue,
+    vps_v_slew: SlewValue,
+    vps_volume_slew: SlewValue,
+    vps_stereo_offset_slew: SlewValue,
     vps_fold_slew: OnePoleSlewValue,
-    vps_stereo_d_offset_slew: SlewValue<f64>,
+    vps_stereo_d_offset_slew: SlewValue,
     vps_shape_amount_slew: OnePoleSlewValue,
 
     // Saw slew limiters
-    saw_volume_slew: SlewValue<f64>,
+    saw_volume_slew: SlewValue,
     saw_fold_slew: OnePoleSlewValue,
     saw_shape_amount_slew: OnePoleSlewValue,
 
     // Sub slew
-    sub_volume_slew: SlewValue<f64>,
+    sub_volume_slew: SlewValue,
 
     // Velocity slew for click-free velocity changes
-    velocity_slew: SlewValue<f64>,
+    velocity_slew: SlewValue,
 
     // Master volume slew for click-free volume changes
-    master_volume_slew: SlewValue<f64>,
+    master_volume_slew: SlewValue,
     target_master_volume: f64,
 
     // ===== Target Values =====
@@ -377,87 +377,89 @@ pub struct Voice {
     mod_env_retrigger_dip: f64,
 
     // Slews for modulation (critical for smooth, crackle-free modulation)
-    mod_slew_pll_damping: SlewValue<f64>,
-    mod_slew_pll_influence: SlewValue<f64>,
-    mod_slew_pll_track: SlewValue<f64>,
-    mod_slew_pll_feedback: SlewValue<f64>,
-    mod_slew_pll_fm: SlewValue<f64>,
-    mod_slew_pll_injection: SlewValue<f64>,
-    mod_slew_pll_mult_slew: SlewValue<f64>,
-    mod_slew_pll_pw: SlewValue<f64>,
-    mod_slew_pll_stereo_phase: SlewValue<f64>,
-    mod_slew_pll_fm_env: SlewValue<f64>,
-    mod_slew_pll_burst: SlewValue<f64>,
-    mod_slew_pll_range: SlewValue<f64>,
-    mod_slew_vps_d: SlewValue<f64>,
-    mod_slew_vps_v: SlewValue<f64>,
-    mod_slew_ring_mod: SlewValue<f64>,
-    mod_slew_wavefold: SlewValue<f64>,
-    mod_slew_drift: SlewValue<f64>,
-    mod_slew_tube: SlewValue<f64>,
-    mod_slew_pll_vol: SlewValue<f64>,
-    mod_slew_vps_vol: SlewValue<f64>,
-    mod_slew_sub_vol: SlewValue<f64>,
-    mod_slew_pll_mult: SlewValue<f64>,
-    mod_slew_pll_mult_direct: SlewValue<f64>,
-    mod_slew_vps_shape_amount: SlewValue<f64>,
-    mod_slew_vps_stereo_d_offset: SlewValue<f64>,
-    mod_slew_vps_fold: SlewValue<f64>,
-    mod_slew_vps_stereo_v_offset: SlewValue<f64>,
-    mod_slew_saw_fold: SlewValue<f64>,
-    mod_slew_saw_shape_amount: SlewValue<f64>,
-    mod_slew_saw_volume: SlewValue<f64>,
-    mod_slew_env_attack: SlewValue<f64>,
-    mod_slew_env_attack_shape: SlewValue<f64>,
-    mod_slew_env_decay: SlewValue<f64>,
-    mod_slew_env_decay_shape: SlewValue<f64>,
-    mod_slew_env_sustain: SlewValue<f64>,
-    mod_slew_env_release: SlewValue<f64>,
-    mod_slew_env_release_shape: SlewValue<f64>,
-    mod_slew_env_retrigger_dip: SlewValue<f64>,
+    mod_slew_pll_damping: SlewValue,
+    mod_slew_pll_influence: SlewValue,
+    mod_slew_pll_track: SlewValue,
+    mod_slew_pll_feedback: SlewValue,
+    mod_slew_pll_fm: SlewValue,
+    mod_slew_pll_injection: SlewValue,
+    mod_slew_pll_mult_slew: SlewValue,
+    mod_slew_pll_pw: SlewValue,
+    mod_slew_pll_stereo_phase: SlewValue,
+    mod_slew_pll_fm_env: SlewValue,
+    mod_slew_pll_burst: SlewValue,
+    mod_slew_pll_range: SlewValue,
+    mod_slew_vps_d: SlewValue,
+    mod_slew_vps_v: SlewValue,
+    mod_slew_ring_mod: SlewValue,
+    mod_slew_wavefold: SlewValue,
+    mod_slew_drift: SlewValue,
+    mod_slew_tube: SlewValue,
+    mod_slew_pll_vol: SlewValue,
+    mod_slew_vps_vol: SlewValue,
+    mod_slew_sub_vol: SlewValue,
+    mod_slew_pll_mult: SlewValue,
+    mod_slew_pll_mult_direct: SlewValue,
+    mod_slew_vps_shape_amount: SlewValue,
+    mod_slew_vps_stereo_d_offset: SlewValue,
+    mod_slew_vps_fold: SlewValue,
+    mod_slew_vps_stereo_v_offset: SlewValue,
+    mod_slew_saw_fold: SlewValue,
+    mod_slew_saw_shape_amount: SlewValue,
+    mod_slew_saw_volume: SlewValue,
+    mod_slew_env_attack: SlewValue,
+    mod_slew_env_attack_shape: SlewValue,
+    mod_slew_env_decay: SlewValue,
+    mod_slew_env_decay_shape: SlewValue,
+    mod_slew_env_sustain: SlewValue,
+    mod_slew_env_release: SlewValue,
+    mod_slew_env_release_shape: SlewValue,
+    mod_slew_env_retrigger_dip: SlewValue,
 
     pll_mult_slew_time: f64,
     bpm: f64,
     target_pll_multiplier: f64,
-    pll_mult_slew_state: SlewValue<f64>,
+    pll_mult_slew_state: SlewValue,
 }
 
 impl Voice {
     pub fn new(sample_rate: f32) -> Self {
+        let sample_rate_f64 = sample_rate as f64;
+
         let mut oversampling_2x_left = Oversampling::<2>::new();
         let mut oversampling_2x_right = Oversampling::<2>::new();
-        oversampling_2x_left.set_sample_rate(sample_rate);
-        oversampling_2x_right.set_sample_rate(sample_rate);
+        oversampling_2x_left.set_sample_rate(sample_rate_f64);
+        oversampling_2x_right.set_sample_rate(sample_rate_f64);
 
         let mut oversampling_4x_left = Oversampling::<4>::new();
         let mut oversampling_4x_right = Oversampling::<4>::new();
-        oversampling_4x_left.set_sample_rate(sample_rate);
-        oversampling_4x_right.set_sample_rate(sample_rate);
+        oversampling_4x_left.set_sample_rate(sample_rate_f64);
+        oversampling_4x_right.set_sample_rate(sample_rate_f64);
 
         let mut oversampling_8x_left = Oversampling::<8>::new();
         let mut oversampling_8x_right = Oversampling::<8>::new();
-        oversampling_8x_left.set_sample_rate(sample_rate);
-        oversampling_8x_right.set_sample_rate(sample_rate);
+        oversampling_8x_left.set_sample_rate(sample_rate_f64);
+        oversampling_8x_right.set_sample_rate(sample_rate_f64);
 
         let mut oversampling_16x_left = Oversampling::<16>::new();
         let mut oversampling_16x_right = Oversampling::<16>::new();
-        oversampling_16x_left.set_sample_rate(sample_rate);
-        oversampling_16x_right.set_sample_rate(sample_rate);
+        oversampling_16x_left.set_sample_rate(sample_rate_f64);
+        oversampling_16x_right.set_sample_rate(sample_rate_f64);
 
         let mut oversampling_32x_left = Oversampling::<32>::new();
         let mut oversampling_32x_right = Oversampling::<32>::new();
-        oversampling_32x_left.set_sample_rate(sample_rate);
-        oversampling_32x_right.set_sample_rate(sample_rate);
+        oversampling_32x_left.set_sample_rate(sample_rate_f64);
+        oversampling_32x_right.set_sample_rate(sample_rate_f64);
 
         let mut oversampling_64x_left = Oversampling::<64>::new();
         let mut oversampling_64x_right = Oversampling::<64>::new();
-        oversampling_64x_left.set_sample_rate(sample_rate);
-        oversampling_64x_right.set_sample_rate(sample_rate);
+        oversampling_64x_left.set_sample_rate(sample_rate_f64);
+        oversampling_64x_right.set_sample_rate(sample_rate_f64);
 
         let mut oversampling_128x_left = Oversampling::<128>::new();
         let mut oversampling_128x_right = Oversampling::<128>::new();
-        oversampling_128x_left.set_sample_rate(sample_rate);
-        oversampling_128x_right.set_sample_rate(sample_rate);
+        oversampling_128x_left.set_sample_rate(sample_rate_f64);
+        oversampling_128x_right.set_sample_rate(sample_rate_f64);
 
         let mut saw_os_2x = Oversampling::<2>::new();
         let mut saw_os_4x = Oversampling::<4>::new();
@@ -466,13 +468,13 @@ impl Voice {
         let mut saw_os_32x = Oversampling::<32>::new();
         let mut saw_os_64x = Oversampling::<64>::new();
         let mut saw_os_128x = Oversampling::<128>::new();
-        saw_os_2x.set_sample_rate(sample_rate);
-        saw_os_4x.set_sample_rate(sample_rate);
-        saw_os_8x.set_sample_rate(sample_rate);
-        saw_os_16x.set_sample_rate(sample_rate);
-        saw_os_32x.set_sample_rate(sample_rate);
-        saw_os_64x.set_sample_rate(sample_rate);
-        saw_os_128x.set_sample_rate(sample_rate);
+        saw_os_2x.set_sample_rate(sample_rate_f64);
+        saw_os_4x.set_sample_rate(sample_rate_f64);
+        saw_os_8x.set_sample_rate(sample_rate_f64);
+        saw_os_16x.set_sample_rate(sample_rate_f64);
+        saw_os_32x.set_sample_rate(sample_rate_f64);
+        saw_os_64x.set_sample_rate(sample_rate_f64);
+        saw_os_128x.set_sample_rate(sample_rate_f64);
 
         let mut vps_os_2x_left = Oversampling::<2>::new();
         let mut vps_os_2x_right = Oversampling::<2>::new();
@@ -488,22 +490,20 @@ impl Voice {
         let mut vps_os_64x_right = Oversampling::<64>::new();
         let mut vps_os_128x_left = Oversampling::<128>::new();
         let mut vps_os_128x_right = Oversampling::<128>::new();
-        vps_os_2x_left.set_sample_rate(sample_rate);
-        vps_os_2x_right.set_sample_rate(sample_rate);
-        vps_os_4x_left.set_sample_rate(sample_rate);
-        vps_os_4x_right.set_sample_rate(sample_rate);
-        vps_os_8x_left.set_sample_rate(sample_rate);
-        vps_os_8x_right.set_sample_rate(sample_rate);
-        vps_os_16x_left.set_sample_rate(sample_rate);
-        vps_os_16x_right.set_sample_rate(sample_rate);
-        vps_os_32x_left.set_sample_rate(sample_rate);
-        vps_os_32x_right.set_sample_rate(sample_rate);
-        vps_os_64x_left.set_sample_rate(sample_rate);
-        vps_os_64x_right.set_sample_rate(sample_rate);
-        vps_os_128x_left.set_sample_rate(sample_rate);
-        vps_os_128x_right.set_sample_rate(sample_rate);
-
-        let sample_rate_f64 = sample_rate as f64;
+        vps_os_2x_left.set_sample_rate(sample_rate_f64);
+        vps_os_2x_right.set_sample_rate(sample_rate_f64);
+        vps_os_4x_left.set_sample_rate(sample_rate_f64);
+        vps_os_4x_right.set_sample_rate(sample_rate_f64);
+        vps_os_8x_left.set_sample_rate(sample_rate_f64);
+        vps_os_8x_right.set_sample_rate(sample_rate_f64);
+        vps_os_16x_left.set_sample_rate(sample_rate_f64);
+        vps_os_16x_right.set_sample_rate(sample_rate_f64);
+        vps_os_32x_left.set_sample_rate(sample_rate_f64);
+        vps_os_32x_right.set_sample_rate(sample_rate_f64);
+        vps_os_64x_left.set_sample_rate(sample_rate_f64);
+        vps_os_64x_right.set_sample_rate(sample_rate_f64);
+        vps_os_128x_left.set_sample_rate(sample_rate_f64);
+        vps_os_128x_right.set_sample_rate(sample_rate_f64);
         // Default to 1x (no oversampling) - processing at DAW rate
         let processing_rate = sample_rate_f64;
 
@@ -883,46 +883,46 @@ impl Voice {
             self.daw_sample_rate = new_rate;
 
             // Update oversampling objects with new DAW rate
-            self.oversampling_2x_left.set_sample_rate(sample_rate);
-            self.oversampling_2x_right.set_sample_rate(sample_rate);
-            self.oversampling_4x_left.set_sample_rate(sample_rate);
-            self.oversampling_4x_right.set_sample_rate(sample_rate);
-            self.oversampling_8x_left.set_sample_rate(sample_rate);
-            self.oversampling_8x_right.set_sample_rate(sample_rate);
-            self.oversampling_16x_left.set_sample_rate(sample_rate);
-            self.oversampling_16x_right.set_sample_rate(sample_rate);
-            self.oversampling_32x_left.set_sample_rate(sample_rate);
-            self.oversampling_32x_right.set_sample_rate(sample_rate);
-            self.oversampling_64x_left.set_sample_rate(sample_rate);
-            self.oversampling_64x_right.set_sample_rate(sample_rate);
-            self.oversampling_128x_left.set_sample_rate(sample_rate);
-            self.oversampling_128x_right.set_sample_rate(sample_rate);
-            self.saw_os_2x.set_sample_rate(sample_rate);
-            self.saw_os_4x.set_sample_rate(sample_rate);
-            self.saw_os_8x.set_sample_rate(sample_rate);
-            self.saw_os_16x.set_sample_rate(sample_rate);
-            self.saw_os_32x.set_sample_rate(sample_rate);
-            self.saw_os_64x.set_sample_rate(sample_rate);
-            self.saw_os_128x.set_sample_rate(sample_rate);
-            self.vps_os_2x_left.set_sample_rate(sample_rate);
-            self.vps_os_2x_right.set_sample_rate(sample_rate);
-            self.vps_os_4x_left.set_sample_rate(sample_rate);
-            self.vps_os_4x_right.set_sample_rate(sample_rate);
-            self.vps_os_8x_left.set_sample_rate(sample_rate);
-            self.vps_os_8x_right.set_sample_rate(sample_rate);
-            self.vps_os_16x_left.set_sample_rate(sample_rate);
-            self.vps_os_16x_right.set_sample_rate(sample_rate);
-            self.vps_os_32x_left.set_sample_rate(sample_rate);
-            self.vps_os_32x_right.set_sample_rate(sample_rate);
-            self.vps_os_64x_left.set_sample_rate(sample_rate);
-            self.vps_os_64x_right.set_sample_rate(sample_rate);
-            self.vps_os_128x_left.set_sample_rate(sample_rate);
-            self.vps_os_128x_right.set_sample_rate(sample_rate);
+            self.oversampling_2x_left.set_sample_rate(new_rate);
+            self.oversampling_2x_right.set_sample_rate(new_rate);
+            self.oversampling_4x_left.set_sample_rate(new_rate);
+            self.oversampling_4x_right.set_sample_rate(new_rate);
+            self.oversampling_8x_left.set_sample_rate(new_rate);
+            self.oversampling_8x_right.set_sample_rate(new_rate);
+            self.oversampling_16x_left.set_sample_rate(new_rate);
+            self.oversampling_16x_right.set_sample_rate(new_rate);
+            self.oversampling_32x_left.set_sample_rate(new_rate);
+            self.oversampling_32x_right.set_sample_rate(new_rate);
+            self.oversampling_64x_left.set_sample_rate(new_rate);
+            self.oversampling_64x_right.set_sample_rate(new_rate);
+            self.oversampling_128x_left.set_sample_rate(new_rate);
+            self.oversampling_128x_right.set_sample_rate(new_rate);
+            self.saw_os_2x.set_sample_rate(new_rate);
+            self.saw_os_4x.set_sample_rate(new_rate);
+            self.saw_os_8x.set_sample_rate(new_rate);
+            self.saw_os_16x.set_sample_rate(new_rate);
+            self.saw_os_32x.set_sample_rate(new_rate);
+            self.saw_os_64x.set_sample_rate(new_rate);
+            self.saw_os_128x.set_sample_rate(new_rate);
+            self.vps_os_2x_left.set_sample_rate(new_rate);
+            self.vps_os_2x_right.set_sample_rate(new_rate);
+            self.vps_os_4x_left.set_sample_rate(new_rate);
+            self.vps_os_4x_right.set_sample_rate(new_rate);
+            self.vps_os_8x_left.set_sample_rate(new_rate);
+            self.vps_os_8x_right.set_sample_rate(new_rate);
+            self.vps_os_16x_left.set_sample_rate(new_rate);
+            self.vps_os_16x_right.set_sample_rate(new_rate);
+            self.vps_os_32x_left.set_sample_rate(new_rate);
+            self.vps_os_32x_right.set_sample_rate(new_rate);
+            self.vps_os_64x_left.set_sample_rate(new_rate);
+            self.vps_os_64x_right.set_sample_rate(new_rate);
+            self.vps_os_128x_left.set_sample_rate(new_rate);
+            self.vps_os_128x_right.set_sample_rate(new_rate);
             // Update envelopes with DAW rate (they run at DAW rate, not oversampled)
             self.volume_envelope.set_sample_rate(new_rate);
 
             // Update all slew limiters
-            let update_slew = |s: &mut SlewValue<f64>| s.set_sample_rate(new_rate);
+            let update_slew = |s: &mut SlewValue| s.set_sample_rate(new_rate);
             update_slew(&mut self.freq_slew);
             update_slew(&mut self.pll_volume_slew);
             update_slew(&mut self.pll_track_slew);
@@ -1585,7 +1585,7 @@ impl Voice {
             let iterations = self.pll_effective_ratio as usize;
             let use_oversampling = self.pll_effective_ratio > 1;
 
-            let (buf_l, buf_r): (&mut [f32], &mut [f32]) = match self.pll_effective_ratio {
+            let (buf_l, buf_r): (&mut [f64], &mut [f64]) = match self.pll_effective_ratio {
                 2 => (self.oversampling_2x_left.resample_buffer(), self.oversampling_2x_right.resample_buffer()),
                 4 => (self.oversampling_4x_left.resample_buffer(), self.oversampling_4x_right.resample_buffer()),
                 8 => (self.oversampling_8x_left.resample_buffer(), self.oversampling_8x_right.resample_buffer()),
@@ -1646,33 +1646,33 @@ impl Voice {
 
                 feedback = feedback * 0.9 + (pll_raw_l + pll_raw_r) * 0.05;
 
-                buf_l[i] = pll_raw_l as f32;
-                buf_r[i] = if use_stereo_pll { pll_raw_r as f32 } else { pll_raw_l as f32 };
+                buf_l[i] = pll_raw_l;
+                buf_r[i] = if use_stereo_pll { pll_raw_r } else { pll_raw_l };
             }
 
             // Downsample PLL output
             if use_oversampling {
                 pll_sample_l = match self.pll_effective_ratio {
-                    2 => self.oversampling_2x_left.downsample() as f64,
-                    4 => self.oversampling_4x_left.downsample() as f64,
-                    8 => self.oversampling_8x_left.downsample() as f64,
-                    16 => self.oversampling_16x_left.downsample() as f64,
-                    32 => self.oversampling_32x_left.downsample() as f64,
-                    64 => self.oversampling_64x_left.downsample() as f64,
-                    _ => self.oversampling_128x_left.downsample() as f64,
+                    2 => self.oversampling_2x_left.downsample(),
+                    4 => self.oversampling_4x_left.downsample(),
+                    8 => self.oversampling_8x_left.downsample(),
+                    16 => self.oversampling_16x_left.downsample(),
+                    32 => self.oversampling_32x_left.downsample(),
+                    64 => self.oversampling_64x_left.downsample(),
+                    _ => self.oversampling_128x_left.downsample(),
                 };
                 pll_sample_r = match self.pll_effective_ratio {
-                    2 => self.oversampling_2x_right.downsample() as f64,
-                    4 => self.oversampling_4x_right.downsample() as f64,
-                    8 => self.oversampling_8x_right.downsample() as f64,
-                    16 => self.oversampling_16x_right.downsample() as f64,
-                    32 => self.oversampling_32x_right.downsample() as f64,
-                    64 => self.oversampling_64x_right.downsample() as f64,
-                    _ => self.oversampling_128x_right.downsample() as f64,
+                    2 => self.oversampling_2x_right.downsample(),
+                    4 => self.oversampling_4x_right.downsample(),
+                    8 => self.oversampling_8x_right.downsample(),
+                    16 => self.oversampling_16x_right.downsample(),
+                    32 => self.oversampling_32x_right.downsample(),
+                    64 => self.oversampling_64x_right.downsample(),
+                    _ => self.oversampling_128x_right.downsample(),
                 };
             } else {
-                pll_sample_l = buf_l[0] as f64;
-                pll_sample_r = buf_r[0] as f64;
+                pll_sample_l = buf_l[0];
+                pll_sample_r = buf_r[0];
             }
         }
 
@@ -1706,9 +1706,9 @@ impl Voice {
             let vps_iterations = self.vps_effective_ratio as usize;
             let vps_use_oversampling = self.vps_effective_ratio > 1;
             let dist_type = (self.vps_shape_type + 1) as u8;
-            let shape_amt = self.vps_shape_amount as f32;
+            let shape_amt = self.vps_shape_amount;
 
-            let (vbuf_l, vbuf_r): (&mut [f32], &mut [f32]) = match self.vps_effective_ratio {
+            let (vbuf_l, vbuf_r): (&mut [f64], &mut [f64]) = match self.vps_effective_ratio {
                 2 => (self.vps_os_2x_left.resample_buffer(), self.vps_os_2x_right.resample_buffer()),
                 4 => (self.vps_os_4x_left.resample_buffer(), self.vps_os_4x_right.resample_buffer()),
                 8 => (self.vps_os_8x_left.resample_buffer(), self.vps_os_8x_right.resample_buffer()),
@@ -1725,8 +1725,8 @@ impl Voice {
 
                 let (shaped_l, shaped_r) = if self.vps_shape_amount > 0.001 {
                     (
-                        apply_distortion(raw_l as f32, shape_amt, dist_type) as f64,
-                        apply_distortion(raw_r as f32, shape_amt, dist_type) as f64,
+                        apply_distortion(raw_l, shape_amt, dist_type),
+                        apply_distortion(raw_r, shape_amt, dist_type),
                     )
                 } else {
                     (raw_l, raw_r)
@@ -1739,32 +1739,32 @@ impl Voice {
                     (shaped_l, shaped_r)
                 };
 
-                vbuf_l[i] = folded_l as f32;
-                vbuf_r[i] = folded_r as f32;
+                vbuf_l[i] = folded_l;
+                vbuf_r[i] = folded_r;
             }
 
             let (ds_l, ds_r) = if vps_use_oversampling {
                 let l = match self.vps_effective_ratio {
-                    2 => self.vps_os_2x_left.downsample() as f64,
-                    4 => self.vps_os_4x_left.downsample() as f64,
-                    8 => self.vps_os_8x_left.downsample() as f64,
-                    16 => self.vps_os_16x_left.downsample() as f64,
-                    32 => self.vps_os_32x_left.downsample() as f64,
-                    64 => self.vps_os_64x_left.downsample() as f64,
-                    _ => self.vps_os_128x_left.downsample() as f64,
+                    2 => self.vps_os_2x_left.downsample(),
+                    4 => self.vps_os_4x_left.downsample(),
+                    8 => self.vps_os_8x_left.downsample(),
+                    16 => self.vps_os_16x_left.downsample(),
+                    32 => self.vps_os_32x_left.downsample(),
+                    64 => self.vps_os_64x_left.downsample(),
+                    _ => self.vps_os_128x_left.downsample(),
                 };
                 let r = match self.vps_effective_ratio {
-                    2 => self.vps_os_2x_right.downsample() as f64,
-                    4 => self.vps_os_4x_right.downsample() as f64,
-                    8 => self.vps_os_8x_right.downsample() as f64,
-                    16 => self.vps_os_16x_right.downsample() as f64,
-                    32 => self.vps_os_32x_right.downsample() as f64,
-                    64 => self.vps_os_64x_right.downsample() as f64,
-                    _ => self.vps_os_128x_right.downsample() as f64,
+                    2 => self.vps_os_2x_right.downsample(),
+                    4 => self.vps_os_4x_right.downsample(),
+                    8 => self.vps_os_8x_right.downsample(),
+                    16 => self.vps_os_16x_right.downsample(),
+                    32 => self.vps_os_32x_right.downsample(),
+                    64 => self.vps_os_64x_right.downsample(),
+                    _ => self.vps_os_128x_right.downsample(),
                 };
                 (l, r)
             } else {
-                (vbuf_l[0] as f64, vbuf_r[0] as f64)
+                (vbuf_l[0], vbuf_r[0])
             };
 
             vps_out_l = ds_l * self.vps_volume * volume_env;
@@ -1781,9 +1781,9 @@ impl Voice {
             let iterations = self.saw_effective_ratio as usize;
             let use_oversampling = self.saw_effective_ratio > 1;
             let dist_type = (self.saw_shape_type + 1) as u8;
-            let shape_amt = self.saw_shape_amount as f32;
+            let shape_amt = self.saw_shape_amount;
 
-            let buf: &mut [f32] = match self.saw_effective_ratio {
+            let buf: &mut [f64] = match self.saw_effective_ratio {
                 2 => self.saw_os_2x.resample_buffer(),
                 4 => self.saw_os_4x.resample_buffer(),
                 8 => self.saw_os_8x.resample_buffer(),
@@ -1798,7 +1798,7 @@ impl Voice {
                 let raw = self.saw_oscillator.next();
 
                 let shaped = if self.saw_shape_amount > 0.001 {
-                    apply_distortion(raw as f32, shape_amt, dist_type) as f64
+                    apply_distortion(raw, shape_amt, dist_type)
                 } else {
                     raw
                 };
@@ -1816,21 +1816,21 @@ impl Voice {
                     shaped
                 };
 
-                *sample = folded as f32;
+                *sample = folded;
             }
 
             let sample = if use_oversampling {
                 match self.saw_effective_ratio {
-                    2 => self.saw_os_2x.downsample() as f64,
-                    4 => self.saw_os_4x.downsample() as f64,
-                    8 => self.saw_os_8x.downsample() as f64,
-                    16 => self.saw_os_16x.downsample() as f64,
-                    32 => self.saw_os_32x.downsample() as f64,
-                    64 => self.saw_os_64x.downsample() as f64,
-                    _ => self.saw_os_128x.downsample() as f64,
+                    2 => self.saw_os_2x.downsample(),
+                    4 => self.saw_os_4x.downsample(),
+                    8 => self.saw_os_8x.downsample(),
+                    16 => self.saw_os_16x.downsample(),
+                    32 => self.saw_os_32x.downsample(),
+                    64 => self.saw_os_64x.downsample(),
+                    _ => self.saw_os_128x.downsample(),
                 }
             } else {
-                buf[0] as f64
+                buf[0]
             };
 
             let tightened = self.saw_tight_filter.process(sample, self.saw_tight);

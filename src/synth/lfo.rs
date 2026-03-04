@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use synfx_dsp::SlewValue;
+use super::dsp::SlewValue;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum LfoWaveform {
@@ -135,7 +135,7 @@ pub struct Lfo {
     sh_noise_state: u32,
 
     // Slew for output smoothing
-    output_slew: SlewValue<f64>,
+    output_slew: SlewValue,
     slew_time_ms: f64,
 
     // Phase modulation amount from sync source
@@ -544,7 +544,7 @@ pub struct LfoBank {
     pub amounts: [[f64; 2]; 3],
 
     // Slews for amounts to avoid clicks when changing modulation depth
-    amount_slews: [[SlewValue<f64>; 2]; 3],
+    amount_slews: [[SlewValue; 2]; 3],
 
     // Current LFO outputs (for cross-modulation)
     lfo_outputs: [f64; 3],
