@@ -377,12 +377,14 @@ pub fn f_fold_distort(gain: f64, threshold: f64, i: f64) -> f64 {
 #[inline]
 pub fn apply_distortion(s: f64, damt: f64, dist_type: u8) -> f64 {
     match dist_type {
-        1 => (damt.clamp(0.01, 1.0) * 100.0 * s).tanh(),
-        2 => f_distort(1.0, damt * damt * damt * 1000.0, s),
+        1 => {
+            let gain = 1.0 + damt * damt * 7.0;
+            (gain * s).tanh()
+        }
+        2 => f_distort(1.0, damt * damt * 64.0, s),
         3 => {
-            let damt = damt.clamp(0.0, 0.99);
-            let damt = 1.0 - damt * damt;
-            f_fold_distort(1.0, damt, s) * (1.0 / damt)
+            let threshold = (1.0 - damt * damt * 0.9).max(0.1);
+            f_fold_distort(1.0, threshold, s) * (1.0 / threshold)
         }
         _ => s,
     }

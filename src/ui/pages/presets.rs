@@ -755,6 +755,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_osc_stereo_d_offset, data.synth_osc_stereo_d_offset);
     setter.set_parameter(&params.synth_vps_shape_type, data.synth_vps_shape_type);
     setter.set_parameter(&params.synth_vps_shape_amount, data.synth_vps_shape_amount);
+    setter.set_parameter(&params.synth_vps_fold_range, data.synth_vps_fold_range);
     setter.set_parameter(&params.synth_vps_phase_mode, data.synth_vps_phase_mode);
     setter.set_parameter(&params.synth_osc_volume, data.synth_osc_volume);
 
@@ -1251,6 +1252,7 @@ fn save_params_to_preset_data(
     data.synth_osc_stereo_d_offset = params.synth_osc_stereo_d_offset.modulated_plain_value();
     data.synth_vps_shape_type = params.synth_vps_shape_type.value();
     data.synth_vps_shape_amount = params.synth_vps_shape_amount.modulated_plain_value();
+    data.synth_vps_fold_range = params.synth_vps_fold_range.value();
     data.synth_vps_phase_mode = params.synth_vps_phase_mode.value();
     data.synth_osc_volume = params.synth_osc_volume.modulated_plain_value();
 

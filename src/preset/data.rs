@@ -278,6 +278,8 @@ pub struct PresetData {
     #[serde(default)]
     pub synth_vps_shape_amount: f32,
     #[serde(default)]
+    pub synth_vps_fold_range: i32,
+    #[serde(default)]
     pub synth_vps_phase_mode: i32,
     pub synth_osc_volume: f32,
 
@@ -631,6 +633,7 @@ impl Default for PresetData {
             synth_osc_stereo_d_offset: 0.0,
             synth_vps_shape_type: 0,
             synth_vps_shape_amount: 0.0,
+            synth_vps_fold_range: 0,
             synth_vps_phase_mode: 0,
             synth_osc_volume: 0.0,
 

@@ -463,7 +463,7 @@ fn render_sound_tab(
                             ui, params, setter,
                             &params.synth_saw_shape_type, "SHPE",
                             Some(Color32::from_rgb(100, 80, 100)),
-                            None, None, ml!("synth_saw_shape_type"),
+                            None, Some(&["SOFT", "BRAM", "FOLD"]), ml!("synth_saw_shape_type"),
                         );
                         render_vertical_slider(
                             ui, params, setter,
@@ -508,10 +508,11 @@ fn render_sound_tab(
                                         setter.set_parameter(&params.synth_vps_enable, vps_on);
                                     }
                                     ui.add_space(60.0);
-                                    let mut shape_fold = params.synth_vps_shape_type.value() == 1;
-                                    render_labeled_toggle(ui, &mut shape_fold, "SOFT", "FOLD");
-                                    if (shape_fold as i32) != params.synth_vps_shape_type.value() {
-                                        setter.set_parameter(&params.synth_vps_shape_type, if shape_fold { 1 } else { 0 });
+                                    let mut vps_fold_pi = params.synth_vps_fold_range.value() == 1;
+                                    render_labeled_toggle(ui, &mut vps_fold_pi, "1X", "PI");
+                                    let new_range = if vps_fold_pi { 1 } else { 0 };
+                                    if new_range != params.synth_vps_fold_range.value() {
+                                        setter.set_parameter(&params.synth_vps_fold_range, new_range);
                                     }
                                     ui.add_space(60.0);
                                     let mut sync_on = params.synth_vps_phase_mode.value() == 1;
@@ -570,6 +571,12 @@ fn render_sound_tab(
                             0.0, 1.0, SliderScale::Linear,
                             Some(Color32::from_rgb(120, 80, 60)),
                             ml!("synth_osc_fold"),
+                        );
+                        render_int_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_vps_shape_type, "SHPE",
+                            Some(Color32::from_rgb(100, 80, 100)),
+                            None, Some(&["SOFT", "BRAM", "FOLD"]), ml!("synth_vps_shape_type"),
                         );
                         render_vertical_slider(
                             ui, params, setter,

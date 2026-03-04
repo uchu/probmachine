@@ -412,6 +412,8 @@ pub struct DeviceParams {
     pub synth_vps_shape_type: IntParam,
     #[id = "synth_vps_shape_amount"]
     pub synth_vps_shape_amount: FloatParam,
+    #[id = "synth_vps_fold_range"]
+    pub synth_vps_fold_range: IntParam,
     #[id = "synth_vps_phase_mode"]
     pub synth_vps_phase_mode: IntParam,
     #[id = "synth_sub_volume"]
@@ -1627,13 +1629,18 @@ impl Default for DeviceParams {
             synth_vps_shape_type: IntParam::new(
                 "VPS Shape Type".to_string(),
                 0,
-                IntRange::Linear { min: 0, max: 1 }
+                IntRange::Linear { min: 0, max: 2 }
             ),
             synth_vps_shape_amount: FloatParam::new(
                 "VPS Shape Amount".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 0.5 }
             ).with_smoother(SmoothingStyle::Linear(20.0)),
+            synth_vps_fold_range: IntParam::new(
+                "VPS Fold Range".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 1 }
+            ),
             synth_vps_phase_mode: IntParam::new(
                 "VPS Phase Mode".to_string(),
                 0,
@@ -2355,6 +2362,7 @@ impl DeviceParams {
             "synth_osc_octave" => set_int!(self.synth_osc_octave),
             "synth_osc_tune" => set_int!(self.synth_osc_tune),
             "synth_vps_shape_type" => set_int!(self.synth_vps_shape_type),
+            "synth_vps_fold_range" => set_int!(self.synth_vps_fold_range),
             "synth_vps_shape_amount" => set_float!(self.synth_vps_shape_amount),
             "synth_sub_volume" => set_float!(self.synth_sub_volume),
             "synth_saw_volume" => set_float!(self.synth_saw_volume),
@@ -2436,6 +2444,7 @@ impl DeviceParams {
             "synth_osc_octave" => read_int!(self.synth_osc_octave),
             "synth_osc_tune" => read_int!(self.synth_osc_tune),
             "synth_vps_shape_type" => read_int!(self.synth_vps_shape_type),
+            "synth_vps_fold_range" => read_int!(self.synth_vps_fold_range),
             "synth_vps_shape_amount" => read_float!(self.synth_vps_shape_amount),
             "synth_sub_volume" => read_float!(self.synth_sub_volume),
             "synth_saw_volume" => read_float!(self.synth_saw_volume),

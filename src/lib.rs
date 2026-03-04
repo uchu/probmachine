@@ -380,6 +380,7 @@ impl Plugin for PhaseBurn {
                 self.params.synth_vps_shape_type.value(),
                 self.params.synth_vps_shape_amount.modulated_plain_value(),
             );
+            synth.set_vps_fold_range(self.params.synth_vps_fold_range.value());
             synth.set_vps_phase_mode(self.params.synth_vps_phase_mode.value());
 
             synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());

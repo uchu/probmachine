@@ -4,7 +4,7 @@ use super::dsp::{Oversampling, SlewValue, apply_distortion};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, SawOscillator, VpsPhaseMode};
 use super::envelope::{Envelope, TailEnvelope};
 use super::lfo::ModulationValues;
-use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, OnePoleSlewValue};
+use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_wavefold_pi, OnePoleSlewValue};
 
 struct SawTightFilter {
     ic1eq: f64,
@@ -161,6 +161,7 @@ pub struct Voice {
     vps_stereo_d_offset: f64,
     vps_shape_type: i32,
     vps_shape_amount: f64,
+    vps_fold_range: i32,
     vps_phase_mode: VpsPhaseMode,
     prev_ref_phase: f64,
 
@@ -596,6 +597,7 @@ impl Voice {
             vps_stereo_d_offset: 0.0,
             vps_shape_type: 0,
             vps_shape_amount: 0.0,
+            vps_fold_range: 0,
             vps_phase_mode: VpsPhaseMode::Free,
             prev_ref_phase: 0.0,
 
@@ -1085,6 +1087,10 @@ impl Voice {
     pub fn set_vps_shape(&mut self, shape_type: i32, amount: f64) {
         self.vps_shape_type = shape_type;
         self.target_vps_shape_amount = amount;
+    }
+
+    pub fn set_vps_fold_range(&mut self, range: i32) {
+        self.vps_fold_range = range;
     }
 
     pub fn set_vps_phase_mode(&mut self, mode: i32) {
@@ -1733,7 +1739,12 @@ impl Voice {
                 };
 
                 let (folded_l, folded_r) = if self.vps_fold > 0.001 {
-                    let folded = stereo_wavefold(stereo(shaped_l, shaped_r), self.vps_fold);
+                    let s = stereo(shaped_l, shaped_r);
+                    let folded = if self.vps_fold_range == 1 {
+                        stereo_wavefold_pi(s, self.vps_fold)
+                    } else {
+                        stereo_wavefold(s, self.vps_fold)
+                    };
                     (stereo_left(folded), stereo_right(folded))
                 } else {
                     (shaped_l, shaped_r)

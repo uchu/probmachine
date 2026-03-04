@@ -271,6 +271,10 @@ impl SynthEngine {
         self.voice.set_vps_shape(shape_type, amount as f64);
     }
 
+    pub fn set_vps_fold_range(&mut self, range: i32) {
+        self.voice.set_vps_fold_range(range);
+    }
+
     pub fn set_vps_phase_mode(&mut self, mode: i32) {
         self.voice.set_vps_phase_mode(mode);
     }
