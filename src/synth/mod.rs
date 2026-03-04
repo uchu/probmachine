@@ -315,6 +315,18 @@ impl SynthEngine {
         self.voice.set_volume_envelope(attack as f64, attack_shape as f64, decay as f64, decay_shape as f64, sustain as f64, release as f64, release_shape as f64);
     }
 
+    pub fn set_retrigger_dip(&mut self, dip: f32) {
+        self.voice.set_retrigger_dip(dip as f64);
+    }
+
+    pub fn set_phase_reset_on_retrigger(&mut self, enabled: bool) {
+        self.voice.set_phase_reset_on_retrigger(enabled);
+    }
+
+    pub fn set_pll_tail(&mut self, enabled: bool, time_ms: f32, amount: f32) {
+        self.voice.set_pll_tail(enabled, time_ms as f64, amount as f64);
+    }
+
     pub fn update_note_pool(&mut self, note_pool: crate::sequencer::NotePool) {
         self.sequencer.note_pool = note_pool;
     }

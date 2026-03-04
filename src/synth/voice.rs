@@ -2,7 +2,7 @@
 
 use synfx_dsp::{Oversampling, SlewValue, apply_distortion};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, SawOscillator, VpsPhaseMode};
-use super::envelope::Envelope;
+use super::envelope::{Envelope, TailEnvelope};
 use super::lfo::ModulationValues;
 use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, OnePoleSlewValue};
 
@@ -239,6 +239,14 @@ pub struct Voice {
     vol_env_release_shape: f64,
     velocity: f64,
 
+    // ===== Retrigger / Phase / PLL Tail =====
+    retrigger_dip: f64,
+    phase_reset_on_retrigger: bool,
+    pll_tail_enabled: bool,
+    pll_tail_time_ms: f64,
+    pll_tail_amount: f64,
+    pll_tail_envelope: TailEnvelope,
+
     // ===== Slew Limiters =====
     freq_slew: SlewValue<f64>,
     pll_volume_slew: SlewValue<f64>,
@@ -359,6 +367,14 @@ pub struct Voice {
     mod_saw_fold: f64,
     mod_saw_shape_amount: f64,
     mod_saw_volume: f64,
+    mod_env_attack: f64,
+    mod_env_attack_shape: f64,
+    mod_env_decay: f64,
+    mod_env_decay_shape: f64,
+    mod_env_sustain: f64,
+    mod_env_release: f64,
+    mod_env_release_shape: f64,
+    mod_env_retrigger_dip: f64,
 
     // Slews for modulation (critical for smooth, crackle-free modulation)
     mod_slew_pll_damping: SlewValue<f64>,
@@ -391,6 +407,14 @@ pub struct Voice {
     mod_slew_saw_fold: SlewValue<f64>,
     mod_slew_saw_shape_amount: SlewValue<f64>,
     mod_slew_saw_volume: SlewValue<f64>,
+    mod_slew_env_attack: SlewValue<f64>,
+    mod_slew_env_attack_shape: SlewValue<f64>,
+    mod_slew_env_decay: SlewValue<f64>,
+    mod_slew_env_decay_shape: SlewValue<f64>,
+    mod_slew_env_sustain: SlewValue<f64>,
+    mod_slew_env_release: SlewValue<f64>,
+    mod_slew_env_release_shape: SlewValue<f64>,
+    mod_slew_env_retrigger_dip: SlewValue<f64>,
 
     pll_mult_slew_time: f64,
     bpm: f64,
@@ -635,14 +659,21 @@ impl Voice {
             drift_phase_r: 0.33,
             tube_drive: 0.0,
 
-            vol_env_attack: 1.0,
-            vol_env_attack_shape: 0.5,
-            vol_env_decay: 20.0,
-            vol_env_decay_shape: 0.5,
-            vol_env_sustain: 1.0,
-            vol_env_release: 5.0,
-            vol_env_release_shape: 0.5,
+            vol_env_attack: 10.0,
+            vol_env_attack_shape: 0.0,
+            vol_env_decay: 100.0,
+            vol_env_decay_shape: 0.0,
+            vol_env_sustain: 0.7,
+            vol_env_release: 200.0,
+            vol_env_release_shape: 0.0,
             velocity: 1.0,
+
+            retrigger_dip: 0.0,
+            phase_reset_on_retrigger: true,
+            pll_tail_enabled: false,
+            pll_tail_time_ms: 500.0,
+            pll_tail_amount: 0.3,
+            pll_tail_envelope: TailEnvelope::new(),
 
             freq_slew: make_slew(),
             pll_volume_slew: make_slew(),
@@ -749,6 +780,14 @@ impl Voice {
             mod_saw_fold: 0.0,
             mod_saw_shape_amount: 0.0,
             mod_saw_volume: 0.0,
+            mod_env_attack: 0.0,
+            mod_env_attack_shape: 0.0,
+            mod_env_decay: 0.0,
+            mod_env_decay_shape: 0.0,
+            mod_env_sustain: 0.0,
+            mod_env_release: 0.0,
+            mod_env_release_shape: 0.0,
+            mod_env_retrigger_dip: 0.0,
 
             mod_slew_pll_damping: make_slew(),
             mod_slew_pll_influence: make_slew(),
@@ -780,6 +819,14 @@ impl Voice {
             mod_slew_saw_fold: make_slew(),
             mod_slew_saw_shape_amount: make_slew(),
             mod_slew_saw_volume: make_slew(),
+            mod_slew_env_attack: make_slew(),
+            mod_slew_env_attack_shape: make_slew(),
+            mod_slew_env_decay: make_slew(),
+            mod_slew_env_decay_shape: make_slew(),
+            mod_slew_env_sustain: make_slew(),
+            mod_slew_env_release: make_slew(),
+            mod_slew_env_release_shape: make_slew(),
+            mod_slew_env_retrigger_dip: make_slew(),
 
             pll_mult_slew_time: 0.15,
             bpm: 120.0,
@@ -1224,6 +1271,14 @@ impl Voice {
         self.mod_saw_fold = self.mod_slew_saw_fold.next(mod_values.saw_fold, MOD_SLEW_MS);
         self.mod_saw_shape_amount = self.mod_slew_saw_shape_amount.next(mod_values.saw_shape_amount, MOD_SLEW_MS);
         self.mod_saw_volume = self.mod_slew_saw_volume.next(mod_values.saw_volume, MOD_SLEW_MS);
+        self.mod_env_attack = self.mod_slew_env_attack.next(mod_values.env_attack, MOD_SLEW_MS);
+        self.mod_env_attack_shape = self.mod_slew_env_attack_shape.next(mod_values.env_attack_shape, MOD_SLEW_MS);
+        self.mod_env_decay = self.mod_slew_env_decay.next(mod_values.env_decay, MOD_SLEW_MS);
+        self.mod_env_decay_shape = self.mod_slew_env_decay_shape.next(mod_values.env_decay_shape, MOD_SLEW_MS);
+        self.mod_env_sustain = self.mod_slew_env_sustain.next(mod_values.env_sustain, MOD_SLEW_MS);
+        self.mod_env_release = self.mod_slew_env_release.next(mod_values.env_release, MOD_SLEW_MS);
+        self.mod_env_release_shape = self.mod_slew_env_release_shape.next(mod_values.env_release_shape, MOD_SLEW_MS);
+        self.mod_env_retrigger_dip = self.mod_slew_env_retrigger_dip.next(mod_values.env_retrigger_dip, MOD_SLEW_MS);
     }
 
     pub fn set_volume(&mut self, volume: f64) {
@@ -1249,6 +1304,20 @@ impl Voice {
         self.vol_env_release_shape = release_shape;
     }
 
+    pub fn set_retrigger_dip(&mut self, dip: f64) {
+        self.retrigger_dip = dip.clamp(0.0, 1.0);
+    }
+
+    pub fn set_phase_reset_on_retrigger(&mut self, enabled: bool) {
+        self.phase_reset_on_retrigger = enabled;
+    }
+
+    pub fn set_pll_tail(&mut self, enabled: bool, time_ms: f64, amount: f64) {
+        self.pll_tail_enabled = enabled;
+        self.pll_tail_time_ms = time_ms.clamp(50.0, 5000.0);
+        self.pll_tail_amount = amount.clamp(0.0, 1.0);
+    }
+
     pub fn set_velocity(&mut self, velocity: u8) {
         self.target_velocity = velocity as f64 / 127.0;
     }
@@ -1265,6 +1334,7 @@ impl Voice {
             return;
         }
 
+        let was_idle = !self.volume_envelope.is_active();
         self.volume_envelope.trigger(
             self.vol_env_attack,
             self.vol_env_attack_shape,
@@ -1275,11 +1345,14 @@ impl Voice {
             self.vol_env_release_shape,
         );
 
-        self.reset_oscillator_phases();
+        if was_idle || self.phase_reset_on_retrigger {
+            self.reset_oscillator_phases();
+        }
     }
 
     pub fn trigger_articulated(&mut self) {
-        self.volume_envelope.restart(
+        let effective_dip = (self.retrigger_dip + self.mod_env_retrigger_dip).clamp(0.0, 1.0);
+        self.volume_envelope.trigger_with_dip(
             self.vol_env_attack,
             self.vol_env_attack_shape,
             self.vol_env_decay,
@@ -1287,9 +1360,12 @@ impl Voice {
             self.vol_env_sustain,
             self.vol_env_release,
             self.vol_env_release_shape,
+            effective_dip,
         );
 
-        self.reset_oscillator_phases();
+        if self.phase_reset_on_retrigger {
+            self.reset_oscillator_phases();
+        }
     }
 
     fn reset_oscillator_phases(&mut self) {
@@ -1310,6 +1386,7 @@ impl Voice {
         self.prev_ref_phase = 0.0;
         self.pll_prev_out_l = 0.0;
         self.pll_prev_out_r = 0.0;
+        self.pll_feedback_state = 0.0;
     }
 
     pub fn release(&mut self) {
@@ -1317,6 +1394,13 @@ impl Voice {
             return;
         }
         self.volume_envelope.release();
+        if self.pll_tail_enabled {
+            self.pll_tail_envelope.trigger_tail(
+                self.pll_tail_time_ms,
+                self.pll_tail_amount,
+                self.daw_sample_rate,
+            );
+        }
     }
 
     pub fn stop(&mut self) {
@@ -1328,6 +1412,7 @@ impl Voice {
 
     pub fn reset(&mut self) {
         self.volume_envelope.force_off();
+        self.pll_tail_envelope.reset();
 
         self.pll_feedback_state = 0.0;
         self.pll_prev_out_l = 0.0;
@@ -1342,14 +1427,18 @@ impl Voice {
         let volume_env = if self.vca_mode {
             1.0
         } else {
+            let mod_attack = (self.vol_env_attack + self.mod_env_attack * 4000.0).max(0.5);
+            let mod_attack_shape = (self.vol_env_attack_shape + self.mod_env_attack_shape).clamp(-1.0, 1.0);
+            let mod_decay = (self.vol_env_decay + self.mod_env_decay * 8000.0).max(0.5);
+            let mod_decay_shape = (self.vol_env_decay_shape + self.mod_env_decay_shape).clamp(-1.0, 1.0);
+            let mod_sustain = (self.vol_env_sustain + self.mod_env_sustain).clamp(0.0, 1.0);
+            let mod_release = (self.vol_env_release + self.mod_env_release * 8000.0).max(0.5);
+            let mod_release_shape = (self.vol_env_release_shape + self.mod_env_release_shape).clamp(-1.0, 1.0);
             self.volume_envelope.update_params(
-                self.vol_env_attack,
-                self.vol_env_attack_shape,
-                self.vol_env_decay,
-                self.vol_env_decay_shape,
-                self.vol_env_sustain,
-                self.vol_env_release,
-                self.vol_env_release_shape,
+                mod_attack, mod_attack_shape,
+                mod_decay, mod_decay_shape,
+                mod_sustain,
+                mod_release, mod_release_shape,
             );
             self.volume_envelope.next()
         };
@@ -1426,7 +1515,7 @@ impl Voice {
         // Master volume slew for click-free volume changes (20ms)
         self.master_volume = self.master_volume_slew.next(self.target_master_volume, 20.0);
 
-        if !self.vca_mode && !self.volume_envelope.is_active() {
+        if !self.vca_mode && !self.volume_envelope.is_active() && !self.pll_tail_envelope.is_active() {
             return (0.0, 0.0, 0.0);
         }
 
@@ -1749,8 +1838,13 @@ impl Voice {
         }
 
         // ===== MIX AT DAW RATE =====
-        let pll_out_final_l = pll_sample_l * self.pll_volume * volume_env;
-        let pll_out_final_r = pll_sample_r * self.pll_volume * volume_env;
+        let pll_env = if volume_env > 0.0001 {
+            volume_env
+        } else {
+            self.pll_tail_envelope.next()
+        };
+        let pll_out_final_l = pll_sample_l * self.pll_volume * pll_env;
+        let pll_out_final_r = pll_sample_r * self.pll_volume * pll_env;
 
         let mixed_l = vps_out_l + pll_out_final_l + saw_out;
         let mixed_r = vps_out_r + pll_out_final_r + saw_out;

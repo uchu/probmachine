@@ -124,13 +124,18 @@
 
 | ID | Name | Range | Default |
 |----|------|-------|---------|
-| synth_vol_attack | Atk | 1–5000ms | 1 |
-| synth_vol_attack_shape | AtkSh | -5..+5 | 0 |
-| synth_vol_decay | Dec | 1–10000ms | 20 |
-| synth_vol_decay_shape | DecSh | -5..+5 | 0 |
-| synth_vol_sustain | Sus | 0.0–1.0 | 1.0 |
-| synth_vol_release | Rel | 1–10000ms | 5 |
-| synth_vol_release_shape | RelSh | -5..+5 | 0 |
+| synth_vol_attack | Atk | 0.5–5000ms | 10.0 |
+| synth_vol_attack_shape | AtkSh | -1.0..+1.0 | 0.0 |
+| synth_vol_decay | Dec | 0.5–10000ms | 100.0 |
+| synth_vol_decay_shape | DecSh | -1.0..+1.0 | 0.0 |
+| synth_vol_sustain | Sus | 0.0–1.0 | 0.7 |
+| synth_vol_release | Rel | 0.5–10000ms | 200.0 |
+| synth_vol_release_shape | RelSh | -1.0..+1.0 | 0.0 |
+| synth_retrigger_dip | Dip | 0.0–1.0 | 0.0 |
+| synth_phase_reset | PhRst | bool | true |
+| synth_pll_tail | Tail | bool | false |
+| synth_pll_tail_time | TailT | 50–5000ms | 500.0 |
+| synth_pll_tail_amount | TailA | 0.0–1.0 | 0.3 |
 
 ## Master
 

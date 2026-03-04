@@ -326,6 +326,15 @@ pub enum ModDestination {
     SawFold,
     SawShapeAmount,
     SawVolume,
+    // Envelope
+    EnvAttack,
+    EnvAttackShape,
+    EnvDecay,
+    EnvDecayShape,
+    EnvSustain,
+    EnvRelease,
+    EnvReleaseShape,
+    EnvRetriggerDip,
 }
 
 impl ModDestination {
@@ -362,6 +371,14 @@ impl ModDestination {
             28 => ModDestination::SawFold,
             29 => ModDestination::SawShapeAmount,
             30 => ModDestination::SawVolume,
+            31 => ModDestination::EnvAttack,
+            32 => ModDestination::EnvAttackShape,
+            33 => ModDestination::EnvDecay,
+            34 => ModDestination::EnvDecayShape,
+            35 => ModDestination::EnvSustain,
+            36 => ModDestination::EnvRelease,
+            37 => ModDestination::EnvReleaseShape,
+            38 => ModDestination::EnvRetriggerDip,
             _ => ModDestination::None,
         }
     }
@@ -393,6 +410,14 @@ impl ModDestination {
             ModDestination::SawFold => "Saw Fold",
             ModDestination::SawShapeAmount => "Saw SHP",
             ModDestination::SawVolume => "Saw Vol",
+            ModDestination::EnvAttack => "Env Atk",
+            ModDestination::EnvAttackShape => "Env A SH",
+            ModDestination::EnvDecay => "Env Dec",
+            ModDestination::EnvDecayShape => "Env D SH",
+            ModDestination::EnvSustain => "Env Sus",
+            ModDestination::EnvRelease => "Env Rel",
+            ModDestination::EnvReleaseShape => "Env R SH",
+            ModDestination::EnvRetriggerDip => "Env Dip",
         }
     }
 }
@@ -424,6 +449,14 @@ pub struct ModulationValues {
     pub saw_fold: f64,
     pub saw_shape_amount: f64,
     pub saw_volume: f64,
+    pub env_attack: f64,
+    pub env_attack_shape: f64,
+    pub env_decay: f64,
+    pub env_decay_shape: f64,
+    pub env_sustain: f64,
+    pub env_release: f64,
+    pub env_release_shape: f64,
+    pub env_retrigger_dip: f64,
 }
 
 impl ModulationValues {
@@ -452,6 +485,14 @@ impl ModulationValues {
         self.saw_fold += other.saw_fold;
         self.saw_shape_amount += other.saw_shape_amount;
         self.saw_volume += other.saw_volume;
+        self.env_attack += other.env_attack;
+        self.env_attack_shape += other.env_attack_shape;
+        self.env_decay += other.env_decay;
+        self.env_decay_shape += other.env_decay_shape;
+        self.env_sustain += other.env_sustain;
+        self.env_release += other.env_release;
+        self.env_release_shape += other.env_release_shape;
+        self.env_retrigger_dip += other.env_retrigger_dip;
     }
 
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
@@ -482,6 +523,14 @@ impl ModulationValues {
             ModDestination::SawFold => self.saw_fold += mod_value,
             ModDestination::SawShapeAmount => self.saw_shape_amount += mod_value,
             ModDestination::SawVolume => self.saw_volume += mod_value,
+            ModDestination::EnvAttack => self.env_attack += mod_value,
+            ModDestination::EnvAttackShape => self.env_attack_shape += mod_value,
+            ModDestination::EnvDecay => self.env_decay += mod_value,
+            ModDestination::EnvDecayShape => self.env_decay_shape += mod_value,
+            ModDestination::EnvSustain => self.env_sustain += mod_value,
+            ModDestination::EnvRelease => self.env_release += mod_value,
+            ModDestination::EnvReleaseShape => self.env_release_shape += mod_value,
+            ModDestination::EnvRetriggerDip => self.env_retrigger_dip += mod_value,
         }
     }
 }

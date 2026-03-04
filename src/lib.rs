@@ -500,7 +500,13 @@ impl Plugin for PhaseBurn {
                 self.params.synth_vol_release.modulated_plain_value(),
                 self.params.synth_vol_release_shape.modulated_plain_value(),
             );
-
+            synth.set_retrigger_dip(self.params.synth_retrigger_dip.modulated_plain_value());
+            synth.set_phase_reset_on_retrigger(self.params.synth_phase_reset.value());
+            synth.set_pll_tail(
+                self.params.synth_pll_tail.value(),
+                self.params.synth_pll_tail_time.modulated_plain_value(),
+                self.params.synth_pll_tail_amount.modulated_plain_value(),
+            );
 
             synth.set_lfo_params(
                 0,

@@ -587,6 +587,17 @@ pub struct DeviceParams {
     #[id = "synth_vol_release_shape"]
     pub synth_vol_release_shape: FloatParam,
 
+    #[id = "synth_retrigger_dip"]
+    pub synth_retrigger_dip: FloatParam,
+    #[id = "synth_phase_reset"]
+    pub synth_phase_reset: BoolParam,
+    #[id = "synth_pll_tail"]
+    pub synth_pll_tail: BoolParam,
+    #[id = "synth_pll_tail_time"]
+    pub synth_pll_tail_time: FloatParam,
+    #[id = "synth_pll_tail_amount"]
+    pub synth_pll_tail_amount: FloatParam,
+
     #[id = "synth_reverb_mix"]
     pub synth_reverb_mix: FloatParam,
     #[id = "synth_reverb_pre_delay"]
@@ -1951,22 +1962,22 @@ impl Default for DeviceParams {
             synth_vol_attack: FloatParam::new(
                 "Vol Attack".to_string(),
                 10.0,
-                FloatRange::Linear { min: 1.0, max: 1000.0 }
+                FloatRange::Skewed { min: 0.5, max: 5000.0, factor: FloatRange::skew_factor(-2.0) }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_attack_shape: FloatParam::new(
                 "Vol Attack Shape".to_string(),
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_decay: FloatParam::new(
                 "Vol Decay".to_string(),
                 100.0,
-                FloatRange::Linear { min: 1.0, max: 1000.0 }
+                FloatRange::Skewed { min: 0.5, max: 10000.0, factor: FloatRange::skew_factor(-2.0) }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_decay_shape: FloatParam::new(
                 "Vol Decay Shape".to_string(),
-                0.5,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_sustain: FloatParam::new(
                 "Vol Sustain".to_string(),
@@ -1976,11 +1987,29 @@ impl Default for DeviceParams {
             synth_vol_release: FloatParam::new(
                 "Vol Release".to_string(),
                 200.0,
-                FloatRange::Linear { min: 1.0, max: 1000.0 }
+                FloatRange::Skewed { min: 0.5, max: 10000.0, factor: FloatRange::skew_factor(-2.0) }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_vol_release_shape: FloatParam::new(
                 "Vol Release Shape".to_string(),
-                0.5,
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+
+            synth_retrigger_dip: FloatParam::new(
+                "Retrigger Dip".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_phase_reset: BoolParam::new("Phase Reset".to_string(), true),
+            synth_pll_tail: BoolParam::new("PLL Tail".to_string(), false),
+            synth_pll_tail_time: FloatParam::new(
+                "PLL Tail Time".to_string(),
+                500.0,
+                FloatRange::Skewed { min: 50.0, max: 5000.0, factor: FloatRange::skew_factor(-2.0) }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_pll_tail_amount: FloatParam::new(
+                "PLL Tail Amount".to_string(),
+                0.3,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
 
@@ -2370,6 +2399,9 @@ impl DeviceParams {
             "synth_vol_decay" => set_float!(self.synth_vol_decay),
             "synth_vol_sustain" => set_float!(self.synth_vol_sustain),
             "synth_vol_release" => set_float!(self.synth_vol_release),
+            "synth_retrigger_dip" => set_float!(self.synth_retrigger_dip),
+            "synth_pll_tail_time" => set_float!(self.synth_pll_tail_time),
+            "synth_pll_tail_amount" => set_float!(self.synth_pll_tail_amount),
             "global_volume" => set_float!(self.global_volume),
             "brilliance_amount" => set_float!(self.brilliance_amount),
             "synth_pll_enable" => set_bool!(self.synth_pll_enable),

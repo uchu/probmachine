@@ -774,6 +774,11 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_vol_decay, data.synth_vol_decay);
     setter.set_parameter(&params.synth_vol_sustain, data.synth_vol_sustain);
     setter.set_parameter(&params.synth_vol_release, data.synth_vol_release);
+    setter.set_parameter(&params.synth_retrigger_dip, data.synth_retrigger_dip);
+    setter.set_parameter(&params.synth_phase_reset, data.synth_phase_reset);
+    setter.set_parameter(&params.synth_pll_tail, data.synth_pll_tail);
+    setter.set_parameter(&params.synth_pll_tail_time, data.synth_pll_tail_time);
+    setter.set_parameter(&params.synth_pll_tail_amount, data.synth_pll_tail_amount);
 
     setter.set_parameter(&params.synth_reverb_mix, data.synth_reverb_mix);
     setter.set_parameter(&params.synth_reverb_time_scale, data.synth_reverb_time_scale);
@@ -1265,6 +1270,11 @@ fn save_params_to_preset_data(
     data.synth_vol_decay = params.synth_vol_decay.modulated_plain_value();
     data.synth_vol_sustain = params.synth_vol_sustain.modulated_plain_value();
     data.synth_vol_release = params.synth_vol_release.modulated_plain_value();
+    data.synth_retrigger_dip = params.synth_retrigger_dip.modulated_plain_value();
+    data.synth_phase_reset = params.synth_phase_reset.value();
+    data.synth_pll_tail = params.synth_pll_tail.value();
+    data.synth_pll_tail_time = params.synth_pll_tail_time.modulated_plain_value();
+    data.synth_pll_tail_amount = params.synth_pll_tail_amount.modulated_plain_value();
 
     data.synth_reverb_mix = params.synth_reverb_mix.modulated_plain_value();
     data.synth_reverb_time_scale = params.synth_reverb_time_scale.modulated_plain_value();

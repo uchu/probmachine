@@ -62,7 +62,11 @@ High-shelf exciter at 4.5kHz. Amount = boost level, Drive = tanh saturation on e
 
 ## Envelopes
 
-Volume ADSR: Attack 1–5000ms, Decay 1–10000ms, Sustain 0–1, Release 1–10000ms. Each stage has shape control (-5 to +5, log→exp). Anti-click: 1ms min attack, 2ms on retrigger, 5ms velocity smoothing, 20ms volume smoothing.
+Custom 64-bit precision ADSR envelope. Attack 0.5–5000ms, Decay 0.5–10000ms, Sustain 0–1, Release 0.5–10000ms. Each stage has shape control (-1.0 to +1.0: negative=logarithmic, 0=linear, positive=exponential) using RC-circuit-like curves.
+
+Retrigger from any stage starts attack from current value (C0-continuous). Retrigger Dip (0–1) creates percussive re-articulation by dipping amplitude before re-attack. Phase Reset toggle controls whether oscillator phases reset on retrigger. Sustain changes smoothly via 3ms one-pole filter.
+
+PLL Tail: When enabled, PLL resonance rings out after note release with configurable decay time (50–5000ms) and amount (0–1).
 
 ## LFO System
 

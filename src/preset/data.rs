@@ -306,6 +306,16 @@ pub struct PresetData {
     pub synth_vol_decay: f32,
     pub synth_vol_sustain: f32,
     pub synth_vol_release: f32,
+    #[serde(default)]
+    pub synth_retrigger_dip: f32,
+    #[serde(default = "default_phase_reset")]
+    pub synth_phase_reset: bool,
+    #[serde(default)]
+    pub synth_pll_tail: bool,
+    #[serde(default = "default_pll_tail_time")]
+    pub synth_pll_tail_time: f32,
+    #[serde(default = "default_pll_tail_amount")]
+    pub synth_pll_tail_amount: f32,
 
     pub synth_reverb_mix: f32,
     pub synth_reverb_time_scale: f32,
@@ -518,6 +528,9 @@ fn default_mseq_division() -> i32 { 3 }
 fn default_fm_ratio_float() -> f32 { 1.0 }
 fn default_mseq_slew() -> f32 { 5.0 }
 fn default_mult_slew_time() -> f32 { 0.15 }
+fn default_phase_reset() -> bool { true }
+fn default_pll_tail_time() -> f32 { 500.0 }
+fn default_pll_tail_amount() -> f32 { 0.3 }
 
 impl Default for PresetData {
     fn default() -> Self {
@@ -637,6 +650,11 @@ impl Default for PresetData {
             synth_vol_decay: 100.0,
             synth_vol_sustain: 0.7,
             synth_vol_release: 200.0,
+            synth_retrigger_dip: 0.0,
+            synth_phase_reset: true,
+            synth_pll_tail: false,
+            synth_pll_tail_time: 500.0,
+            synth_pll_tail_amount: 0.3,
 
             synth_reverb_mix: 0.0,
             synth_reverb_time_scale: 0.5,

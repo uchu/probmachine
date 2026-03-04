@@ -24,7 +24,7 @@ const DIVISION_DISPLAY_ORDER: [usize; 16] = [
     6, 7, 8, 9,
     10, 11, 12, 13,
 ];
-const DEST_ENTRIES: [(&str, i32); 26] = [
+const DEST_ENTRIES: [(&str, i32); 34] = [
     ("None", 0),
     // PLL
     ("PLL Damp", 1), ("PLL Infl", 2), ("PLL Track", 3), ("PLL FM", 4),
@@ -37,6 +37,9 @@ const DEST_ENTRIES: [(&str, i32); 26] = [
     ("VPS Fold", 24), ("VPS SHP", 22), ("VPS Vol", 18),
     // SAW
     ("Saw Fold", 28), ("Saw SHP", 29), ("Saw Vol", 30),
+    // Envelope
+    ("Env Atk", 31), ("Env A SH", 32), ("Env Dec", 33), ("Env D SH", 34),
+    ("Env Sus", 35), ("Env Rel", 36), ("Env R SH", 37), ("Env Dip", 38),
     // Coloration
     ("Drift", 13), ("Tube", 14),
 ];

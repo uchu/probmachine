@@ -513,6 +513,12 @@ fn render_sound_tab(
                                     if (shape_fold as i32) != params.synth_vps_shape_type.value() {
                                         setter.set_parameter(&params.synth_vps_shape_type, if shape_fold { 1 } else { 0 });
                                     }
+                                    ui.add_space(60.0);
+                                    let mut sync_on = params.synth_vps_phase_mode.value() == 1;
+                                    render_labeled_toggle(ui, &mut sync_on, "FREE", "SYNC");
+                                    if (sync_on as i32) != params.synth_vps_phase_mode.value() {
+                                        setter.set_parameter(&params.synth_vps_phase_mode, if sync_on { 1 } else { 0 });
+                                    }
                                 });
                             });
                     });
@@ -1295,41 +1301,93 @@ fn render_envelope_controls_compact(
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
 ) {
-    let (attack_param, decay_param, sustain_param, release_param) = (
-        &params.synth_vol_attack,
-        &params.synth_vol_decay,
-        &params.synth_vol_sustain,
-        &params.synth_vol_release,
-    );
-
     ui.horizontal(|ui| {
         render_vertical_slider(
             ui, params, setter,
-            attack_param, "A",
-            1.0, 1000.0, SliderScale::Exponential(2.0),
+            &params.synth_vol_attack, "A",
+            0.5, 5000.0, SliderScale::Exponential(2.0),
+            None, None,
+        );
+        ui.add_space(2.0);
+        render_vertical_slider(
+            ui, params, setter,
+            &params.synth_vol_attack_shape, "A\u{2009}SH",
+            -1.0, 1.0, SliderScale::Linear,
             None, None,
         );
         ui.add_space(4.0);
         render_vertical_slider(
             ui, params, setter,
-            decay_param, "D",
-            1.0, 1000.0, SliderScale::Exponential(2.0),
+            &params.synth_vol_decay, "D",
+            0.5, 10000.0, SliderScale::Exponential(2.0),
+            None, None,
+        );
+        ui.add_space(2.0);
+        render_vertical_slider(
+            ui, params, setter,
+            &params.synth_vol_decay_shape, "D\u{2009}SH",
+            -1.0, 1.0, SliderScale::Linear,
             None, None,
         );
         ui.add_space(4.0);
         render_vertical_slider(
             ui, params, setter,
-            sustain_param, "S",
-            0.0, 1.0, SliderScale::Exponential(2.0),
+            &params.synth_vol_sustain, "S",
+            0.0, 1.0, SliderScale::Linear,
             None, None,
         );
         ui.add_space(4.0);
         render_vertical_slider(
             ui, params, setter,
-            release_param, "R",
-            1.0, 1000.0, SliderScale::Exponential(2.0),
+            &params.synth_vol_release, "R",
+            0.5, 10000.0, SliderScale::Exponential(2.0),
             None, None,
         );
+        ui.add_space(2.0);
+        render_vertical_slider(
+            ui, params, setter,
+            &params.synth_vol_release_shape, "R\u{2009}SH",
+            -1.0, 1.0, SliderScale::Linear,
+            None, None,
+        );
+        ui.add_space(6.0);
+        render_vertical_slider(
+            ui, params, setter,
+            &params.synth_retrigger_dip, "DIP",
+            0.0, 1.0, SliderScale::Linear,
+            None, None,
+        );
+    });
+
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        let mut phase_reset = params.synth_phase_reset.value();
+        render_toggle(ui, &mut phase_reset, "PH RST", None);
+        if phase_reset != params.synth_phase_reset.value() {
+            setter.set_parameter(&params.synth_phase_reset, phase_reset);
+        }
+        ui.add_space(12.0);
+        let mut pll_tail = params.synth_pll_tail.value();
+        render_toggle(ui, &mut pll_tail, "PLL TAIL", None);
+        if pll_tail != params.synth_pll_tail.value() {
+            setter.set_parameter(&params.synth_pll_tail, pll_tail);
+        }
+        if params.synth_pll_tail.value() {
+            ui.add_space(4.0);
+            render_vertical_slider(
+                ui, params, setter,
+                &params.synth_pll_tail_time, "TIME",
+                50.0, 5000.0, SliderScale::Exponential(2.0),
+                None, None,
+            );
+            ui.add_space(2.0);
+            render_vertical_slider(
+                ui, params, setter,
+                &params.synth_pll_tail_amount, "AMT",
+                0.0, 1.0, SliderScale::Linear,
+                None, None,
+            );
+        }
     });
 }
 
