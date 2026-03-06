@@ -93,7 +93,7 @@ After accounting for root padding, page frame margins, and tab bars:
 | Page type | Available width |
 |-----------|----------------|
 | Standard page (no tab bar) | ~1200px |
-| Synth sub-tabs (after 52px tab bar) | ~1100px |
+| Sound sub-tabs (after 52px tab bar) | ~1100px |
 
 When laying out columns, verify: `left_pad + N×col_width + (N-1)×gap` fits the available width.
 
