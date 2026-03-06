@@ -33,7 +33,7 @@ impl Page {
             Page::Length => "Length",
             Page::Notes => "Notes",
             Page::Strength => "Strength",
-            Page::Synth => "Synth",
+            Page::Synth => "Sound",
             Page::Presets => "Presets",
             Page::Settings => "Settings",
         }

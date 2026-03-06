@@ -21,8 +21,9 @@ use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
 use ui::{Page, SharedUiState};
-use synth::{SynthEngine, MasterLimiter, MasterHpf, BrillianceFilter};
+use synth::{SynthEngine, MasterLimiter, MasterHpf, BoxCutFilter, BrillianceFilter, StereoControl};
 use synth::master_hpf::{HpfMode, HpfBoost};
+use synth::box_cut::BoxCutMode;
 use midi::MidiProcessor;
 use midi_modes::{MidiInputMode, MidiModeProcessor, MidiModeResult};
 
@@ -37,7 +38,11 @@ pub struct PhaseBurn {
     output_level_smoothed: f32,
     limiter: MasterLimiter,
     master_hpf: MasterHpf,
+    box_cut: BoxCutFilter,
+    sub_hpf: MasterHpf,
+    sub_box_cut: BoxCutFilter,
     brilliance: BrillianceFilter,
+    stereo_control: StereoControl,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
     midi_mode_processor: MidiModeProcessor,
     midi_clock_pll: midi_clock::MidiClockPll,
@@ -65,7 +70,11 @@ impl Default for PhaseBurn {
             output_level_smoothed: 0.0,
             limiter: MasterLimiter::new(44100.0),
             master_hpf: MasterHpf::new(44100.0),
+            box_cut: BoxCutFilter::new(44100.0),
+            sub_hpf: MasterHpf::new(44100.0),
+            sub_box_cut: BoxCutFilter::new(44100.0),
             brilliance: BrillianceFilter::new(44100.0),
+            stereo_control: StereoControl::new(44100.0),
             midi_events_buffer: Vec::with_capacity(64),
             midi_mode_processor: MidiModeProcessor::new(),
             midi_clock_pll: midi_clock::MidiClockPll::new(),
@@ -135,6 +144,12 @@ impl Plugin for PhaseBurn {
                 });
 
                 apply_midi_learn(&params, setter, &ui_state);
+
+                let restored_os = ui_state.restored_oversampling.load(std::sync::atomic::Ordering::Relaxed);
+                if restored_os >= 0 {
+                    setter.set_parameter(&params.synth_oversampling, restored_os);
+                    ui_state.restored_oversampling.store(-1, std::sync::atomic::Ordering::Relaxed);
+                }
 
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
                     taffy_layout(ui, ui.id().with("page_layout"))
@@ -208,7 +223,11 @@ impl Plugin for PhaseBurn {
             self.synth_engine = Some(SynthEngine::new(new_sample_rate));
             self.limiter.set_sample_rate(new_sample_rate);
             self.master_hpf.set_sample_rate(new_sample_rate);
+            self.box_cut.set_sample_rate(new_sample_rate);
+            self.sub_hpf.set_sample_rate(new_sample_rate);
+            self.sub_box_cut.set_sample_rate(new_sample_rate);
             self.brilliance.set_sample_rate(new_sample_rate);
+            self.stereo_control.set_sample_rate(new_sample_rate);
         }
 
         true
@@ -381,7 +400,7 @@ impl Plugin for PhaseBurn {
                 self.params.synth_vps_shape_amount.modulated_plain_value(),
             );
             synth.set_vps_fold_range(self.params.synth_vps_fold_range.value());
-            synth.set_vps_phase_mode(self.params.synth_vps_phase_mode.value());
+
 
             synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
 
@@ -399,7 +418,6 @@ impl Plugin for PhaseBurn {
             synth.set_pll_fm_params(
                 self.params.synth_pll_fm_amount.modulated_plain_value(),
                 self.params.synth_pll_fm_ratio_float.modulated_plain_value(),
-                self.params.synth_pll_fm_expand.value(),
             );
 
             synth.set_pll_experimental_params(
@@ -417,8 +435,6 @@ impl Plugin for PhaseBurn {
             synth.set_pll_fm_env_amount(self.params.synth_pll_fm_env_amount.modulated_plain_value());
 
             synth.set_coloration_params(
-                self.params.synth_ring_mod.modulated_plain_value(),
-                self.params.synth_wavefold.modulated_plain_value(),
                 self.params.synth_drift_amount.modulated_plain_value(),
                 self.params.synth_drift_rate.modulated_plain_value(),
                 self.params.synth_tube_drive.modulated_plain_value(),
@@ -427,15 +443,10 @@ impl Plugin for PhaseBurn {
             synth.set_bypass_switches(
                 self.params.synth_pll_enable.value(),
                 self.params.synth_vps_enable.value(),
-                self.params.synth_coloration_enable.value(),
                 self.params.synth_reverb_enable.value(),
                 self.params.synth_saw_enable.value(),
             );
-            synth.set_oversampling(
-                self.params.synth_pll_oversampling.value(),
-                self.params.synth_saw_oversampling.value(),
-                self.params.synth_vps_oversampling.value(),
-            );
+            synth.set_oversampling(self.params.synth_oversampling.value());
 
             synth.set_base_rate(self.params.synth_base_rate.value());
 
@@ -502,11 +513,11 @@ impl Plugin for PhaseBurn {
                 self.params.synth_vol_release_shape.modulated_plain_value(),
             );
             synth.set_retrigger_dip(self.params.synth_retrigger_dip.modulated_plain_value());
-            synth.set_phase_reset_on_retrigger(self.params.synth_phase_reset.value());
+            let pll_tail_amount = self.params.synth_pll_tail_amount.modulated_plain_value();
             synth.set_pll_tail(
-                self.params.synth_pll_tail.value(),
+                pll_tail_amount > 0.001,
                 self.params.synth_pll_tail_time.modulated_plain_value(),
-                self.params.synth_pll_tail_amount.modulated_plain_value(),
+                pll_tail_amount,
             );
 
             synth.set_lfo_params(
@@ -705,29 +716,38 @@ impl Plugin for PhaseBurn {
                 self.ui_state.set_cpu_load(self.cpu_load_smoothed);
             }
 
-            let sub_in_hpf = self.params.master_hpf_sub.value() == 1;
+            let hpf_mode = HpfMode::from_index(self.params.master_hpf.value());
+            let hpf_boost = HpfBoost::from_index(self.params.master_hpf_boost.value());
+            let box_cut_mode = BoxCutMode::from_index(self.params.box_cut_mode.value());
 
-            if sub_in_hpf {
-                for i in 0..num_samples {
-                    self.output_buffer_l[i] += self.sub_buffer[i];
-                    self.output_buffer_r[i] += self.sub_buffer[i];
-                }
-            }
-
-            self.master_hpf.set_mode(HpfMode::from_index(self.params.master_hpf.value()));
-            self.master_hpf.set_boost(HpfBoost::from_index(self.params.master_hpf_boost.value()));
+            self.master_hpf.set_mode(hpf_mode);
+            self.master_hpf.set_boost(hpf_boost);
             self.master_hpf.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
 
-            if !sub_in_hpf {
-                for i in 0..num_samples {
-                    self.output_buffer_l[i] += self.sub_buffer[i];
-                    self.output_buffer_r[i] += self.sub_buffer[i];
-                }
+            self.box_cut.set_mode(box_cut_mode);
+            self.box_cut.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+
+            let brill_amount = self.params.brilliance_amount.modulated_plain_value() as f64;
+            self.brilliance.set_amount(brill_amount);
+            self.brilliance.set_drive(brill_amount);
+            self.brilliance.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+
+            self.stereo_control.set_crossover_hz(self.params.stereo_mono_bass.modulated_plain_value() as f64);
+            self.stereo_control.set_width(self.params.stereo_width.modulated_plain_value() as f64);
+            self.stereo_control.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+
+            if self.params.master_hpf_sub.value() == 1 {
+                self.sub_hpf.set_mode(hpf_mode);
+                self.sub_hpf.set_boost(hpf_boost);
+                self.sub_hpf.process_mono(&mut self.sub_buffer[..num_samples]);
+                self.sub_box_cut.set_mode(box_cut_mode);
+                self.sub_box_cut.process_mono(&mut self.sub_buffer[..num_samples]);
             }
 
-            self.brilliance.set_amount(self.params.brilliance_amount.modulated_plain_value() as f64);
-            self.brilliance.set_drive(self.params.brilliance_drive.modulated_plain_value() as f64);
-            self.brilliance.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+            for i in 0..num_samples {
+                self.output_buffer_l[i] += self.sub_buffer[i];
+                self.output_buffer_r[i] += self.sub_buffer[i];
+            }
 
             let linear_volume = self.params.global_volume.modulated_plain_value();
             let target_volume = linear_volume * linear_volume * linear_volume;

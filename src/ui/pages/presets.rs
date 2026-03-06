@@ -756,7 +756,6 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_vps_shape_type, data.synth_vps_shape_type);
     setter.set_parameter(&params.synth_vps_shape_amount, data.synth_vps_shape_amount);
     setter.set_parameter(&params.synth_vps_fold_range, data.synth_vps_fold_range);
-    setter.set_parameter(&params.synth_vps_phase_mode, data.synth_vps_phase_mode);
     setter.set_parameter(&params.synth_osc_volume, data.synth_osc_volume);
 
     setter.set_parameter(&params.synth_sub_volume, data.synth_sub_volume);
@@ -776,8 +775,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_vol_sustain, data.synth_vol_sustain);
     setter.set_parameter(&params.synth_vol_release, data.synth_vol_release);
     setter.set_parameter(&params.synth_retrigger_dip, data.synth_retrigger_dip);
-    setter.set_parameter(&params.synth_phase_reset, data.synth_phase_reset);
-    setter.set_parameter(&params.synth_pll_tail, data.synth_pll_tail);
+    setter.set_parameter(&params.synth_env_range, data.synth_env_range);
     setter.set_parameter(&params.synth_pll_tail_time, data.synth_pll_tail_time);
     setter.set_parameter(&params.synth_pll_tail_amount, data.synth_pll_tail_amount);
 
@@ -859,13 +857,10 @@ fn load_preset_to_params(
     setter.set_parameter(&params.pos_mod_2_shift, data.pos_mod_2_shift);
     setter.set_parameter(&params.pos_mod_2_prob, data.pos_mod_2_prob);
 
-    setter.set_parameter(&params.synth_ring_mod, data.synth_ring_mod);
-    setter.set_parameter(&params.synth_wavefold, data.synth_wavefold);
     setter.set_parameter(&params.synth_drift_amount, data.synth_drift_amount);
     setter.set_parameter(&params.synth_drift_rate, data.synth_drift_rate);
     setter.set_parameter(&params.synth_tube_drive, data.synth_tube_drive);
     setter.set_parameter(&params.synth_vps_enable, data.synth_vps_enable);
-    setter.set_parameter(&params.synth_coloration_enable, data.synth_coloration_enable);
     setter.set_parameter(&params.synth_reverb_enable, data.synth_reverb_enable);
     setter.set_parameter(&params.synth_pll_mult_slew, data.synth_pll_mult_slew);
     setter.set_parameter(&params.synth_noise_amount, data.synth_noise_amount);
@@ -875,8 +870,11 @@ fn load_preset_to_params(
     setter.set_parameter(&params.master_hpf, data.master_hpf);
     setter.set_parameter(&params.master_hpf_boost, data.master_hpf_boost);
     setter.set_parameter(&params.master_hpf_sub, data.master_hpf_sub);
+    setter.set_parameter(&params.box_cut_mode, data.box_cut_mode);
     setter.set_parameter(&params.brilliance_amount, data.brilliance_amount);
     setter.set_parameter(&params.brilliance_drive, data.brilliance_drive);
+    setter.set_parameter(&params.stereo_mono_bass, data.stereo_mono_bass);
+    setter.set_parameter(&params.stereo_width, data.stereo_width);
 
     let mseq_steps = [
         &params.mseq_step_1, &params.mseq_step_2, &params.mseq_step_3, &params.mseq_step_4,
@@ -1253,7 +1251,6 @@ fn save_params_to_preset_data(
     data.synth_vps_shape_type = params.synth_vps_shape_type.value();
     data.synth_vps_shape_amount = params.synth_vps_shape_amount.modulated_plain_value();
     data.synth_vps_fold_range = params.synth_vps_fold_range.value();
-    data.synth_vps_phase_mode = params.synth_vps_phase_mode.value();
     data.synth_osc_volume = params.synth_osc_volume.modulated_plain_value();
 
     data.synth_sub_volume = params.synth_sub_volume.modulated_plain_value();
@@ -1273,8 +1270,7 @@ fn save_params_to_preset_data(
     data.synth_vol_sustain = params.synth_vol_sustain.modulated_plain_value();
     data.synth_vol_release = params.synth_vol_release.modulated_plain_value();
     data.synth_retrigger_dip = params.synth_retrigger_dip.modulated_plain_value();
-    data.synth_phase_reset = params.synth_phase_reset.value();
-    data.synth_pll_tail = params.synth_pll_tail.value();
+    data.synth_env_range = params.synth_env_range.modulated_plain_value();
     data.synth_pll_tail_time = params.synth_pll_tail_time.modulated_plain_value();
     data.synth_pll_tail_amount = params.synth_pll_tail_amount.modulated_plain_value();
 
@@ -1356,8 +1352,6 @@ fn save_params_to_preset_data(
     data.pos_mod_2_shift = params.pos_mod_2_shift.modulated_plain_value();
     data.pos_mod_2_prob = params.pos_mod_2_prob.modulated_plain_value();
 
-    data.synth_ring_mod = params.synth_ring_mod.modulated_plain_value();
-    data.synth_wavefold = params.synth_wavefold.modulated_plain_value();
     data.synth_drift_amount = params.synth_drift_amount.modulated_plain_value();
     data.synth_drift_rate = params.synth_drift_rate.modulated_plain_value();
     data.synth_noise_amount = 0.0;
@@ -1365,7 +1359,6 @@ fn save_params_to_preset_data(
     data.synth_color_distortion_amount = 0.0;
     data.synth_color_distortion_threshold = 0.7;
     data.synth_vps_enable = params.synth_vps_enable.value();
-    data.synth_coloration_enable = params.synth_coloration_enable.value();
     data.synth_reverb_enable = params.synth_reverb_enable.value();
     data.synth_pll_mult_slew = params.synth_pll_mult_slew.value();
     data.synth_noise_amount = params.synth_noise_amount.modulated_plain_value();
@@ -1375,8 +1368,11 @@ fn save_params_to_preset_data(
     data.master_hpf = params.master_hpf.value();
     data.master_hpf_boost = params.master_hpf_boost.value();
     data.master_hpf_sub = params.master_hpf_sub.value();
+    data.box_cut_mode = params.box_cut_mode.value();
     data.brilliance_amount = params.brilliance_amount.modulated_plain_value();
     data.brilliance_drive = params.brilliance_drive.modulated_plain_value();
+    data.stereo_mono_bass = params.stereo_mono_bass.modulated_plain_value();
+    data.stereo_width = params.stereo_width.modulated_plain_value();
 
     data.mseq_steps = vec![
         params.mseq_step_1.modulated_plain_value(),

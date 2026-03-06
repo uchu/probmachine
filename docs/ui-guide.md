@@ -157,7 +157,7 @@ ui.horizontal(|ui| {
 });
 ```
 
-### Pattern 6: Manual section backgrounds (Synth/Sound — best approach)
+### Pattern 6: Manual section backgrounds (Sound/OSCs — best approach)
 When you need tinted backgrounds behind sections in a horizontal layout, **do not use `Frame::fill()`** — it creates gaps between frames due to layout spacing. Instead:
 
 1. Render all content frames without fill
@@ -210,7 +210,7 @@ Key points:
 |------|--------|-------|
 | Presets | Excellent | Responsive grid, dynamic sizing, clean painting |
 | Beats | Good | Custom grid, well-sized controls (96×48 buttons) |
-| Synth/Sound | Good | Slider columns, section bg tints via manual painting, separator lines |
+| Sound/OSCs | Good | Slider columns, section bg tints via manual painting, separator lines |
 | Strength | Adequate | Reuses Beats grid pattern |
 | Length | Adequate | Side-by-side frames, hard-coded widths |
 | Notes (piano) | Good | Proportional key sizing, custom painting |
@@ -248,7 +248,7 @@ Key points:
 | FM/Modulation | RGB(100, 60, 100) |
 | Volume/Mix | RGB(40, 80, 40) |
 
-### Section background tints (Sound tab)
+### Section background tints (OSCs tab)
 Very subtle tints to visually differentiate oscillator sections:
 | Section | Color (premultiplied RGBA) |
 |---------|---------------------------|

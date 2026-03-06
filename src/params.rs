@@ -518,11 +518,6 @@ pub struct DeviceParams {
     #[id = "synth_pll_feedback_div"]
     pub synth_pll_feedback_div: IntParam,
 
-    #[id = "synth_ring_mod"]
-    pub synth_ring_mod: FloatParam,
-    #[id = "synth_wavefold"]
-    pub synth_wavefold: FloatParam,
-
     #[id = "synth_drift_amount"]
     pub synth_drift_amount: FloatParam,
     #[id = "synth_drift_rate"]
@@ -541,16 +536,10 @@ pub struct DeviceParams {
     pub synth_pll_enable: BoolParam,
     #[id = "synth_vps_enable"]
     pub synth_vps_enable: BoolParam,
-    #[id = "synth_coloration_enable"]
-    pub synth_coloration_enable: BoolParam,
     #[id = "synth_reverb_enable"]
     pub synth_reverb_enable: BoolParam,
-    #[id = "synth_pll_oversampling"]
-    pub synth_pll_oversampling: IntParam,
-    #[id = "synth_saw_oversampling"]
-    pub synth_saw_oversampling: IntParam,
-    #[id = "synth_vps_oversampling"]
-    pub synth_vps_oversampling: IntParam,
+    #[id = "synth_oversampling"]
+    pub synth_oversampling: IntParam,
     #[id = "synth_base_rate"]
     pub synth_base_rate: IntParam,  // 0=Auto, 1=44.1k, 2=88.2k, 3=96k, 4=192k
 
@@ -566,10 +555,18 @@ pub struct DeviceParams {
     #[id = "master_hpf_sub"]
     pub master_hpf_sub: IntParam,
 
+    #[id = "box_cut_mode"]
+    pub box_cut_mode: IntParam,
+
     #[id = "brilliance_amount"]
     pub brilliance_amount: FloatParam,
     #[id = "brilliance_drive"]
     pub brilliance_drive: FloatParam,
+
+    #[id = "stereo_mono_bass"]
+    pub stereo_mono_bass: FloatParam,
+    #[id = "stereo_width"]
+    pub stereo_width: FloatParam,
 
     #[id = "limiter_enable"]
     pub limiter_enable: BoolParam,
@@ -591,10 +588,10 @@ pub struct DeviceParams {
 
     #[id = "synth_retrigger_dip"]
     pub synth_retrigger_dip: FloatParam,
+    #[id = "synth_env_range"]
+    pub synth_env_range: FloatParam,
     #[id = "synth_phase_reset"]
     pub synth_phase_reset: BoolParam,
-    #[id = "synth_pll_tail"]
-    pub synth_pll_tail: BoolParam,
     #[id = "synth_pll_tail_time"]
     pub synth_pll_tail_time: FloatParam,
     #[id = "synth_pll_tail_amount"]
@@ -1861,17 +1858,6 @@ impl Default for DeviceParams {
                 IntRange::Linear { min: 0, max: 7 }
             ),
 
-            synth_ring_mod: FloatParam::new(
-                "Ring Mod".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-            synth_wavefold: FloatParam::new(
-                "Wavefold".to_string(),
-                0.0,
-                FloatRange::Linear { min: 0.0, max: 1.0 }
-            ).with_smoother(SmoothingStyle::Linear(50.0)),
-
             synth_drift_amount: FloatParam::new(
                 "Drift Amount".to_string(),
                 0.0,
@@ -1906,22 +1892,11 @@ impl Default for DeviceParams {
             // Bypass switches (all enabled by default)
             synth_pll_enable: BoolParam::new("PLL Enable".to_string(), true),
             synth_vps_enable: BoolParam::new("VPS Enable".to_string(), true),
-            synth_coloration_enable: BoolParam::new("Coloration Enable".to_string(), true),
             synth_reverb_enable: BoolParam::new("Reverb Enable".to_string(), true),
-            synth_pll_oversampling: IntParam::new(
-                "PLL Oversampling",
-                0,
-                IntRange::Linear { min: 0, max: 7 },
-            ),
-            synth_saw_oversampling: IntParam::new(
-                "Saw Oversampling",
-                0,
-                IntRange::Linear { min: 0, max: 7 },
-            ),
-            synth_vps_oversampling: IntParam::new(
-                "VPS Oversampling",
-                0,
-                IntRange::Linear { min: 0, max: 7 },
+            synth_oversampling: IntParam::new(
+                "Oversampling",
+                1,
+                IntRange::Linear { min: 1, max: 7 },
             ),
             synth_base_rate: IntParam::new(
                 "Base Sample Rate",
@@ -1953,6 +1928,12 @@ impl Default for DeviceParams {
                 IntRange::Linear { min: 0, max: 1 },
             ),
 
+            box_cut_mode: IntParam::new(
+                "Box Cut".to_string(),
+                0,
+                IntRange::Linear { min: 0, max: 3 },
+            ),
+
             brilliance_amount: FloatParam::new(
                 "Brilliance Amount".to_string(),
                 0.0,
@@ -1962,6 +1943,17 @@ impl Default for DeviceParams {
                 "Brilliance Drive".to_string(),
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
+            ).with_step_size(0.01),
+
+            stereo_mono_bass: FloatParam::new(
+                "Mono Bass".to_string(),
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 300.0 },
+            ).with_step_size(1.0),
+            stereo_width: FloatParam::new(
+                "Stereo Width".to_string(),
+                1.0,
+                FloatRange::Linear { min: 0.0, max: 2.0 },
             ).with_step_size(0.01),
 
             limiter_enable: BoolParam::new("Limiter".to_string(), true),
@@ -2007,8 +1999,12 @@ impl Default for DeviceParams {
                 0.0,
                 FloatRange::Linear { min: 0.0, max: 1.0 }
             ).with_smoother(SmoothingStyle::Linear(50.0)),
+            synth_env_range: FloatParam::new(
+                "Env Range".to_string(),
+                500.0,
+                FloatRange::Skewed { min: 20.0, max: 10000.0, factor: FloatRange::skew_factor(-2.0) }
+            ).with_smoother(SmoothingStyle::Linear(50.0)),
             synth_phase_reset: BoolParam::new("Phase Reset".to_string(), true),
-            synth_pll_tail: BoolParam::new("PLL Tail".to_string(), false),
             synth_pll_tail_time: FloatParam::new(
                 "PLL Tail Time".to_string(),
                 500.0,
@@ -2398,8 +2394,6 @@ impl DeviceParams {
             "synth_pll_stereo_phase" => set_float!(self.synth_pll_stereo_phase),
             "synth_pll_fm_env_amount" => set_float!(self.synth_pll_fm_env_amount),
             "synth_pll_injection_amount" => set_float!(self.synth_pll_injection_amount),
-            "synth_ring_mod" => set_float!(self.synth_ring_mod),
-            "synth_wavefold" => set_float!(self.synth_wavefold),
             "synth_drift_amount" => set_float!(self.synth_drift_amount),
             "synth_drift_rate" => set_float!(self.synth_drift_rate),
             "synth_tube_drive" => set_float!(self.synth_tube_drive),
@@ -2411,7 +2405,10 @@ impl DeviceParams {
             "synth_pll_tail_time" => set_float!(self.synth_pll_tail_time),
             "synth_pll_tail_amount" => set_float!(self.synth_pll_tail_amount),
             "global_volume" => set_float!(self.global_volume),
+            "box_cut_mode" => set_int!(self.box_cut_mode),
             "brilliance_amount" => set_float!(self.brilliance_amount),
+            "stereo_mono_bass" => set_float!(self.stereo_mono_bass),
+            "stereo_width" => set_float!(self.stereo_width),
             "synth_pll_enable" => set_bool!(self.synth_pll_enable),
             "synth_pll_colored" => set_bool!(self.synth_pll_colored),
             "synth_pll_mode" => set_bool!(self.synth_pll_mode),
@@ -2480,6 +2477,8 @@ impl DeviceParams {
             "synth_pll_fm_expand" => read_bool!(self.synth_pll_fm_expand),
             "synth_saw_enable" => read_bool!(self.synth_saw_enable),
             "synth_vps_enable" => read_bool!(self.synth_vps_enable),
+            "stereo_mono_bass" => read_float!(self.stereo_mono_bass),
+            "stereo_width" => read_float!(self.stereo_width),
             _ => None,
         }
     }

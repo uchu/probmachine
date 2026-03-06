@@ -579,14 +579,6 @@ fn render_performance_section(
 
     ui.add_space(8.0);
 
-    let mut color = params.synth_coloration_enable.value();
-    if ui
-        .checkbox(&mut color, egui::RichText::new("Coloration").size(UI_FONT))
-        .changed()
-    {
-        setter.set_parameter(&params.synth_coloration_enable, color);
-    }
-
     let mut limiter = params.limiter_enable.value();
     if ui
         .checkbox(&mut limiter, egui::RichText::new("Limiter").size(UI_FONT))
@@ -618,13 +610,11 @@ fn render_performance_section(
     ui.label(egui::RichText::new("Oversampling").size(UI_FONT).strong());
     ui.add_space(4.0);
 
-    render_os_combo(ui, "PLL:", "os_pll", params, setter, |p| &p.synth_pll_oversampling);
-    render_os_combo(ui, "SAW:", "os_saw", params, setter, |p| &p.synth_saw_oversampling);
-    render_os_combo(ui, "VPS:", "os_vps", params, setter, |p| &p.synth_vps_oversampling);
+    render_os_combo(ui, "Factor:", "os_all", params, setter, ui_state, |p| &p.synth_oversampling);
 }
 
 fn os_label(val: i32) -> &'static str {
-    match val { 0 => "1x (off)", 1 => "2x", 2 => "4x", 3 => "8x", 4 => "16x", 5 => "32x", 6 => "64x", _ => "128x" }
+    match val { 1 => "2x", 2 => "4x", 3 => "8x", 4 => "16x", 5 => "32x", 6 => "64x", _ => "128x" }
 }
 
 fn render_os_combo(
@@ -633,6 +623,7 @@ fn render_os_combo(
     id: &str,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
+    ui_state: &Arc<SharedUiState>,
     get_param: fn(&DeviceParams) -> &nih_plug::prelude::IntParam,
 ) {
     ui.horizontal(|ui| {
@@ -643,12 +634,16 @@ fn render_os_combo(
             .width(90.0)
             .selected_text(egui::RichText::new(os_label(current)).size(UI_FONT))
             .show_ui(ui, |ui| {
-                for (val, lbl) in [(0, "1x (off)"), (1, "2x"), (2, "4x"), (3, "8x"), (4, "16x"), (5, "32x"), (6, "64x"), (7, "128x")] {
+                for (val, lbl) in [(1, "2x"), (2, "4x"), (3, "8x"), (4, "16x"), (5, "32x"), (6, "64x"), (7, "128x")] {
                     let btn = egui::Button::new(egui::RichText::new(lbl).size(UI_FONT))
                         .min_size(egui::vec2(80.0, 36.0))
                         .selected(current == val);
                     if ui.add(btn).clicked() {
                         setter.set_parameter(get_param(params), val);
+                        if let Ok(mut mgr) = ui_state.midi_device_manager.try_lock() {
+                            mgr.set_oversampling(val);
+                            mgr.save_config();
+                        }
                         ui.close_menu();
                     }
                 }

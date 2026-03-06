@@ -92,23 +92,6 @@ pub fn stereo_avg(s: Stereo) -> f64 {
     (s[0] + s[1]) * 0.5
 }
 
-#[inline(always)]
-pub fn stereo_tanh(s: Stereo) -> Stereo {
-    let x = s;
-    let x2 = x * x;
-    let x3 = x2 * x;
-    let x5 = x3 * x2;
-    let x7 = x5 * x2;
-    let result = x - x3 * Stereo::splat(1.0 / 3.0)
-                   + x5 * Stereo::splat(2.0 / 15.0)
-                   - x7 * Stereo::splat(17.0 / 315.0);
-    stereo_clamp(result, -1.0, 1.0)
-}
-
-#[inline(always)]
-pub fn stereo_tanh_accurate(s: Stereo) -> Stereo {
-    stereo(s[0].tanh(), s[1].tanh())
-}
 
 #[inline(always)]
 pub fn stereo_sin(s: Stereo) -> Stereo {
@@ -149,38 +132,6 @@ pub fn stereo_wavefold_pi(s: Stereo, amount: f64) -> Stereo {
     s * one_minus_amt + folded * amt
 }
 
-#[inline(always)]
-pub fn stereo_tube_saturate(s: Stereo, drive: f64) -> Stereo {
-    let drive_factor = 1.0 + drive * 3.0;
-    let driven = s * Stereo::splat(drive_factor);
-
-    let pos_clip = driven.simd_min(Stereo::splat(1.0));
-    let neg_clip = (-driven).simd_min(Stereo::splat(0.8));
-
-    let cubic = |x: Stereo| -> Stereo {
-        let x3 = x * x * x;
-        (x - x3 * Stereo::splat(1.0 / 3.0)) * Stereo::splat(1.0 / (1.0 - 1.0 / 3.0))
-    };
-
-    let pos_result = cubic(pos_clip);
-    let neg_result = -cubic(neg_clip) * Stereo::splat(0.9);
-
-    let is_positive = driven.simd_ge(Stereo::splat(0.0));
-    let result = is_positive.select(pos_result, neg_result);
-
-    result * Stereo::splat(1.0 - drive * 0.3)
-}
-
-/// Bram de Jong waveshaper distortion (stereo SIMD version of dsp::f_distort)
-/// f(x,a) = x*(abs(x) + a)/(x^2 + (a-1)*abs(x) + 1)
-#[inline(always)]
-pub fn stereo_distort_bram(s: Stereo, gain: f64, threshold: f64) -> Stereo {
-    let abs_s = s.abs();
-    let s2 = s * s;
-    let numerator = s * (abs_s + Stereo::splat(threshold));
-    let denominator = s2 + (Stereo::splat(threshold - 1.0) * abs_s) + Stereo::splat(1.0);
-    Stereo::splat(gain) * (numerator / denominator)
-}
 
 #[inline(always)]
 pub fn stereo_to_f32(s: Stereo) -> StereoF32 {
@@ -356,14 +307,6 @@ mod tests {
         let clamped = stereo_clamp(s, -1.0, 1.0);
         assert_eq!(stereo_left(clamped), -1.0);
         assert_eq!(stereo_right(clamped), 1.0);
-    }
-
-    #[test]
-    fn test_stereo_tanh() {
-        let s = stereo(0.0, 0.5);
-        let result = stereo_tanh(s);
-        assert!((stereo_left(result) - 0.0).abs() < 0.01);
-        assert!((stereo_right(result) - 0.46).abs() < 0.1);
     }
 
     #[test]

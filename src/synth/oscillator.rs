@@ -8,12 +8,6 @@ pub enum PllMode {
     EdgePFD,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum VpsPhaseMode {
-    Free,
-    PllSync,
-}
-
 pub struct Oscillator {
     osc: VPSOscillator,
     freq: f64,
@@ -619,5 +613,37 @@ impl PLLOscillator {
         } else {
             clamped
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fast_sin_unit_accuracy() {
+        let n = 10000;
+        let mut max_error = 0.0_f64;
+        let mut sum_sq_error = 0.0_f64;
+
+        for i in 0..n {
+            let phase = i as f64 / n as f64;
+            let fast = fast_sin_unit(phase);
+            let exact = (phase * std::f64::consts::TAU).sin();
+            let error = (fast - exact).abs();
+            if error > max_error {
+                max_error = error;
+            }
+            sum_sq_error += error * error;
+        }
+
+        let rms_error = (sum_sq_error / n as f64).sqrt();
+
+        println!("fast_sin_unit accuracy over {} samples:", n);
+        println!("  max error:  {:.6} ({:.4}%)", max_error, max_error * 100.0);
+        println!("  RMS error:  {:.6} ({:.4}%)", rms_error, rms_error * 100.0);
+
+        assert!(max_error < 0.01, "max error {:.6} exceeds 1% threshold", max_error);
+        assert!(rms_error < 0.005, "RMS error {:.6} exceeds 0.5% threshold", rms_error);
     }
 }

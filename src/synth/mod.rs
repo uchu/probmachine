@@ -9,13 +9,17 @@ pub mod lfo;
 mod limiter;
 pub mod mod_sequencer;
 pub mod master_hpf;
+pub mod box_cut;
 pub mod brilliance;
+pub mod stereo_control;
 
 pub use voice::Voice;
 pub use lfo::LfoBank;
 pub use limiter::MasterLimiter;
 pub use master_hpf::MasterHpf;
+pub use box_cut::BoxCutFilter;
 pub use brilliance::BrillianceFilter;
+pub use stereo_control::StereoControl;
 use crate::sequencer::Sequencer;
 use crate::params::DeviceParams;
 use crate::midi::ExternalNoteEvent;
@@ -175,8 +179,8 @@ impl SynthEngine {
         };
     }
 
-    pub fn set_pll_fm_params(&mut self, amount: f32, ratio_float: f32, expand: bool) {
-        self.voice.set_pll_fm_params(amount as f64, ratio_float as f64, expand);
+    pub fn set_pll_fm_params(&mut self, amount: f32, ratio_float: f32) {
+        self.voice.set_pll_fm_params(amount as f64, ratio_float as f64);
     }
 
     pub fn set_pll_experimental_params(
@@ -229,15 +233,11 @@ impl SynthEngine {
 
     pub fn set_coloration_params(
         &mut self,
-        ring_mod: f32,
-        wavefold: f32,
         drift_amount: f32,
         drift_rate: f32,
         tube: f32,
     ) {
         self.voice.set_coloration_params(
-            ring_mod as f64,
-            wavefold as f64,
             drift_amount as f64,
             drift_rate as f64,
             tube as f64,
@@ -248,15 +248,14 @@ impl SynthEngine {
         &mut self,
         pll: bool,
         vps: bool,
-        coloration: bool,
         reverb: bool,
         saw: bool,
     ) {
-        self.voice.set_bypass_switches(pll, vps, coloration, reverb, saw);
+        self.voice.set_bypass_switches(pll, vps, reverb, saw);
     }
 
-    pub fn set_oversampling(&mut self, pll: i32, saw: i32, vps: i32) {
-        self.voice.set_oversampling(pll, saw, vps);
+    pub fn set_oversampling(&mut self, factor: i32) {
+        self.voice.set_oversampling(factor);
     }
 
     pub fn set_base_rate(&mut self, rate_option: i32) {
@@ -273,10 +272,6 @@ impl SynthEngine {
 
     pub fn set_vps_fold_range(&mut self, range: i32) {
         self.voice.set_vps_fold_range(range);
-    }
-
-    pub fn set_vps_phase_mode(&mut self, mode: i32) {
-        self.voice.set_vps_phase_mode(mode);
     }
 
     pub fn set_sub_volume(&mut self, volume: f32) {
@@ -322,10 +317,6 @@ impl SynthEngine {
 
     pub fn set_retrigger_dip(&mut self, dip: f32) {
         self.voice.set_retrigger_dip(dip as f64);
-    }
-
-    pub fn set_phase_reset_on_retrigger(&mut self, enabled: bool) {
-        self.voice.set_phase_reset_on_retrigger(enabled);
     }
 
     pub fn set_pll_tail(&mut self, enabled: bool, time_ms: f32, amount: f32) {

@@ -83,7 +83,14 @@ impl MasterLimiter {
             let delayed_l = self.delay_buffer_l[read_pos];
             let delayed_r = self.delay_buffer_r[read_pos];
 
-            let peak = left[i].abs().max(right[i].abs());
+            let mut peak = 0.0_f32;
+            for j in 0..self.lookahead_samples {
+                let pos = (self.write_pos + self.buffer_size - j) % self.buffer_size;
+                let sample_peak = self.delay_buffer_l[pos].abs().max(self.delay_buffer_r[pos].abs());
+                if sample_peak > peak {
+                    peak = sample_peak;
+                }
+            }
             let target_gain = self.compute_gain_soft_knee(peak);
 
             let coeff = if target_gain < self.current_gain {

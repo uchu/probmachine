@@ -37,9 +37,12 @@ pub struct SettingsConfig {
     pub midi_transport_in: bool,
     #[serde(default)]
     pub midi_transport_out: bool,
+    #[serde(default = "default_oversampling")]
+    pub oversampling: i32,
 }
 
 fn default_true() -> bool { true }
+fn default_oversampling() -> i32 { 1 }
 
 impl Default for SettingsConfig {
     fn default() -> Self {
@@ -57,6 +60,7 @@ impl Default for SettingsConfig {
             midi_clock_out: false,
             midi_transport_in: false,
             midi_transport_out: false,
+            oversampling: 1,
         }
     }
 }
@@ -330,6 +334,10 @@ impl MidiDeviceManager {
 
     pub fn set_midi_transport_out(&mut self, enabled: bool) {
         self.config.midi_transport_out = enabled;
+    }
+
+    pub fn set_oversampling(&mut self, factor: i32) {
+        self.config.oversampling = factor;
     }
 
     pub fn has_feedback_risk(&self) -> bool {

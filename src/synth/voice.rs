@@ -1,10 +1,10 @@
 #![allow(clippy::too_many_arguments)]
 
 use super::dsp::{Oversampling, SlewValue, apply_distortion};
-use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, SawOscillator, VpsPhaseMode};
+use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, SawOscillator};
 use super::envelope::{Envelope, TailEnvelope};
 use super::lfo::ModulationValues;
-use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_wavefold_pi, OnePoleSlewValue};
+use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_wavefold_pi, OnePoleSlewValue, StereoDCBlocker};
 
 struct SawTightFilter {
     ic1eq: f64,
@@ -101,35 +101,8 @@ pub struct Voice {
     oversampling_64x_right: Oversampling<64>,
     oversampling_128x_left: Oversampling<128>,
     oversampling_128x_right: Oversampling<128>,
-    saw_os_2x: Oversampling<2>,
-    saw_os_4x: Oversampling<4>,
-    saw_os_8x: Oversampling<8>,
-    saw_os_16x: Oversampling<16>,
-    saw_os_32x: Oversampling<32>,
-    saw_os_64x: Oversampling<64>,
-    saw_os_128x: Oversampling<128>,
 
-    // ===== Global Parameters =====
-    base_frequency: f64,
-    master_volume: f64,
-    daw_sample_rate: f64,
-    processing_sample_rate: f64,
-    base_rate_option: i32,  // 0=Auto, 1=44.1k, 2=88.2k, 3=96k, 4=192k
-
-    // ===== Bypass Switches =====
-    pll_enabled: bool,
-    vps_enabled: bool,
-    coloration_enabled: bool,
-
-    // Per-oscillator oversampling
-    current_pll_os_factor: i32,
-    current_saw_os_factor: i32,
-    current_vps_os_factor: i32,
-    pll_effective_ratio: i32,
-    saw_effective_ratio: i32,
-    vps_effective_ratio: i32,
-
-    // VPS oversampling buffers
+    // VPS oversampling (stereo)
     vps_os_2x_left: Oversampling<2>,
     vps_os_2x_right: Oversampling<2>,
     vps_os_4x_left: Oversampling<4>,
@@ -144,6 +117,33 @@ pub struct Voice {
     vps_os_64x_right: Oversampling<64>,
     vps_os_128x_left: Oversampling<128>,
     vps_os_128x_right: Oversampling<128>,
+
+    // SAW oversampling (mono)
+    saw_os_2x: Oversampling<2>,
+    saw_os_4x: Oversampling<4>,
+    saw_os_8x: Oversampling<8>,
+    saw_os_16x: Oversampling<16>,
+    saw_os_32x: Oversampling<32>,
+    saw_os_64x: Oversampling<64>,
+    saw_os_128x: Oversampling<128>,
+
+    // VPS DC blocker
+    vps_dc_blocker: StereoDCBlocker,
+
+    // ===== Global Parameters =====
+    base_frequency: f64,
+    master_volume: f64,
+    daw_sample_rate: f64,
+    processing_sample_rate: f64,
+    base_rate_option: i32,  // 0=Auto, 1=44.1k, 2=88.2k, 3=96k, 4=192k
+
+    // ===== Bypass Switches =====
+    pll_enabled: bool,
+    vps_enabled: bool,
+
+    // Unified oversampling
+    current_os_factor: i32,
+    effective_ratio: i32,
 
     // ===== Stereo =====
     pll_damping_stereo_offset: f64,
@@ -162,8 +162,6 @@ pub struct Voice {
     vps_shape_type: i32,
     vps_shape_amount: f64,
     vps_fold_range: i32,
-    vps_phase_mode: VpsPhaseMode,
-    prev_ref_phase: f64,
 
     // ===== Sub Oscillator =====
     sub_volume: f64,
@@ -195,7 +193,6 @@ pub struct Voice {
     // ===== PLL FM =====
     pll_fm_amount: f64,
     pll_fm_ratio_float: f64,
-    pll_fm_expand: bool,
 
     // ===== PLL Reference =====
     pll_ref_octave: i32,
@@ -221,9 +218,7 @@ pub struct Voice {
     pll_prev_out_l: f64,
     pll_prev_out_r: f64,
 
-    // ===== Coloration =====
-    ring_mod_amount: f64,
-    wavefold_amount: f64,
+    // ===== Drift & Tube =====
     drift_amount: f64,
     drift_rate: f64,
     drift_phase_l: f64,
@@ -242,7 +237,6 @@ pub struct Voice {
 
     // ===== Retrigger / Phase / PLL Tail =====
     retrigger_dip: f64,
-    phase_reset_on_retrigger: bool,
     pll_tail_enabled: bool,
     pll_tail_time_ms: f64,
     pll_tail_amount: f64,
@@ -267,9 +261,7 @@ pub struct Voice {
     pll_fm_env_slew: SlewValue,
     pll_range_slew: SlewValue,
 
-    // Coloration slews
-    ring_mod_slew: SlewValue,
-    wavefold_slew: SlewValue,
+    // Drift & tube slews
     drift_amount_slew: SlewValue,
     drift_rate_slew: SlewValue,
     tube_drive_slew: SlewValue,
@@ -320,8 +312,6 @@ pub struct Voice {
     target_pll_stereo_phase: f64,
     target_pll_fm_env_amount: f64,
     target_pll_range: f64,
-    target_ring_mod: f64,
-    target_wavefold: f64,
     target_drift_amount: f64,
     target_drift_rate: f64,
     target_tube_drive: f64,
@@ -352,8 +342,6 @@ pub struct Voice {
     mod_pll_range: f64,
     mod_vps_d: f64,
     mod_vps_v: f64,
-    mod_ring_mod: f64,
-    mod_wavefold: f64,
     mod_drift_amount: f64,
     mod_tube_drive: f64,
     mod_pll_volume: f64,
@@ -376,6 +364,9 @@ pub struct Voice {
     mod_env_release: f64,
     mod_env_release_shape: f64,
     mod_env_retrigger_dip: f64,
+    mod_env_range: f64,
+    mod_pll_tail_amount: f64,
+    mod_pll_tail_time: f64,
 
     // Slews for modulation (critical for smooth, crackle-free modulation)
     mod_slew_pll_damping: SlewValue,
@@ -392,8 +383,6 @@ pub struct Voice {
     mod_slew_pll_range: SlewValue,
     mod_slew_vps_d: SlewValue,
     mod_slew_vps_v: SlewValue,
-    mod_slew_ring_mod: SlewValue,
-    mod_slew_wavefold: SlewValue,
     mod_slew_drift: SlewValue,
     mod_slew_tube: SlewValue,
     mod_slew_pll_vol: SlewValue,
@@ -416,6 +405,9 @@ pub struct Voice {
     mod_slew_env_release: SlewValue,
     mod_slew_env_release_shape: SlewValue,
     mod_slew_env_retrigger_dip: SlewValue,
+    mod_slew_env_range: SlewValue,
+    mod_slew_pll_tail_amount: SlewValue,
+    mod_slew_pll_tail_time: SlewValue,
 
     pll_mult_slew_time: f64,
     bpm: f64,
@@ -462,51 +454,31 @@ impl Voice {
         oversampling_128x_left.set_sample_rate(sample_rate_f64);
         oversampling_128x_right.set_sample_rate(sample_rate_f64);
 
-        let mut saw_os_2x = Oversampling::<2>::new();
-        let mut saw_os_4x = Oversampling::<4>::new();
-        let mut saw_os_8x = Oversampling::<8>::new();
-        let mut saw_os_16x = Oversampling::<16>::new();
-        let mut saw_os_32x = Oversampling::<32>::new();
-        let mut saw_os_64x = Oversampling::<64>::new();
-        let mut saw_os_128x = Oversampling::<128>::new();
-        saw_os_2x.set_sample_rate(sample_rate_f64);
-        saw_os_4x.set_sample_rate(sample_rate_f64);
-        saw_os_8x.set_sample_rate(sample_rate_f64);
-        saw_os_16x.set_sample_rate(sample_rate_f64);
-        saw_os_32x.set_sample_rate(sample_rate_f64);
-        saw_os_64x.set_sample_rate(sample_rate_f64);
-        saw_os_128x.set_sample_rate(sample_rate_f64);
+        let mut vps_os_2x_left = Oversampling::<2>::new(); let mut vps_os_2x_right = Oversampling::<2>::new();
+        vps_os_2x_left.set_sample_rate(sample_rate_f64); vps_os_2x_right.set_sample_rate(sample_rate_f64);
+        let mut vps_os_4x_left = Oversampling::<4>::new(); let mut vps_os_4x_right = Oversampling::<4>::new();
+        vps_os_4x_left.set_sample_rate(sample_rate_f64); vps_os_4x_right.set_sample_rate(sample_rate_f64);
+        let mut vps_os_8x_left = Oversampling::<8>::new(); let mut vps_os_8x_right = Oversampling::<8>::new();
+        vps_os_8x_left.set_sample_rate(sample_rate_f64); vps_os_8x_right.set_sample_rate(sample_rate_f64);
+        let mut vps_os_16x_left = Oversampling::<16>::new(); let mut vps_os_16x_right = Oversampling::<16>::new();
+        vps_os_16x_left.set_sample_rate(sample_rate_f64); vps_os_16x_right.set_sample_rate(sample_rate_f64);
+        let mut vps_os_32x_left = Oversampling::<32>::new(); let mut vps_os_32x_right = Oversampling::<32>::new();
+        vps_os_32x_left.set_sample_rate(sample_rate_f64); vps_os_32x_right.set_sample_rate(sample_rate_f64);
+        let mut vps_os_64x_left = Oversampling::<64>::new(); let mut vps_os_64x_right = Oversampling::<64>::new();
+        vps_os_64x_left.set_sample_rate(sample_rate_f64); vps_os_64x_right.set_sample_rate(sample_rate_f64);
+        let mut vps_os_128x_left = Oversampling::<128>::new(); let mut vps_os_128x_right = Oversampling::<128>::new();
+        vps_os_128x_left.set_sample_rate(sample_rate_f64); vps_os_128x_right.set_sample_rate(sample_rate_f64);
 
-        let mut vps_os_2x_left = Oversampling::<2>::new();
-        let mut vps_os_2x_right = Oversampling::<2>::new();
-        let mut vps_os_4x_left = Oversampling::<4>::new();
-        let mut vps_os_4x_right = Oversampling::<4>::new();
-        let mut vps_os_8x_left = Oversampling::<8>::new();
-        let mut vps_os_8x_right = Oversampling::<8>::new();
-        let mut vps_os_16x_left = Oversampling::<16>::new();
-        let mut vps_os_16x_right = Oversampling::<16>::new();
-        let mut vps_os_32x_left = Oversampling::<32>::new();
-        let mut vps_os_32x_right = Oversampling::<32>::new();
-        let mut vps_os_64x_left = Oversampling::<64>::new();
-        let mut vps_os_64x_right = Oversampling::<64>::new();
-        let mut vps_os_128x_left = Oversampling::<128>::new();
-        let mut vps_os_128x_right = Oversampling::<128>::new();
-        vps_os_2x_left.set_sample_rate(sample_rate_f64);
-        vps_os_2x_right.set_sample_rate(sample_rate_f64);
-        vps_os_4x_left.set_sample_rate(sample_rate_f64);
-        vps_os_4x_right.set_sample_rate(sample_rate_f64);
-        vps_os_8x_left.set_sample_rate(sample_rate_f64);
-        vps_os_8x_right.set_sample_rate(sample_rate_f64);
-        vps_os_16x_left.set_sample_rate(sample_rate_f64);
-        vps_os_16x_right.set_sample_rate(sample_rate_f64);
-        vps_os_32x_left.set_sample_rate(sample_rate_f64);
-        vps_os_32x_right.set_sample_rate(sample_rate_f64);
-        vps_os_64x_left.set_sample_rate(sample_rate_f64);
-        vps_os_64x_right.set_sample_rate(sample_rate_f64);
-        vps_os_128x_left.set_sample_rate(sample_rate_f64);
-        vps_os_128x_right.set_sample_rate(sample_rate_f64);
-        // Default to 1x (no oversampling) - processing at DAW rate
-        let processing_rate = sample_rate_f64;
+        let mut saw_os_2x = Oversampling::<2>::new(); saw_os_2x.set_sample_rate(sample_rate_f64);
+        let mut saw_os_4x = Oversampling::<4>::new(); saw_os_4x.set_sample_rate(sample_rate_f64);
+        let mut saw_os_8x = Oversampling::<8>::new(); saw_os_8x.set_sample_rate(sample_rate_f64);
+        let mut saw_os_16x = Oversampling::<16>::new(); saw_os_16x.set_sample_rate(sample_rate_f64);
+        let mut saw_os_32x = Oversampling::<32>::new(); saw_os_32x.set_sample_rate(sample_rate_f64);
+        let mut saw_os_64x = Oversampling::<64>::new(); saw_os_64x.set_sample_rate(sample_rate_f64);
+        let mut saw_os_128x = Oversampling::<128>::new(); saw_os_128x.set_sample_rate(sample_rate_f64);
+
+        // Default to 2x oversampling
+        let processing_rate = sample_rate_f64 * 2.0;
 
         let make_slew = || {
             let mut s = SlewValue::new();
@@ -544,13 +516,19 @@ impl Voice {
             oversampling_64x_right,
             oversampling_128x_left,
             oversampling_128x_right,
-            saw_os_2x,
-            saw_os_4x,
-            saw_os_8x,
-            saw_os_16x,
-            saw_os_32x,
-            saw_os_64x,
-            saw_os_128x,
+
+            vps_os_2x_left, vps_os_2x_right,
+            vps_os_4x_left, vps_os_4x_right,
+            vps_os_8x_left, vps_os_8x_right,
+            vps_os_16x_left, vps_os_16x_right,
+            vps_os_32x_left, vps_os_32x_right,
+            vps_os_64x_left, vps_os_64x_right,
+            vps_os_128x_left, vps_os_128x_right,
+
+            saw_os_2x, saw_os_4x, saw_os_8x, saw_os_16x,
+            saw_os_32x, saw_os_64x, saw_os_128x,
+
+            vps_dc_blocker: StereoDCBlocker::new(),
 
             base_frequency: 220.0,
             master_volume: 0.8,
@@ -561,27 +539,8 @@ impl Voice {
             // Bypass switches (all enabled by default)
             pll_enabled: true,
             vps_enabled: true,
-            coloration_enabled: true,
-            current_pll_os_factor: 0,
-            current_saw_os_factor: 0,
-            current_vps_os_factor: 0,
-            pll_effective_ratio: 1,
-            saw_effective_ratio: 1,
-            vps_effective_ratio: 1,
-            vps_os_2x_left,
-            vps_os_2x_right,
-            vps_os_4x_left,
-            vps_os_4x_right,
-            vps_os_8x_left,
-            vps_os_8x_right,
-            vps_os_16x_left,
-            vps_os_16x_right,
-            vps_os_32x_left,
-            vps_os_32x_right,
-            vps_os_64x_left,
-            vps_os_64x_right,
-            vps_os_128x_left,
-            vps_os_128x_right,
+            current_os_factor: 1,
+            effective_ratio: 2,
 
             pll_damping_stereo_offset: 0.0,
 
@@ -598,8 +557,6 @@ impl Voice {
             vps_shape_type: 0,
             vps_shape_amount: 0.0,
             vps_fold_range: 0,
-            vps_phase_mode: VpsPhaseMode::Free,
-            prev_ref_phase: 0.0,
 
             sub_volume: 0.0,
 
@@ -627,7 +584,6 @@ impl Voice {
 
             pll_fm_amount: 0.0,
             pll_fm_ratio_float: 1.0,
-            pll_fm_expand: false,
 
             pll_ref_octave: 0,
             pll_ref_tune: 0,
@@ -652,9 +608,7 @@ impl Voice {
             pll_prev_out_l: 0.0,
             pll_prev_out_r: 0.0,
 
-            // Coloration defaults
-            ring_mod_amount: 0.0,
-            wavefold_amount: 0.0,
+            // Drift & tube defaults
             drift_amount: 0.0,
             drift_rate: 0.3,
             drift_phase_l: 0.0,
@@ -671,7 +625,6 @@ impl Voice {
             velocity: 1.0,
 
             retrigger_dip: 0.0,
-            phase_reset_on_retrigger: true,
             pll_tail_enabled: false,
             pll_tail_time_ms: 500.0,
             pll_tail_amount: 0.3,
@@ -694,8 +647,6 @@ impl Voice {
             pll_stereo_phase_slew: make_slew(),
             pll_fm_env_slew: make_slew(),
             pll_range_slew: make_slew(),
-            ring_mod_slew: make_slew(),
-            wavefold_slew: make_slew(),
             drift_amount_slew: make_slew(),
             drift_rate_slew: make_slew(),
             tube_drive_slew: make_slew(),
@@ -735,8 +686,6 @@ impl Voice {
             target_pll_stereo_phase: 0.0,
             target_pll_fm_env_amount: 0.0,
             target_pll_range: 1.0,
-            target_ring_mod: 0.0,
-            target_wavefold: 0.0,
             target_drift_amount: 0.0,
             target_drift_rate: 0.3,
             target_tube_drive: 0.0,
@@ -766,8 +715,6 @@ impl Voice {
             mod_pll_range: 0.0,
             mod_vps_d: 0.0,
             mod_vps_v: 0.0,
-            mod_ring_mod: 0.0,
-            mod_wavefold: 0.0,
             mod_drift_amount: 0.0,
             mod_tube_drive: 0.0,
             mod_pll_volume: 0.0,
@@ -790,6 +737,9 @@ impl Voice {
             mod_env_release: 0.0,
             mod_env_release_shape: 0.0,
             mod_env_retrigger_dip: 0.0,
+            mod_env_range: 0.0,
+            mod_pll_tail_amount: 0.0,
+            mod_pll_tail_time: 0.0,
 
             mod_slew_pll_damping: make_slew(),
             mod_slew_pll_influence: make_slew(),
@@ -805,8 +755,6 @@ impl Voice {
             mod_slew_pll_range: make_slew(),
             mod_slew_vps_d: make_slew(),
             mod_slew_vps_v: make_slew(),
-            mod_slew_ring_mod: make_slew(),
-            mod_slew_wavefold: make_slew(),
             mod_slew_drift: make_slew(),
             mod_slew_tube: make_slew(),
             mod_slew_pll_vol: make_slew(),
@@ -829,6 +777,9 @@ impl Voice {
             mod_slew_env_release: make_slew(),
             mod_slew_env_release_shape: make_slew(),
             mod_slew_env_retrigger_dip: make_slew(),
+            mod_slew_env_range: make_slew(),
+            mod_slew_pll_tail_amount: make_slew(),
+            mod_slew_pll_tail_time: make_slew(),
 
             pll_mult_slew_time: 0.15,
             bpm: 120.0,
@@ -842,31 +793,17 @@ impl Voice {
         &mut self,
         pll: bool,
         vps: bool,
-        coloration: bool,
         _reverb: bool,
         saw: bool,
     ) {
         self.pll_enabled = pll;
         self.vps_enabled = vps;
         self.saw_enabled = saw;
-        self.coloration_enabled = coloration;
     }
 
-    pub fn set_oversampling(&mut self, pll: i32, saw: i32, vps: i32) {
-        let mut changed = false;
-        if pll != self.current_pll_os_factor {
-            self.current_pll_os_factor = pll;
-            changed = true;
-        }
-        if saw != self.current_saw_os_factor {
-            self.current_saw_os_factor = saw;
-            changed = true;
-        }
-        if vps != self.current_vps_os_factor {
-            self.current_vps_os_factor = vps;
-            changed = true;
-        }
-        if changed {
+    pub fn set_oversampling(&mut self, factor: i32) {
+        if factor != self.current_os_factor {
+            self.current_os_factor = factor;
             self.update_processing_sample_rate();
         }
     }
@@ -941,8 +878,6 @@ impl Voice {
             update_slew(&mut self.pll_stereo_track_slew);
             update_slew(&mut self.pll_stereo_phase_slew);
             update_slew(&mut self.pll_fm_env_slew);
-            update_slew(&mut self.ring_mod_slew);
-            update_slew(&mut self.wavefold_slew);
             update_slew(&mut self.drift_amount_slew);
             update_slew(&mut self.drift_rate_slew);
             update_slew(&mut self.tube_drive_slew);
@@ -969,8 +904,6 @@ impl Voice {
             update_slew(&mut self.mod_slew_pll_range);
             update_slew(&mut self.mod_slew_vps_d);
             update_slew(&mut self.mod_slew_vps_v);
-            update_slew(&mut self.mod_slew_ring_mod);
-            update_slew(&mut self.mod_slew_wavefold);
             update_slew(&mut self.mod_slew_drift);
             update_slew(&mut self.mod_slew_tube);
             update_slew(&mut self.mod_slew_pll_vol);
@@ -1024,24 +957,18 @@ impl Voice {
             _ => self.daw_sample_rate,
         };
 
-        let pll_rate = base_rate * Self::os_factor_to_mult(self.current_pll_os_factor) as f64;
-        let saw_rate = base_rate * Self::os_factor_to_mult(self.current_saw_os_factor) as f64;
-        let vps_rate = base_rate * Self::os_factor_to_mult(self.current_vps_os_factor) as f64;
+        let rate = base_rate * Self::os_factor_to_mult(self.current_os_factor) as f64;
 
-        self.processing_sample_rate = pll_rate;
-        self.pll_effective_ratio = Self::compute_effective_ratio(pll_rate, self.daw_sample_rate);
-        self.saw_effective_ratio = Self::compute_effective_ratio(saw_rate, self.daw_sample_rate);
-        self.vps_effective_ratio = Self::compute_effective_ratio(vps_rate, self.daw_sample_rate);
+        self.processing_sample_rate = rate;
+        self.effective_ratio = Self::compute_effective_ratio(rate, self.daw_sample_rate);
 
-        self.pll_oscillator_left.set_sample_rate(pll_rate);
-        self.pll_oscillator_right.set_sample_rate(pll_rate);
-        self.pll_reference_oscillator.set_sample_rate(pll_rate);
-        self.fm_oscillator.set_sample_rate(pll_rate);
-
-        self.saw_oscillator.set_sample_rate(saw_rate);
-
-        self.vps_oscillator_left.set_sample_rate(vps_rate);
-        self.vps_oscillator_right.set_sample_rate(vps_rate);
+        self.pll_oscillator_left.set_sample_rate(rate);
+        self.pll_oscillator_right.set_sample_rate(rate);
+        self.pll_reference_oscillator.set_sample_rate(rate);
+        self.fm_oscillator.set_sample_rate(rate);
+        self.saw_oscillator.set_sample_rate(rate);
+        self.vps_oscillator_left.set_sample_rate(rate);
+        self.vps_oscillator_right.set_sample_rate(rate);
 
         self.sub_oscillator.set_sample_rate(self.daw_sample_rate);
     }
@@ -1092,14 +1019,6 @@ impl Voice {
     pub fn set_vps_fold_range(&mut self, range: i32) {
         self.vps_fold_range = range;
     }
-
-    pub fn set_vps_phase_mode(&mut self, mode: i32) {
-        self.vps_phase_mode = match mode {
-            1 => VpsPhaseMode::PllSync,
-            _ => VpsPhaseMode::Free,
-        };
-    }
-
 
     pub fn set_osc_volume(&mut self, volume: f64) {
         self.target_vps_volume = volume;
@@ -1182,10 +1101,9 @@ impl Voice {
         self.target_pll_volume = volume;
     }
 
-    pub fn set_pll_fm_params(&mut self, amount: f64, ratio_float: f64, expand: bool) {
+    pub fn set_pll_fm_params(&mut self, amount: f64, ratio_float: f64) {
         self.target_pll_fm_amount = amount;
         self.pll_fm_ratio_float = ratio_float;
-        self.pll_fm_expand = expand;
     }
 
     pub fn set_pll_experimental_params(
@@ -1235,14 +1153,10 @@ impl Voice {
 
     pub fn set_coloration_params(
         &mut self,
-        ring_mod: f64,
-        wavefold: f64,
         drift_amount: f64,
         drift_rate: f64,
         tube: f64,
     ) {
-        self.target_ring_mod = ring_mod;
-        self.target_wavefold = wavefold;
         self.target_drift_amount = drift_amount;
         self.target_drift_rate = drift_rate;
         self.target_tube_drive = tube;
@@ -1285,6 +1199,9 @@ impl Voice {
         self.mod_env_release = self.mod_slew_env_release.next(mod_values.env_release, MOD_SLEW_MS);
         self.mod_env_release_shape = self.mod_slew_env_release_shape.next(mod_values.env_release_shape, MOD_SLEW_MS);
         self.mod_env_retrigger_dip = self.mod_slew_env_retrigger_dip.next(mod_values.env_retrigger_dip, MOD_SLEW_MS);
+        self.mod_env_range = self.mod_slew_env_range.next(mod_values.env_range, MOD_SLEW_MS);
+        self.mod_pll_tail_amount = self.mod_slew_pll_tail_amount.next(mod_values.pll_tail_amount, MOD_SLEW_MS);
+        self.mod_pll_tail_time = self.mod_slew_pll_tail_time.next(mod_values.pll_tail_time, MOD_SLEW_MS);
     }
 
     pub fn set_volume(&mut self, volume: f64) {
@@ -1312,10 +1229,6 @@ impl Voice {
 
     pub fn set_retrigger_dip(&mut self, dip: f64) {
         self.retrigger_dip = dip.clamp(0.0, 1.0);
-    }
-
-    pub fn set_phase_reset_on_retrigger(&mut self, enabled: bool) {
-        self.phase_reset_on_retrigger = enabled;
     }
 
     pub fn set_pll_tail(&mut self, enabled: bool, time_ms: f64, amount: f64) {
@@ -1351,7 +1264,7 @@ impl Voice {
             self.vol_env_release_shape,
         );
 
-        if was_idle || self.phase_reset_on_retrigger {
+        if was_idle {
             self.reset_oscillator_phases();
         }
     }
@@ -1368,28 +1281,16 @@ impl Voice {
             self.vol_env_release_shape,
             effective_dip,
         );
-
-        if self.phase_reset_on_retrigger {
-            self.reset_oscillator_phases();
-        }
     }
 
     fn reset_oscillator_phases(&mut self) {
         self.pll_oscillator_left.trigger();
         self.pll_oscillator_right.trigger();
-        match self.vps_phase_mode {
-            VpsPhaseMode::PllSync => {
-                self.vps_oscillator_left.hard_reset();
-                self.vps_oscillator_right.hard_reset();
-            }
-            VpsPhaseMode::Free => {
-                self.vps_oscillator_left.trigger();
-                self.vps_oscillator_right.trigger();
-            }
-        }
+        self.vps_oscillator_left.trigger();
+        self.vps_oscillator_right.trigger();
         self.pll_reference_oscillator.reset_phase();
         self.saw_oscillator.trigger();
-        self.prev_ref_phase = 0.0;
+
         self.pll_prev_out_l = 0.0;
         self.pll_prev_out_r = 0.0;
         self.pll_feedback_state = 0.0;
@@ -1423,7 +1324,7 @@ impl Voice {
         self.pll_feedback_state = 0.0;
         self.pll_prev_out_l = 0.0;
         self.pll_prev_out_r = 0.0;
-        self.prev_ref_phase = 0.0;
+
 
         self.drift_phase_l = 0.0;
         self.drift_phase_r = 0.33;
@@ -1472,9 +1373,7 @@ impl Voice {
         self.pll_stereo_phase = (self.pll_stereo_phase_slew.next(self.target_pll_stereo_phase, 60.0) + self.mod_pll_stereo_phase).clamp(0.0, 1.0);
         self.pll_fm_env_amount = (self.pll_fm_env_slew.next(self.target_pll_fm_env_amount, 20.0) + self.mod_pll_fm_env_amount).clamp(0.0, 1.0);
 
-        // Coloration slews + modulation
-        self.ring_mod_amount = (self.ring_mod_slew.next(self.target_ring_mod, 20.0) + self.mod_ring_mod).clamp(0.0, 1.0);
-        self.wavefold_amount = (self.wavefold_slew.next(self.target_wavefold, 20.0) + self.mod_wavefold).clamp(0.0, 1.0);
+        // Drift & tube slews + modulation
         self.drift_amount = (self.drift_amount_slew.next(self.target_drift_amount, 50.0) + self.mod_drift_amount).clamp(0.0, 1.0);
         self.drift_rate = self.drift_rate_slew.next(self.target_drift_rate, 20.0);
         self.tube_drive = (self.tube_drive_slew.next(self.target_tube_drive, 20.0) + self.mod_tube_drive).clamp(0.0, 1.0);
@@ -1528,7 +1427,6 @@ impl Voice {
         // ===== PLL OVERSAMPLED BLOCK =====
         let mut pll_sample_l = 0.0_f64;
         let mut pll_sample_r = 0.0_f64;
-        let mut ref_phase_wrapped = false;
         let mut feedback = self.pll_feedback_state;
 
         if self.pll_enabled {
@@ -1588,10 +1486,10 @@ impl Voice {
                 self.pll_oscillator_right.set_params(track_right, damp_right, effective_mult, slewed_influence, self.pll_colored, mode);
             }
 
-            let iterations = self.pll_effective_ratio as usize;
-            let use_oversampling = self.pll_effective_ratio > 1;
+            let iterations = self.effective_ratio as usize;
+            let use_oversampling = self.effective_ratio > 1;
 
-            let (buf_l, buf_r): (&mut [f64], &mut [f64]) = match self.pll_effective_ratio {
+            let (buf_l, buf_r): (&mut [f64], &mut [f64]) = match self.effective_ratio {
                 2 => (self.oversampling_2x_left.resample_buffer(), self.oversampling_2x_right.resample_buffer()),
                 4 => (self.oversampling_4x_left.resample_buffer(), self.oversampling_4x_right.resample_buffer()),
                 8 => (self.oversampling_8x_left.resample_buffer(), self.oversampling_8x_right.resample_buffer()),
@@ -1605,17 +1503,20 @@ impl Voice {
             let pll_tune_mult = 2.0_f64.powf((self.pll_ref_tune as f64 + self.pll_ref_fine) / 12.0);
             let ref_freq = self.base_frequency * 2.0_f64.powi(self.pll_ref_octave) * pll_tune_mult;
             let fm_ratio = self.pll_fm_ratio_float;
-            let effective_fm_amount = if self.pll_fm_expand { self.pll_fm_amount } else { self.pll_fm_amount * 0.2 };
+            let effective_fm_amount = self.pll_fm_amount * 0.4;
             let fm_env_mod = 1.0;
+
+            let drift_inc = self.drift_rate * 0.00001 / iterations as f64;
+            let drift_inc_r = self.drift_rate * 0.000011 / iterations as f64;
 
             for i in 0..iterations {
                 let drift_mod_l = if self.drift_amount > 0.001 {
-                    self.drift_phase_l += self.drift_rate * 0.00001;
+                    self.drift_phase_l += drift_inc;
                     if self.drift_phase_l > 1.0 { self.drift_phase_l -= 1.0; }
                     (self.drift_phase_l * std::f64::consts::TAU).sin() * self.drift_amount * 0.02
                 } else { 0.0 };
                 let drift_mod_r = if self.drift_amount > 0.001 {
-                    self.drift_phase_r += self.drift_rate * 0.000011;
+                    self.drift_phase_r += drift_inc_r;
                     if self.drift_phase_r > 1.0 { self.drift_phase_r -= 1.0; }
                     (self.drift_phase_r * std::f64::consts::TAU).sin() * self.drift_amount * 0.02
                 } else { 0.0 };
@@ -1633,10 +1534,7 @@ impl Voice {
                 let ref_pulse = self.pll_reference_oscillator.next(self.pll_ref_pulse_width);
                 let ref_phase = self.pll_reference_oscillator.get_phase();
 
-                if ref_phase < self.prev_ref_phase {
-                    ref_phase_wrapped = true;
-                }
-                self.prev_ref_phase = ref_phase;
+
 
                 let ref_phase_r = (ref_phase + self.pll_stereo_phase) % 1.0;
 
@@ -1652,13 +1550,25 @@ impl Voice {
 
                 feedback = feedback * 0.9 + (pll_raw_l + pll_raw_r) * 0.05;
 
-                buf_l[i] = pll_raw_l;
-                buf_r[i] = if use_stereo_pll { pll_raw_r } else { pll_raw_l };
+                let (out_l, out_r) = if self.tube_drive > 0.001 {
+                    let drive = 1.0 + self.tube_drive * 4.0;
+                    let xl = pll_raw_l * drive;
+                    let xr = pll_raw_r * drive;
+                    (
+                        xl * (27.0 + xl * xl) / (27.0 + 9.0 * xl * xl),
+                        xr * (27.0 + xr * xr) / (27.0 + 9.0 * xr * xr),
+                    )
+                } else {
+                    (pll_raw_l, pll_raw_r)
+                };
+
+                buf_l[i] = out_l;
+                buf_r[i] = if use_stereo_pll { out_r } else { out_l };
             }
 
             // Downsample PLL output
             if use_oversampling {
-                pll_sample_l = match self.pll_effective_ratio {
+                pll_sample_l = match self.effective_ratio {
                     2 => self.oversampling_2x_left.downsample(),
                     4 => self.oversampling_4x_left.downsample(),
                     8 => self.oversampling_8x_left.downsample(),
@@ -1667,7 +1577,7 @@ impl Voice {
                     64 => self.oversampling_64x_left.downsample(),
                     _ => self.oversampling_128x_left.downsample(),
                 };
-                pll_sample_r = match self.pll_effective_ratio {
+                pll_sample_r = match self.effective_ratio {
                     2 => self.oversampling_2x_right.downsample(),
                     4 => self.oversampling_4x_right.downsample(),
                     8 => self.oversampling_8x_right.downsample(),
@@ -1689,11 +1599,6 @@ impl Voice {
         let mut vps_out_r = 0.0_f64;
 
         if self.vps_enabled {
-            if ref_phase_wrapped && self.vps_phase_mode == VpsPhaseMode::PllSync {
-                self.vps_oscillator_left.sync_reset();
-                self.vps_oscillator_right.sync_reset();
-            }
-
             let tune_mult = 2.0_f64.powf((self.vps_tune as f64 + self.vps_fine) / 12.0);
             let base_freq = self.base_frequency * 2.0_f64.powi(self.vps_octave) * tune_mult;
 
@@ -1709,12 +1614,12 @@ impl Voice {
             self.vps_oscillator_left.set_frequency(base_freq);
             self.vps_oscillator_right.set_frequency(base_freq);
 
-            let vps_iterations = self.vps_effective_ratio as usize;
-            let vps_use_oversampling = self.vps_effective_ratio > 1;
+            let vps_iterations = self.effective_ratio as usize;
+            let vps_use_oversampling = self.effective_ratio > 1;
             let dist_type = (self.vps_shape_type + 1) as u8;
             let shape_amt = self.vps_shape_amount;
 
-            let (vbuf_l, vbuf_r): (&mut [f64], &mut [f64]) = match self.vps_effective_ratio {
+            let (vbuf_l, vbuf_r): (&mut [f64], &mut [f64]) = match self.effective_ratio {
                 2 => (self.vps_os_2x_left.resample_buffer(), self.vps_os_2x_right.resample_buffer()),
                 4 => (self.vps_os_4x_left.resample_buffer(), self.vps_os_4x_right.resample_buffer()),
                 8 => (self.vps_os_8x_left.resample_buffer(), self.vps_os_8x_right.resample_buffer()),
@@ -1755,7 +1660,7 @@ impl Voice {
             }
 
             let (ds_l, ds_r) = if vps_use_oversampling {
-                let l = match self.vps_effective_ratio {
+                let l = match self.effective_ratio {
                     2 => self.vps_os_2x_left.downsample(),
                     4 => self.vps_os_4x_left.downsample(),
                     8 => self.vps_os_8x_left.downsample(),
@@ -1764,7 +1669,7 @@ impl Voice {
                     64 => self.vps_os_64x_left.downsample(),
                     _ => self.vps_os_128x_left.downsample(),
                 };
-                let r = match self.vps_effective_ratio {
+                let r = match self.effective_ratio {
                     2 => self.vps_os_2x_right.downsample(),
                     4 => self.vps_os_4x_right.downsample(),
                     8 => self.vps_os_8x_right.downsample(),
@@ -1778,8 +1683,9 @@ impl Voice {
                 (vbuf_l[0], vbuf_r[0])
             };
 
-            vps_out_l = ds_l * self.vps_volume * volume_env;
-            vps_out_r = ds_r * self.vps_volume * volume_env;
+            let dc_blocked = self.vps_dc_blocker.process(stereo(ds_l, ds_r));
+            vps_out_l = stereo_left(dc_blocked) * self.vps_volume * volume_env;
+            vps_out_r = stereo_right(dc_blocked) * self.vps_volume * volume_env;
         }
 
         // ===== SAW OVERSAMPLED =====
@@ -1789,12 +1695,12 @@ impl Voice {
             let saw_freq = self.base_frequency * 2.0_f64.powi(self.saw_octave) * tune_mult;
             self.saw_oscillator.set_frequency(saw_freq);
 
-            let iterations = self.saw_effective_ratio as usize;
-            let use_oversampling = self.saw_effective_ratio > 1;
+            let iterations = self.effective_ratio as usize;
+            let use_oversampling = self.effective_ratio > 1;
             let dist_type = (self.saw_shape_type + 1) as u8;
             let shape_amt = self.saw_shape_amount;
 
-            let buf: &mut [f64] = match self.saw_effective_ratio {
+            let buf: &mut [f64] = match self.effective_ratio {
                 2 => self.saw_os_2x.resample_buffer(),
                 4 => self.saw_os_4x.resample_buffer(),
                 8 => self.saw_os_8x.resample_buffer(),
@@ -1831,7 +1737,7 @@ impl Voice {
             }
 
             let sample = if use_oversampling {
-                match self.saw_effective_ratio {
+                match self.effective_ratio {
                     2 => self.saw_os_2x.downsample(),
                     4 => self.saw_os_4x.downsample(),
                     8 => self.saw_os_8x.downsample(),

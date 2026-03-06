@@ -306,9 +306,9 @@ pub enum ModDestination {
     // VPS parameters
     VpsD,
     VpsV,
-    // Coloration
-    DriftAmount,
-    TubeDrive,
+    // PLL Drift & Tube
+    PllDriftAmount,
+    PllTubeDrive,
     // Volume/Mix
     PllVolume,
     VpsVolume,
@@ -335,6 +335,9 @@ pub enum ModDestination {
     EnvRelease,
     EnvReleaseShape,
     EnvRetriggerDip,
+    EnvRange,
+    PllTailAmount,
+    PllTailTime,
 }
 
 impl ModDestination {
@@ -353,8 +356,8 @@ impl ModDestination {
             10 => ModDestination::None,
             11 => ModDestination::None,
             12 => ModDestination::None,
-            13 => ModDestination::DriftAmount,
-            14 => ModDestination::TubeDrive,
+            13 => ModDestination::PllDriftAmount,
+            14 => ModDestination::PllTubeDrive,
             15 => ModDestination::None,
             16 => ModDestination::None,
             17 => ModDestination::PllVolume,
@@ -379,6 +382,9 @@ impl ModDestination {
             36 => ModDestination::EnvRelease,
             37 => ModDestination::EnvReleaseShape,
             38 => ModDestination::EnvRetriggerDip,
+            39 => ModDestination::EnvRange,
+            40 => ModDestination::PllTailAmount,
+            41 => ModDestination::PllTailTime,
             _ => ModDestination::None,
         }
     }
@@ -394,8 +400,8 @@ impl ModDestination {
             ModDestination::PllRange => "PLL Rng",
             ModDestination::VpsD => "VPS D",
             ModDestination::VpsV => "VPS V",
-            ModDestination::DriftAmount => "Drift",
-            ModDestination::TubeDrive => "Tube",
+            ModDestination::PllDriftAmount => "PLL Drift",
+            ModDestination::PllTubeDrive => "PLL Tube",
             ModDestination::PllVolume => "PLL Vol",
             ModDestination::VpsVolume => "VPS Vol",
             ModDestination::SubVolume => "Sub Vol",
@@ -418,6 +424,9 @@ impl ModDestination {
             ModDestination::EnvRelease => "Env Rel",
             ModDestination::EnvReleaseShape => "Env R SH",
             ModDestination::EnvRetriggerDip => "Env Dip",
+            ModDestination::EnvRange => "Env Rng",
+            ModDestination::PllTailAmount => "Tail Amt",
+            ModDestination::PllTailTime => "Tail Time",
         }
     }
 }
@@ -457,6 +466,9 @@ pub struct ModulationValues {
     pub env_release: f64,
     pub env_release_shape: f64,
     pub env_retrigger_dip: f64,
+    pub env_range: f64,
+    pub pll_tail_amount: f64,
+    pub pll_tail_time: f64,
 }
 
 impl ModulationValues {
@@ -493,6 +505,9 @@ impl ModulationValues {
         self.env_release += other.env_release;
         self.env_release_shape += other.env_release_shape;
         self.env_retrigger_dip += other.env_retrigger_dip;
+        self.env_range += other.env_range;
+        self.pll_tail_amount += other.pll_tail_amount;
+        self.pll_tail_time += other.pll_tail_time;
     }
 
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
@@ -507,8 +522,8 @@ impl ModulationValues {
             ModDestination::PllRange => self.pll_range += mod_value,
             ModDestination::VpsD => self.vps_d += mod_value,
             ModDestination::VpsV => self.vps_v += mod_value,
-            ModDestination::DriftAmount => self.drift_amount += mod_value,
-            ModDestination::TubeDrive => self.tube_drive += mod_value,
+            ModDestination::PllDriftAmount => self.drift_amount += mod_value,
+            ModDestination::PllTubeDrive => self.tube_drive += mod_value,
             ModDestination::PllVolume => self.pll_volume += mod_value,
             ModDestination::VpsVolume => self.vps_volume += mod_value,
             ModDestination::SubVolume => self.sub_volume += mod_value,
@@ -531,6 +546,9 @@ impl ModulationValues {
             ModDestination::EnvRelease => self.env_release += mod_value,
             ModDestination::EnvReleaseShape => self.env_release_shape += mod_value,
             ModDestination::EnvRetriggerDip => self.env_retrigger_dip += mod_value,
+            ModDestination::EnvRange => self.env_range += mod_value,
+            ModDestination::PllTailAmount => self.pll_tail_amount += mod_value,
+            ModDestination::PllTailTime => self.pll_tail_time += mod_value,
         }
     }
 }

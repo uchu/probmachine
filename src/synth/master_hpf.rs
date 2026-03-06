@@ -157,4 +157,26 @@ impl MasterHpf {
             *r = (input_r - k * v1_r - v2_r) as f32;
         }
     }
+
+    #[inline]
+    pub fn process_mono(&mut self, buffer: &mut [f32]) {
+        if self.mode == HpfMode::Off {
+            return;
+        }
+
+        let a1 = self.a1;
+        let a2 = self.a2;
+        let a3 = self.a3;
+        let k = self.k;
+
+        for sample in buffer.iter_mut() {
+            let input = *sample as f64;
+            let v3 = input - self.ic2eq_l;
+            let v1 = a1 * self.ic1eq_l + a2 * v3;
+            let v2 = self.ic2eq_l + a2 * self.ic1eq_l + a3 * v3;
+            self.ic1eq_l = 2.0 * v1 - self.ic1eq_l;
+            self.ic2eq_l = 2.0 * v2 - self.ic2eq_l;
+            *sample = (input - k * v1 - v2) as f32;
+        }
+    }
 }

@@ -3,6 +3,7 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EnvelopeStage {
     Idle,
+    Dip,
     Attack,
     Decay,
     Sustain,
@@ -32,10 +33,12 @@ pub struct Envelope {
     release_ln_k: f64,
 
     sustain_smoother: f64,
+    dip_target: f64,
 }
 
 const MIN_STAGE_MS: f64 = 0.5;
 const SUSTAIN_SMOOTH_MS: f64 = 3.0;
+const DIP_MS: f64 = 2.0;
 
 impl Envelope {
     pub fn new(sample_rate: f64) -> Self {
@@ -59,6 +62,7 @@ impl Envelope {
             decay_ln_k: 0.0,
             release_ln_k: 0.0,
             sustain_smoother: 0.7,
+            dip_target: 0.0,
         }
     }
 
@@ -94,12 +98,20 @@ impl Envelope {
         dip: f64,
     ) {
         self.was_idle = self.stage == EnvelopeStage::Idle;
-        self.current_value *= 1.0 - dip.clamp(0.0, 1.0);
-        self.stage_start_value = self.current_value;
         self.held = true;
-
         self.cache_params(attack_ms, attack_shape, decay_ms, decay_shape, sustain, release_ms, release_shape);
-        self.enter_attack();
+
+        let dip_clamped = dip.clamp(0.0, 1.0);
+        if dip_clamped < 0.001 {
+            self.stage_start_value = self.current_value;
+            self.enter_attack();
+        } else {
+            self.stage_start_value = self.current_value;
+            self.dip_target = self.current_value * (1.0 - dip_clamped);
+            self.stage = EnvelopeStage::Dip;
+            self.stage_samples = ms_to_samples(DIP_MS, self.sample_rate);
+            self.stage_counter = 0.0;
+        }
     }
 
     pub fn release(&mut self) {
@@ -121,6 +133,7 @@ impl Envelope {
         self.stage_samples = 0.0;
         self.held = false;
         self.sustain_smoother = 0.0;
+        self.dip_target = 0.0;
     }
 
     pub fn update_params(
@@ -175,6 +188,18 @@ impl Envelope {
     pub fn next(&mut self) -> f64 {
         match self.stage {
             EnvelopeStage::Idle => 0.0,
+            EnvelopeStage::Dip => {
+                self.stage_counter += 1.0;
+                let phase = (self.stage_counter / self.stage_samples).min(1.0);
+                self.current_value = self.stage_start_value + (self.dip_target - self.stage_start_value) * phase;
+
+                if self.stage_counter >= self.stage_samples {
+                    self.current_value = self.dip_target;
+                    self.stage_start_value = self.dip_target;
+                    self.enter_attack();
+                }
+                self.current_value
+            }
             EnvelopeStage::Attack => {
                 self.stage_counter += 1.0;
                 let phase = (self.stage_counter / self.stage_samples).min(1.0);
@@ -475,9 +500,33 @@ mod tests {
         let val_before = env.current_value;
         assert!((val_before - 0.7).abs() < 0.05);
 
-        env.trigger_with_dip(5.0, 0.0, 50.0, 0.0, 0.7, 200.0, 0.0, 0.5);
-        let val_after = env.current_value;
-        assert!((val_after - val_before * 0.5).abs() < 0.05, "dip should halve: before={val_before}, after={val_after}");
+        env.trigger_with_dip(50.0, 0.0, 50.0, 0.0, 0.7, 200.0, 0.0, 0.5);
+        assert_eq!(env.stage, EnvelopeStage::Dip);
+
+        let dip_samples_count = (DIP_MS * 0.001 * SR) as usize;
+        let dip_samples = run_samples(&mut env, dip_samples_count + 1);
+        let dip_end = *dip_samples.last().unwrap();
+        let expected = val_before * 0.5;
+        assert!((dip_end - expected).abs() < 0.1, "dip should reach target: got={dip_end}, expected={expected}");
+        assert_eq!(env.stage, EnvelopeStage::Attack);
+    }
+
+    #[test]
+    fn trigger_with_dip_is_smooth() {
+        let mut env = make_env();
+        env.trigger(5.0, 0.0, 50.0, 0.0, 0.7, 200.0, 0.0);
+        run_samples(&mut env, 5000);
+
+        let val_before = env.current_value;
+        env.trigger_with_dip(5.0, 0.0, 50.0, 0.0, 0.7, 200.0, 0.0, 0.8);
+
+        let mut prev = val_before;
+        for _ in 0..500 {
+            let v = env.next();
+            let delta = (v - prev).abs();
+            assert!(delta < 0.02, "envelope jump too large: {delta} (prev={prev}, cur={v})");
+            prev = v;
+        }
     }
 
     #[test]

@@ -1,6 +1,6 @@
 /// Shared state for UI communication with the audio engine
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use crate::sequencer::NotePool;
 use crate::sequencer::scales::{Scale, StabilityPattern, OctaveRandomization};
 use crate::sequencer::styles::StyleConfig;
@@ -48,6 +48,7 @@ pub struct SharedUiState {
     pub midi_transport_stop: Arc<AtomicBool>,
     pub soft_takeover: Arc<AtomicBool>,
     pub beat_links: Arc<Mutex<BeatLinks>>,
+    pub restored_oversampling: Arc<AtomicI32>,
 }
 
 impl SharedUiState {
@@ -105,6 +106,7 @@ impl SharedUiState {
             midi_transport_stop: Arc::new(AtomicBool::new(false)),
             soft_takeover: Arc::new(AtomicBool::new(cfg.soft_takeover)),
             beat_links: Arc::new(Mutex::new(BeatLinks::new())),
+            restored_oversampling: Arc::new(AtomicI32::new(cfg.oversampling)),
         }
     }
 

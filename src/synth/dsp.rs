@@ -177,9 +177,8 @@ impl<const N: usize> Oversampling<N> {
     pub fn set_sample_rate(&mut self, srate: f64) {
         let cutoff = 0.98 * (0.5 * srate);
         let ovr_srate = (N as f64) * srate;
-        let filters_len = self.filters.len();
         for (i, filt) in self.filters.iter_mut().enumerate() {
-            let q = BiquadCoefs::calc_cascaded_butter_q(2 * 4, filters_len - i);
+            let q = BiquadCoefs::calc_cascaded_butter_q(2 * 4, i + 1);
             filt.set_coefs(BiquadCoefs::lowpass(ovr_srate, q, cutoff));
         }
     }

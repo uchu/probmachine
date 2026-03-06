@@ -310,10 +310,10 @@ pub struct PresetData {
     pub synth_vol_release: f32,
     #[serde(default)]
     pub synth_retrigger_dip: f32,
+    #[serde(default = "default_env_range")]
+    pub synth_env_range: f32,
     #[serde(default = "default_phase_reset")]
     pub synth_phase_reset: bool,
-    #[serde(default)]
-    pub synth_pll_tail: bool,
     #[serde(default = "default_pll_tail_time")]
     pub synth_pll_tail_time: f32,
     #[serde(default = "default_pll_tail_amount")]
@@ -457,10 +457,6 @@ pub struct PresetData {
     pub pos_mod_2_prob: f32,
 
     #[serde(default)]
-    pub synth_ring_mod: f32,
-    #[serde(default)]
-    pub synth_wavefold: f32,
-    #[serde(default)]
     pub synth_drift_amount: f32,
     #[serde(default = "default_drift_rate")]
     pub synth_drift_rate: f32,
@@ -475,8 +471,6 @@ pub struct PresetData {
     #[serde(default = "default_true")]
     pub synth_vps_enable: bool,
     #[serde(default = "default_true")]
-    pub synth_coloration_enable: bool,
-    #[serde(default = "default_true")]
     pub synth_reverb_enable: bool,
 
     #[serde(default)]
@@ -489,9 +483,17 @@ pub struct PresetData {
     pub master_hpf_sub: i32,
 
     #[serde(default)]
+    pub box_cut_mode: i32,
+
+    #[serde(default)]
     pub brilliance_amount: f32,
     #[serde(default)]
     pub brilliance_drive: f32,
+
+    #[serde(default)]
+    pub stereo_mono_bass: f32,
+    #[serde(default = "default_stereo_width")]
+    pub stereo_width: f32,
 
     #[serde(default)]
     pub mseq_steps: Vec<f32>,
@@ -526,11 +528,13 @@ fn default_pll_range() -> f32 { 1.0 }
 fn default_reverb_input_hpf() -> f32 { 20.0 }
 fn default_reverb_input_lpf() -> f32 { 18000.0 }
 fn default_reverb_mod_shape() -> f32 { 0.5 }
+fn default_stereo_width() -> f32 { 1.0 }
 fn default_mseq_division() -> i32 { 3 }
 fn default_fm_ratio_float() -> f32 { 1.0 }
 fn default_mseq_slew() -> f32 { 5.0 }
 fn default_mult_slew_time() -> f32 { 0.15 }
 fn default_phase_reset() -> bool { true }
+fn default_env_range() -> f32 { 500.0 }
 fn default_pll_tail_time() -> f32 { 500.0 }
 fn default_pll_tail_amount() -> f32 { 0.3 }
 
@@ -654,8 +658,8 @@ impl Default for PresetData {
             synth_vol_sustain: 0.7,
             synth_vol_release: 200.0,
             synth_retrigger_dip: 0.0,
+            synth_env_range: 500.0,
             synth_phase_reset: true,
-            synth_pll_tail: false,
             synth_pll_tail_time: 500.0,
             synth_pll_tail_amount: 0.3,
 
@@ -738,8 +742,6 @@ impl Default for PresetData {
             pos_mod_2_shift: 0.0,
             pos_mod_2_prob: 0.0,
 
-            synth_ring_mod: 0.0,
-            synth_wavefold: 0.0,
             synth_drift_amount: 0.0,
             synth_drift_rate: 0.5,
             synth_noise_amount: 0.0,
@@ -747,15 +749,18 @@ impl Default for PresetData {
             synth_color_distortion_amount: 0.0,
             synth_color_distortion_threshold: 0.7,
             synth_vps_enable: true,
-            synth_coloration_enable: true,
             synth_reverb_enable: true,
             synth_pll_mult_slew: true,
 
             master_hpf: 0,
             master_hpf_boost: 0,
             master_hpf_sub: 0,
+            box_cut_mode: 0,
             brilliance_amount: 0.0,
             brilliance_drive: 0.0,
+
+            stereo_mono_bass: 0.0,
+            stereo_width: 1.0,
 
             mseq_steps: vec![0.0; 16],
             mseq_ties: 0,
