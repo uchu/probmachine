@@ -51,12 +51,12 @@ Monophonic synthesizer + probability sequencer. Rust, nih-plug, egui.
 8. **Box Cut** → Notch at ~400Hz
 9. **Master HPF** → Butterworth (Off/35/80/120/220Hz)
 10. **Brilliance** → High-shelf exciter
-11. **Reverb** (if enabled) → Early reflections + 8-channel FDN late reverb with Hadamard mixing, input diffusion, modulated delay lines, RT60-compensated decay, feedback saturation, ducking, stereo decorrelation
-12. **Pitched Looper** → Bar-synced pitched loop capture/playback
-13. **Compressor** (if enabled) → Feed-forward VCA with soft-knee, program-dependent release, assignable routing (master/looper/reverb IN/OUT)
+11. **Pitched Looper** → Bar-synced pitched loop capture/playback. Input routed from: individual oscs (VPS/PLL/SAW), post-filter (FLTR), or pre-master (PRE, post-HPF/BoxCut/Brilliance). Priority: PRE > FLTR > individual oscs.
+12. **Reverb** (if enabled) → Early reflections + 8-channel FDN late reverb with Hadamard mixing, input diffusion, modulated delay lines, RT60-compensated decay, feedback saturation, ducking, stereo decorrelation. Send from: individual oscs (VPS/PLL/SAW/SUB), post-filter (FLTR, exclusive with oscs), looper contribution only.
+13. **Compressor** (if enabled) → Feed-forward VCA with adjustable soft-knee, true-peak detection, program-dependent release, stereo link control, auto makeup gain, parameter smoothing, lookahead with host PDC reporting and crossfaded delay transitions (64-sample smoothstep), assignable routing (master/looper/reverb IN/OUT)
 14. **Limiter** → Output protection
 
-PLL runs at oversampled rate; VPS, sub, coloration run at DAW rate.
+PLL runs at oversampled rate; VPS, SAW, sub, coloration run at DAW rate with configurable oversampling (1×–128×). Oversampling anti-alias filter: 8th-order cascaded Butterworth at 0.86× Nyquist for strong alias rejection. SAW uses PolyBLEP as baseline anti-aliasing; VPS relies on oversampling alone (cosine readout provides inherent bandwidth limiting). Both benefit from 2× or higher oversampling for cleanest results at high pitches.
 
 ### Precision
 

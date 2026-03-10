@@ -590,16 +590,18 @@ fn render_performance_section(
     ui.add_space(8.0);
 
     let sample_rate = ui_state.sample_rate.load(Ordering::Relaxed) as f32;
-    let latency_samples = ui_state.limiter_latency_samples.load(Ordering::Relaxed);
+    let limiter_latency = ui_state.limiter_latency_samples.load(Ordering::Relaxed);
+    let comp_latency = ui_state.comp_latency_samples.load(Ordering::Relaxed);
+    let total_latency = limiter_latency + comp_latency;
     let latency_ms = if sample_rate > 0.0 {
-        latency_samples as f32 / sample_rate * 1000.0
+        total_latency as f32 / sample_rate * 1000.0
     } else {
         0.0
     };
     ui.label(
         egui::RichText::new(format!(
             "Latency: {} samples ({:.1}ms @ {}Hz)",
-            latency_samples, latency_ms, sample_rate as u32
+            total_latency, latency_ms, sample_rate as u32
         ))
         .size(UI_FONT)
         .weak(),

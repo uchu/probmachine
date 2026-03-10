@@ -175,7 +175,7 @@ impl<const N: usize> Oversampling<N> {
     }
 
     pub fn set_sample_rate(&mut self, srate: f64) {
-        let cutoff = 0.90 * (0.5 * srate);
+        let cutoff = 0.86 * (0.5 * srate);
         let ovr_srate = (N as f64) * srate;
         for (i, filt) in self.filters.iter_mut().enumerate() {
             let q = BiquadCoefs::calc_cascaded_butter_q(2 * 4, i + 1);
@@ -357,6 +357,22 @@ impl PolyBlepOscillator {
         self.phase = self.phase.fract();
         s
     }
+}
+
+#[inline]
+pub fn mono_wavefold(s: f64, amount: f64) -> f64 {
+    let fold_gain = 1.0 + amount * 4.0;
+    let x = s * fold_gain;
+    let folded = x.sin();
+    s * (1.0 - amount) + folded * amount
+}
+
+#[inline]
+pub fn mono_wavefold_pi(s: f64, amount: f64) -> f64 {
+    let fold_gain = 1.0 + amount * 4.0;
+    let x = s * fold_gain;
+    let folded = (x * std::f64::consts::PI).sin();
+    s * (1.0 - amount) + folded * amount
 }
 
 #[inline]

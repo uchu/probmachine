@@ -100,7 +100,7 @@ pub struct SawOscillator {
 
 impl SawOscillator {
     fn compute_dc_block_r(sample_rate: f64) -> f64 {
-        (-std::f64::consts::TAU * 3.5 / sample_rate).exp()
+        (-std::f64::consts::TAU * 10.0 / sample_rate).exp()
     }
 
     pub fn new(sample_rate: f64) -> Self {
@@ -144,13 +144,29 @@ impl SawOscillator {
 }
 
 const COEFF_UPDATE_INTERVAL: u32 = 32;
-const PFD_COUNTER_RESET: i64 = 1 << 30;
+// Reset at ~1M samples to prevent f64 precision loss in subsample edge timestamps
+const PFD_COUNTER_RESET: i64 = 1 << 20;
 
 #[inline(always)]
 fn fast_sin_unit(phase: f64) -> f64 {
+    use std::f64::consts::TAU;
     let p = phase - (phase + 0.5).floor();
-    let y = p * (8.0 - 16.0 * p.abs());
-    0.225 * y * (y.abs() - 1.0) + y
+    let q = if p > 0.25 {
+        0.5 - p
+    } else if p < -0.25 {
+        -0.5 - p
+    } else {
+        p
+    };
+    let x = q * TAU;
+    let x2 = x * x;
+    #[allow(clippy::excessive_precision)]
+    const C3: f64 = -1.666_666_666_666_666_6e-1; // -1/3!
+    #[allow(clippy::excessive_precision)]
+    const C5: f64 = 8.333_333_333_333_333e-3; // 1/5!
+    const C7: f64 = -1.984_126_984_127e-4; // -1/7!
+    const C9: f64 = 2.755_731_922_399e-6; // 1/9!
+    x * (1.0 + x2 * (C3 + x2 * (C5 + x2 * (C7 + x2 * C9))))
 }
 
 pub struct PLLOscillator {
@@ -451,9 +467,15 @@ impl PLLOscillator {
     #[inline(always)]
     fn wrap_pi(x: f64) -> f64 {
         use std::f64::consts::{PI, TAU};
-        if x > PI { x - TAU }
-        else if x < -PI { x + TAU }
-        else { x }
+        if x > PI {
+            let y = x - TAU;
+            if y < PI { y } else { y - ((y + PI) / TAU).floor() * TAU }
+        } else if x < -PI {
+            let y = x + TAU;
+            if y > -PI { y } else { y - ((y + PI) / TAU).floor() * TAU }
+        } else {
+            x
+        }
     }
 
     #[inline]
@@ -643,7 +665,7 @@ mod tests {
         println!("  max error:  {:.6} ({:.4}%)", max_error, max_error * 100.0);
         println!("  RMS error:  {:.6} ({:.4}%)", rms_error, rms_error * 100.0);
 
-        assert!(max_error < 0.01, "max error {:.6} exceeds 1% threshold", max_error);
-        assert!(rms_error < 0.005, "RMS error {:.6} exceeds 0.5% threshold", rms_error);
+        assert!(max_error < 0.0001, "max error {:.8} exceeds 0.01% threshold", max_error);
+        assert!(rms_error < 0.00005, "RMS error {:.8} exceeds 0.005% threshold", rms_error);
     }
 }

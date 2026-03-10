@@ -75,8 +75,8 @@
 | synth_vps_shape_type | SHP | 0=Soft, 1=Foldback | 0 |
 | synth_vps_shape_amount | SHP | 0.0–1.0 | 0.0 |
 | synth_vps_phase_mode | Phase | 0=Free, 1=PLL Sync | 0 |
+| synth_vps_formant | FMT | bool | false |
 | synth_osc_volume | Vol | 0.0–1.0 | 1.0 |
-| synth_vps_enable | Enable | bool | true |
 
 ## SAW
 
@@ -86,6 +86,7 @@
 | synth_saw_volume | Vol | 0.0–1.0 | 0.0 |
 | synth_saw_octave | Oct | -3..+3 | 0 |
 | synth_saw_tune | Tune | -12..+12 | 0 |
+| synth_saw_fine | Fine | -1.0..+1.0 | 0.0 |
 | synth_saw_fold | Fold | 0.0–1.0 | 0.0 |
 | synth_saw_fold_range | Fold Range | 0=1X, 1=PI | 0 |
 | synth_saw_shape_type | Shape | 0–2 | 0 |
@@ -215,6 +216,51 @@
 | mseq_slew | Slew | 0–200ms | 5.0 |
 | mseq_dest1/dest2 | Dst | 0–30 | 0 |
 | mseq_amount1/amount2 | Amt | -1.0..+1.0 | 0.0 |
+
+## Compressor
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| comp_enable | Enable | bool | false |
+| comp_threshold | Threshold | -40 to 0 dB | -12 |
+| comp_ratio | Ratio | 1:1 to 20:1 | 4:1 |
+| comp_attack | Attack | 0.1–100 ms | 10 |
+| comp_release | Release | 5–2000 ms | 100 |
+| comp_knee | Knee | 0–12 dB | 6 |
+| comp_makeup | Makeup | 0–24 dB | 0 |
+| comp_auto_makeup | Auto Makeup | bool | false |
+| comp_mix | Mix | 0.0–1.0 | 1.0 |
+| comp_stereo_link | Stereo Link | 0.0–1.0 | 1.0 |
+| comp_sc_hpf | SC HPF | 0=Off, 1=80Hz, 2=150Hz, 3=250Hz | 0 |
+| comp_lookahead | Lookahead | 0=Off, 1=1ms, 2=2.5ms, 3=5ms | 0 |
+| comp_route_master | Route Master | bool | true |
+| comp_route_looper | Route Looper | bool | false |
+| comp_route_reverb | Route Reverb | bool | false |
+
+## Looper Input Routing
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| looper_input_vps | VPS | bool | false |
+| looper_input_pll | PLL | bool | false |
+| looper_input_saw | SAW | bool | false |
+| looper_input_filter | FLTR | bool | true |
+| looper_input_premaster | PRE | bool | false |
+
+**Priority (exclusive):** PRE > FLTR > individual oscs. When PRE is ON, the looper records the full pre-master signal (post-HPF/BoxCut/Brilliance). When FLTR is ON, it records the post-filter mix. Individual oscs can be combined but are overridden by FLTR or PRE.
+
+## Reverb Send Routing
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_reverb_send_vps | VPS | bool | false |
+| synth_reverb_send_pll | PLL | bool | false |
+| synth_reverb_send_saw | SAW | bool | false |
+| synth_reverb_send_sub | SUB | bool | false |
+| synth_reverb_send_filter | FLTR | bool | false |
+| synth_reverb_send_looper | LOOP | bool | false |
+
+**Priority (exclusive):** When FLTR is ON, individual osc sends (VPS/PLL/SAW/SUB) are overridden — the post-filter mix already contains them. LOOP sends only the looper's contribution (not the full signal).
 
 ## Sequencer
 

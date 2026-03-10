@@ -756,6 +756,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_vps_shape_type, data.synth_vps_shape_type);
     setter.set_parameter(&params.synth_vps_shape_amount, data.synth_vps_shape_amount);
     setter.set_parameter(&params.synth_vps_fold_range, data.synth_vps_fold_range);
+    setter.set_parameter(&params.synth_vps_formant, data.synth_vps_formant);
     setter.set_parameter(&params.synth_osc_volume, data.synth_osc_volume);
 
     setter.set_parameter(&params.synth_sub_volume, data.synth_sub_volume);
@@ -765,6 +766,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_saw_volume, data.synth_saw_volume);
     setter.set_parameter(&params.synth_saw_octave, data.synth_saw_octave);
     setter.set_parameter(&params.synth_saw_tune, data.synth_saw_tune);
+    setter.set_parameter(&params.synth_saw_fine, data.synth_saw_fine);
     setter.set_parameter(&params.synth_saw_fold, data.synth_saw_fold);
     setter.set_parameter(&params.synth_saw_fold_range, data.synth_saw_fold_range);
     setter.set_parameter(&params.synth_saw_tight, data.synth_saw_tight);
@@ -1286,6 +1288,7 @@ fn save_params_to_preset_data(
     data.synth_vps_shape_type = params.synth_vps_shape_type.value();
     data.synth_vps_shape_amount = params.synth_vps_shape_amount.modulated_plain_value();
     data.synth_vps_fold_range = params.synth_vps_fold_range.value();
+    data.synth_vps_formant = params.synth_vps_formant.value();
     data.synth_osc_volume = params.synth_osc_volume.modulated_plain_value();
 
     data.synth_sub_volume = params.synth_sub_volume.modulated_plain_value();
@@ -1295,6 +1298,7 @@ fn save_params_to_preset_data(
     data.synth_saw_volume = params.synth_saw_volume.modulated_plain_value();
     data.synth_saw_octave = params.synth_saw_octave.value();
     data.synth_saw_tune = params.synth_saw_tune.value();
+    data.synth_saw_fine = params.synth_saw_fine.modulated_plain_value();
     data.synth_saw_fold = params.synth_saw_fold.modulated_plain_value();
     data.synth_saw_fold_range = params.synth_saw_fold_range.value();
     data.synth_saw_tight = params.synth_saw_tight.modulated_plain_value();

@@ -95,7 +95,7 @@ pub fn render(
                 2 => render_filter_tab(ui, params, setter, ui_state),
                 3 => render_fx_tab(ui, params, setter),
                 4 => render_lush_tab(ui, params, setter),
-                5 => render_comp_tab(ui, params, setter),
+                5 => render_comp_tab(ui, params, setter, ui_state),
                 6 => super::modulation::render_ui(ui, params, setter),
                 _ => super::modulation::render_step_mod_ui(ui, params, setter),
             }
@@ -200,12 +200,6 @@ fn render_sound_tab(
                 egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            let mut pll_on = params.synth_pll_enable.value();
-                            render_toggle(ui, &mut pll_on, "ON", ml!("synth_pll_enable"));
-                            if pll_on != params.synth_pll_enable.value() {
-                                setter.set_parameter(&params.synth_pll_enable, pll_on);
-                            }
-                            ui.add_space(60.0);
                             let mut colored = params.synth_pll_colored.value();
                             render_toggle(ui, &mut colored, "COLOR", ml!("synth_pll_colored"));
                             if colored != params.synth_pll_colored.value() {
@@ -420,12 +414,6 @@ fn render_sound_tab(
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new("SAW").size(HEADER_FONT).strong());
                         ui.add_space(16.0);
-                        let mut saw_on = params.synth_saw_enable.value();
-                        render_toggle(ui, &mut saw_on, "ON", ml!("synth_saw_enable"));
-                        if saw_on != params.synth_saw_enable.value() {
-                            setter.set_parameter(&params.synth_saw_enable, saw_on);
-                        }
-                        ui.add_space(8.0);
                         let mut saw_fold_pi = params.synth_saw_fold_range.value() == 1;
                         render_labeled_toggle(ui, &mut saw_fold_pi, "1X", "PI");
                         let new_range = if saw_fold_pi { 1 } else { 0 };
@@ -447,6 +435,13 @@ fn render_sound_tab(
                             &params.synth_saw_tune, "TUNE",
                             Some(Color32::from_rgb(80, 80, 40)),
                             Some(&[-12, 0, 12]), None, ml!("synth_saw_tune"),
+                        );
+                        render_vertical_slider(
+                            ui, params, setter,
+                            &params.synth_saw_fine, "FINE",
+                            -1.0, 1.0, SliderScale::Linear,
+                            Some(Color32::from_rgb(80, 80, 40)),
+                            ml!("synth_saw_fine"),
                         );
                         render_vertical_slider(
                             ui, params, setter,
@@ -506,17 +501,17 @@ fn render_sound_tab(
                         egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 0, top: 2, bottom: 0 })
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    let mut vps_on = params.synth_vps_enable.value();
-                                    render_toggle(ui, &mut vps_on, "ON", ml!("synth_vps_enable"));
-                                    if vps_on != params.synth_vps_enable.value() {
-                                        setter.set_parameter(&params.synth_vps_enable, vps_on);
-                                    }
-                                    ui.add_space(60.0);
                                     let mut vps_fold_pi = params.synth_vps_fold_range.value() == 1;
                                     render_labeled_toggle(ui, &mut vps_fold_pi, "1X", "PI");
                                     let new_range = if vps_fold_pi { 1 } else { 0 };
                                     if new_range != params.synth_vps_fold_range.value() {
                                         setter.set_parameter(&params.synth_vps_fold_range, new_range);
+                                    }
+                                    ui.add_space(60.0);
+                                    let mut formant = params.synth_vps_formant.value();
+                                    render_toggle(ui, &mut formant, "FMT", ml!("synth_vps_formant"));
+                                    if formant != params.synth_vps_formant.value() {
+                                        setter.set_parameter(&params.synth_vps_formant, formant);
                                     }
                                 });
                             });
@@ -1433,12 +1428,24 @@ fn render_route_toggle(
     param: &BoolParam,
     label: &str,
 ) {
+    render_route_toggle_dimmed(ui, setter, param, label, false);
+}
+
+fn render_route_toggle_dimmed(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    param: &BoolParam,
+    label: &str,
+    dimmed: bool,
+) {
     let is_on = param.value();
     let btn_w = 56.0;
     let btn_h = 48.0;
+    let alpha = if dimmed { 0.3 } else { 1.0 };
 
     ui.vertical(|ui| {
-        ui.label(egui::RichText::new(label).size(LABEL_FONT).color(Color32::from_gray(160)));
+        let label_gray = (160.0 * alpha) as u8;
+        ui.label(egui::RichText::new(label).size(LABEL_FONT).color(Color32::from_gray(label_gray)));
         ui.add_space(2.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -1446,27 +1453,32 @@ fn render_route_toggle(
                 let is_selected = is_on == *active;
                 let (bg, text_col) = if is_selected {
                     if *active {
-                        (Color32::from_rgb(60, 100, 60), Color32::WHITE)
+                        let g = (100.0 * alpha) as u8;
+                        (Color32::from_rgb((60.0 * alpha) as u8, g, (60.0 * alpha) as u8),
+                         Color32::from_gray((255.0 * alpha) as u8))
                     } else {
-                        (Color32::from_rgb(60, 60, 68), Color32::from_gray(180))
+                        (Color32::from_rgb((60.0 * alpha) as u8, (60.0 * alpha) as u8, (68.0 * alpha) as u8),
+                         Color32::from_gray((180.0 * alpha) as u8))
                     }
                 } else {
-                    (Color32::from_rgb(40, 40, 48), Color32::from_gray(140))
+                    (Color32::from_rgb((40.0 * alpha) as u8, (40.0 * alpha) as u8, (48.0 * alpha) as u8),
+                     Color32::from_gray((140.0 * alpha) as u8))
                 };
 
+                let sense = if dimmed { egui::Sense::hover() } else { egui::Sense::click() };
                 let (rect, response) = ui.allocate_exact_size(
                     egui::vec2(btn_w, btn_h),
-                    egui::Sense::click(),
+                    sense,
                 );
 
-                let hover_bg = if response.hovered() && !is_selected {
+                let hover_bg = if !dimmed && response.hovered() && !is_selected {
                     Color32::from_rgb(55, 55, 65)
                 } else {
                     bg
                 };
 
                 ui.painter().rect_filled(rect, 4.0, hover_bg);
-                if is_selected {
+                if is_selected && !dimmed {
                     let stroke_col = if *active {
                         Color32::from_rgb(80, 140, 80)
                     } else {
@@ -1480,7 +1492,7 @@ fn render_route_toggle(
                 let text_pos = rect.center() - galley.size() / 2.0;
                 ui.painter().galley(text_pos, galley, text_col);
 
-                if response.clicked() {
+                if !dimmed && response.clicked() {
                     setter.set_parameter(param, *active);
                 }
             }
@@ -1736,16 +1748,17 @@ fn render_lush_tab(
         }
 
         ui.add_space(13.0);
+        let rev_filter_on = params.synth_reverb_send_filter.value();
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 16.0;
-            render_route_toggle(ui, setter, &params.synth_reverb_send_vps, "VPS");
-            render_route_toggle(ui, setter, &params.synth_reverb_send_pll, "PLL");
-            render_route_toggle(ui, setter, &params.synth_reverb_send_saw, "SAW");
+            render_route_toggle_dimmed(ui, setter, &params.synth_reverb_send_vps, "VPS", rev_filter_on);
+            render_route_toggle_dimmed(ui, setter, &params.synth_reverb_send_pll, "PLL", rev_filter_on);
+            render_route_toggle_dimmed(ui, setter, &params.synth_reverb_send_saw, "SAW", rev_filter_on);
         });
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 16.0;
-            render_route_toggle(ui, setter, &params.synth_reverb_send_sub, "SUB");
+            render_route_toggle_dimmed(ui, setter, &params.synth_reverb_send_sub, "SUB", rev_filter_on);
             render_route_toggle(ui, setter, &params.synth_reverb_send_filter, "FLTR");
             render_route_toggle(ui, setter, &params.synth_reverb_send_looper, "LOOP");
         });
@@ -1954,6 +1967,7 @@ fn render_comp_tab(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
+    ui_state: &Arc<SharedUiState>,
 ) {
     let comp_color = Some(Color32::from_rgb(160, 90, 130));
 
@@ -1962,7 +1976,6 @@ fn render_comp_tab(
     let sep_x = content_rect.left() + half_w;
     let margin = FRAME_MARGIN;
 
-    // ===== LEFT PANEL: BUTTONS & TOGGLES =====
     let left_rect = egui::Rect::from_min_max(
         egui::pos2(content_rect.left() + margin.left as f32 + 5.0, content_rect.top() + margin.top as f32),
         egui::pos2(sep_x - 10.0, content_rect.bottom()),
@@ -2014,6 +2027,9 @@ fn render_comp_tab(
                         setter.set_parameter(&params.comp_enable, *active);
                     }
                 }
+
+                ui.add_space(8.0);
+                render_comp_auto_makeup_toggle(ui, params, setter);
             });
         }
 
@@ -2036,15 +2052,16 @@ fn render_comp_tab(
             render_route_toggle(ui, setter, &params.comp_route_looper, "LOOP");
             render_route_toggle(ui, setter, &params.comp_route_reverb, "VERB");
         });
+
+        ui.add_space(10.0);
+        render_comp_status(ui, ui_state);
     });
 
-    // ===== SEPARATOR =====
     ui.painter().line_segment(
         [egui::pos2(sep_x, content_rect.top()), egui::pos2(sep_x, content_rect.bottom())],
         egui::Stroke::new(1.0, Color32::BLACK),
     );
 
-    // ===== RIGHT PANEL: ALL SLIDERS =====
     let right_rect = egui::Rect::from_min_max(
         egui::pos2(sep_x - 90.0 + margin.left as f32, content_rect.top() + margin.top as f32),
         egui::pos2(content_rect.right() - margin.right as f32, content_rect.bottom()),
@@ -2077,6 +2094,11 @@ fn render_comp_tab(
                         5.0, 2000.0, SliderScale::Logarithmic, comp_color,
                         &[(5.0, "5ms"), (50.0, "50"), (200.0, "200"), (1000.0, "1k"), (2000.0, "2k")], None,
                     );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_knee, "KNEE",
+                        0.0, 12.0, SliderScale::Linear, comp_color,
+                        &[(0.0, "HARD"), (3.0, "3dB"), (6.0, "6dB"), (9.0, "9dB"), (12.0, "12dB")], None,
+                    );
                 });
             });
 
@@ -2097,10 +2119,107 @@ fn render_comp_tab(
                         0.0, 1.0, SliderScale::Linear, comp_color,
                         &[(0.0, "DRY"), (0.25, "-12dB"), (0.5, "-6dB"), (0.75, "-3dB"), (1.0, "WET")], None,
                     );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_stereo_link, "LINK",
+                        0.0, 1.0, SliderScale::Linear, comp_color,
+                        &[(0.0, "DUAL"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "STEREO")], None,
+                    );
                 });
             });
         });
     });
+}
+
+fn render_comp_auto_makeup_toggle(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let is_on = params.comp_auto_makeup.value();
+    let btn_w = 56.0;
+    let btn_h = 48.0;
+    let (bg, text_col) = if is_on {
+        (Color32::from_rgb(80, 60, 70), Color32::WHITE)
+    } else {
+        (Color32::from_rgb(40, 40, 48), Color32::from_gray(140))
+    };
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(btn_w, btn_h),
+        egui::Sense::click(),
+    );
+    let hover_bg = if response.hovered() && !is_on {
+        Color32::from_rgb(55, 55, 65)
+    } else {
+        bg
+    };
+    ui.painter().rect_filled(rect, 4.0, hover_bg);
+    if is_on {
+        ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, Color32::from_rgb(160, 90, 130)), egui::epaint::StrokeKind::Inside);
+    }
+    let font = egui::FontId::proportional(12.0);
+    let galley = ui.painter().layout_no_wrap("AUTO".to_string(), font, text_col);
+    ui.painter().galley(
+        egui::pos2(rect.center().x - galley.size().x / 2.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        text_col,
+    );
+    if response.clicked() {
+        setter.set_parameter(&params.comp_auto_makeup, !is_on);
+    }
+}
+
+fn render_comp_status(
+    ui: &mut egui::Ui,
+    ui_state: &Arc<SharedUiState>,
+) {
+    let comp_latency = ui_state.comp_latency_samples.load(Ordering::Relaxed);
+    let sample_rate = ui_state.sample_rate.load(Ordering::Relaxed) as f32;
+    let gr_raw = ui_state.comp_gr_db.load(Ordering::Relaxed);
+    let gr_db = gr_raw as f32 / 100.0;
+
+    if gr_db > 0.01 {
+        let gr_bar_width = 180.0_f32;
+        let gr_bar_height = 12.0_f32;
+        let (bar_rect, _) = ui.allocate_exact_size(
+            egui::vec2(gr_bar_width, gr_bar_height),
+            egui::Sense::hover(),
+        );
+        ui.painter().rect_filled(bar_rect, 2.0, Color32::from_rgb(25, 25, 30));
+        let fill_frac = (gr_db / 30.0).min(1.0);
+        let fill_rect = egui::Rect::from_min_max(
+            bar_rect.min,
+            egui::pos2(bar_rect.left() + gr_bar_width * fill_frac, bar_rect.bottom()),
+        );
+        let gr_color = if gr_db > 12.0 {
+            Color32::from_rgb(200, 80, 60)
+        } else if gr_db > 6.0 {
+            Color32::from_rgb(200, 160, 60)
+        } else {
+            Color32::from_rgb(160, 90, 130)
+        };
+        ui.painter().rect_filled(fill_rect, 2.0, gr_color);
+        let font = egui::FontId::proportional(10.0);
+        let text = format!("GR: -{:.1}dB", gr_db);
+        let galley = ui.painter().layout_no_wrap(text, font, Color32::from_gray(200));
+        ui.painter().galley(
+            egui::pos2(bar_rect.left() + 4.0, bar_rect.center().y - galley.size().y / 2.0),
+            galley,
+            Color32::from_gray(200),
+        );
+        ui.add_space(4.0);
+    }
+
+    if comp_latency > 0 && sample_rate > 0.0 {
+        let latency_ms = comp_latency as f32 / sample_rate * 1000.0;
+        ui.label(
+            egui::RichText::new(format!(
+                "Lookahead: {} smp ({:.1}ms)",
+                comp_latency, latency_ms
+            ))
+            .size(11.0)
+            .color(Color32::from_gray(100)),
+        );
+    }
 }
 
 fn render_comp_sc_hpf_buttons(
@@ -2376,17 +2495,22 @@ fn render_looper_section(
         });
 
         ui.add_space(8.0);
+        let lp_premaster = params.looper_input_premaster.value();
+        let lp_filter = params.looper_input_filter.value();
+        let oscs_dimmed = lp_premaster || lp_filter;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 16.0;
-            render_route_toggle(ui, setter, &params.looper_input_vps, "VPS");
-            render_route_toggle(ui, setter, &params.looper_input_pll, "PLL");
+            render_route_toggle_dimmed(ui, setter, &params.looper_input_vps, "VPS", oscs_dimmed);
+            render_route_toggle_dimmed(ui, setter, &params.looper_input_pll, "PLL", oscs_dimmed);
         });
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 16.0;
-            render_route_toggle(ui, setter, &params.looper_input_saw, "SAW");
-            render_route_toggle(ui, setter, &params.looper_input_filter, "FLTR");
+            render_route_toggle_dimmed(ui, setter, &params.looper_input_saw, "SAW", oscs_dimmed);
+            render_route_toggle_dimmed(ui, setter, &params.looper_input_filter, "FLTR", lp_premaster);
         });
+        ui.add_space(6.0);
+        render_route_toggle(ui, setter, &params.looper_input_premaster, "PRE");
     });
 }
 

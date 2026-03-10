@@ -280,6 +280,8 @@ pub struct PresetData {
     #[serde(default)]
     pub synth_vps_fold_range: i32,
     #[serde(default)]
+    pub synth_vps_formant: bool,
+    #[serde(default)]
     pub synth_vps_phase_mode: i32,
     pub synth_osc_volume: f32,
 
@@ -295,6 +297,8 @@ pub struct PresetData {
     pub synth_saw_octave: i32,
     #[serde(default)]
     pub synth_saw_tune: i32,
+    #[serde(default)]
+    pub synth_saw_fine: f32,
     #[serde(default)]
     pub synth_saw_fold: f32,
     #[serde(default)]
@@ -716,6 +720,7 @@ impl Default for PresetData {
             synth_vps_shape_type: 0,
             synth_vps_shape_amount: 0.0,
             synth_vps_fold_range: 0,
+            synth_vps_formant: false,
             synth_vps_phase_mode: 0,
             synth_osc_volume: 0.0,
 
@@ -726,6 +731,7 @@ impl Default for PresetData {
             synth_saw_volume: 0.0,
             synth_saw_octave: 0,
             synth_saw_tune: 0,
+            synth_saw_fine: 0.0,
             synth_saw_fold: 0.0,
             synth_saw_fold_range: 0,
             synth_saw_tight: 0.0,

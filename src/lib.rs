@@ -69,6 +69,7 @@ pub struct PhaseBurn {
     looper_input_l: Vec<f32>,
     looper_input_r: Vec<f32>,
     cpu_measure_counter: u32,
+    last_reported_latency: u32,
 }
 
 impl Default for PhaseBurn {
@@ -112,6 +113,7 @@ impl Default for PhaseBurn {
             looper_input_l: Vec::new(),
             looper_input_r: Vec::new(),
             cpu_measure_counter: 0,
+            last_reported_latency: 0,
         }
     }
 }
@@ -435,7 +437,10 @@ impl Plugin for PhaseBurn {
 
             synth.set_saw_volume(self.params.synth_saw_volume.modulated_plain_value());
             synth.set_saw_octave(self.params.synth_saw_octave.value());
-            synth.set_saw_tune(self.params.synth_saw_tune.value());
+            synth.set_saw_tune(
+                self.params.synth_saw_tune.value(),
+                self.params.synth_saw_fine.modulated_plain_value(),
+            );
             synth.set_saw_fold(self.params.synth_saw_fold.modulated_plain_value());
             synth.set_saw_fold_range(self.params.synth_saw_fold_range.value());
             synth.set_saw_tight(self.params.synth_saw_tight.modulated_plain_value());
@@ -502,12 +507,8 @@ impl Plugin for PhaseBurn {
                 self.params.synth_tube_drive.modulated_plain_value(),
             );
 
-            synth.set_bypass_switches(
-                self.params.synth_pll_enable.value(),
-                self.params.synth_vps_enable.value(),
-                self.params.synth_reverb_enable.value(),
-                self.params.synth_saw_enable.value(),
-            );
+            synth.set_bypass_switches(true, true, true, true);
+            synth.set_vps_formant(self.params.synth_vps_formant.value());
             synth.set_oversampling(self.params.synth_oversampling.value());
 
             synth.set_base_rate(self.params.synth_base_rate.value());
@@ -734,20 +735,29 @@ impl Plugin for PhaseBurn {
                 passthrough_notes,
             );
 
-            let (vps_l, vps_r, pll_l, pll_r, saw) = synth.source_buffers();
-            let lp_vps = self.params.looper_input_vps.value();
-            let lp_pll = self.params.looper_input_pll.value();
-            let lp_saw = self.params.looper_input_saw.value();
-            let lp_flt = self.params.looper_input_filter.value();
-            for i in 0..num_samples {
-                let mut l = 0.0f32;
-                let mut r = 0.0f32;
-                if lp_vps { l += vps_l[i]; r += vps_r[i]; }
-                if lp_pll { l += pll_l[i]; r += pll_r[i]; }
-                if lp_saw { l += saw[i]; r += saw[i]; }
-                if lp_flt { l += self.output_buffer_l[i]; r += self.output_buffer_r[i]; }
-                self.looper_input_l[i] = l;
-                self.looper_input_r[i] = r;
+            let lp_premaster = self.params.looper_input_premaster.value();
+            if lp_premaster {
+                for i in 0..num_samples {
+                    self.looper_input_l[i] = 0.0;
+                    self.looper_input_r[i] = 0.0;
+                }
+            } else if self.params.looper_input_filter.value() {
+                self.looper_input_l[..num_samples].copy_from_slice(&self.output_buffer_l[..num_samples]);
+                self.looper_input_r[..num_samples].copy_from_slice(&self.output_buffer_r[..num_samples]);
+            } else {
+                let (vps_l, vps_r, pll_l, pll_r, saw) = synth.source_buffers();
+                let lp_vps = self.params.looper_input_vps.value();
+                let lp_pll = self.params.looper_input_pll.value();
+                let lp_saw = self.params.looper_input_saw.value();
+                for i in 0..num_samples {
+                    let mut l = 0.0f32;
+                    let mut r = 0.0f32;
+                    if lp_vps { l += vps_l[i]; r += vps_r[i]; }
+                    if lp_pll { l += pll_l[i]; r += pll_r[i]; }
+                    if lp_saw { l += saw[i]; r += saw[i]; }
+                    self.looper_input_l[i] = l;
+                    self.looper_input_r[i] = r;
+                }
             }
 
             for (is_note_on, is_note_off, midi_note, velocity, sample_idx) in &self.midi_events_buffer {
@@ -829,8 +839,15 @@ impl Plugin for PhaseBurn {
             self.brilliance.set_drive(brill_amount);
             self.brilliance.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
 
+            if lp_premaster {
+                self.looper_input_l[..num_samples].copy_from_slice(&self.output_buffer_l[..num_samples]);
+                self.looper_input_r[..num_samples].copy_from_slice(&self.output_buffer_r[..num_samples]);
+            }
+
             let comp_enabled = self.params.comp_enable.value();
-            if comp_enabled {
+            let reverb_send_looper = self.params.synth_reverb_send_looper.value()
+                && self.params.looper_enabled.value();
+            if comp_enabled || reverb_send_looper {
                 self.comp_pre_looper_l[..num_samples].copy_from_slice(&self.output_buffer_l[..num_samples]);
                 self.comp_pre_looper_r[..num_samples].copy_from_slice(&self.output_buffer_r[..num_samples]);
             }
@@ -870,10 +887,10 @@ impl Plugin for PhaseBurn {
             }
 
             if self.params.synth_reverb_enable.value() {
-                if self.params.synth_reverb_send_looper.value() && self.params.looper_enabled.value() {
+                if reverb_send_looper {
                     for i in 0..num_samples {
-                        self.reverb_send_l[i] += self.output_buffer_l[i];
-                        self.reverb_send_r[i] += self.output_buffer_r[i];
+                        self.reverb_send_l[i] += self.output_buffer_l[i] - self.comp_pre_looper_l[i];
+                        self.reverb_send_r[i] += self.output_buffer_r[i] - self.comp_pre_looper_r[i];
                     }
                 }
 
@@ -929,6 +946,9 @@ impl Plugin for PhaseBurn {
                     self.params.comp_mix.modulated_plain_value() as f64,
                     ScHpfMode::from_index(self.params.comp_sc_hpf.value()),
                     LookaheadMode::from_index(self.params.comp_lookahead.value()),
+                    self.params.comp_knee.modulated_plain_value() as f64,
+                    self.params.comp_stereo_link.modulated_plain_value() as f64,
+                    self.params.comp_auto_makeup.value(),
                 );
 
                 let route_master = self.params.comp_route_master.value();
@@ -1008,6 +1028,21 @@ impl Plugin for PhaseBurn {
                 self.output_buffer_r[i] *= self.volume_slew;
             }
 
+            let comp_latency = if comp_enabled {
+                self.ui_state.comp_gr_db.store(
+                    (self.compressor.gain_reduction_db() * 100.0) as u32,
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+                self.compressor.latency_samples()
+            } else {
+                self.ui_state.comp_gr_db.store(0, std::sync::atomic::Ordering::Relaxed);
+                0
+            };
+            self.ui_state.comp_latency_samples.store(
+                comp_latency as u32,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+
             if self.params.limiter_enable.value() {
                 self.limiter.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
                 self.ui_state.limiter_latency_samples.store(
@@ -1016,6 +1051,17 @@ impl Plugin for PhaseBurn {
                 );
             } else {
                 self.ui_state.limiter_latency_samples.store(0, std::sync::atomic::Ordering::Relaxed);
+            }
+
+            let limiter_latency = if self.params.limiter_enable.value() {
+                self.limiter.lookahead_samples()
+            } else {
+                0
+            };
+            let total_latency = (comp_latency + limiter_latency) as u32;
+            if total_latency != self.last_reported_latency {
+                self.last_reported_latency = total_latency;
+                context.set_latency_samples(total_latency);
             }
 
             let mut peak: f32 = 0.0;

@@ -13,7 +13,7 @@ pub const SOUND_PARAMS: &[&str] = &[
     // SUB
     "synth_sub_volume",
     // SAW
-    "synth_saw_octave", "synth_saw_tune", "synth_saw_fold", "synth_saw_tight",
+    "synth_saw_octave", "synth_saw_tune", "synth_saw_fine", "synth_saw_fold", "synth_saw_tight",
     "synth_saw_shape_type", "synth_saw_shape_amount", "synth_saw_volume",
     // FILTER
     "synth_filter_cutoff", "synth_filter_resonance", "synth_filter_drive",

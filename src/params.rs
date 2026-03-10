@@ -414,6 +414,8 @@ pub struct DeviceParams {
     pub synth_vps_shape_amount: FloatParam,
     #[id = "synth_vps_fold_range"]
     pub synth_vps_fold_range: IntParam,
+    #[id = "synth_vps_formant"]
+    pub synth_vps_formant: BoolParam,
     #[id = "synth_vps_phase_mode"]
     pub synth_vps_phase_mode: IntParam,
     #[id = "synth_sub_volume"]
@@ -429,6 +431,8 @@ pub struct DeviceParams {
     pub synth_saw_octave: IntParam,
     #[id = "synth_saw_tune"]
     pub synth_saw_tune: IntParam,
+    #[id = "synth_saw_fine"]
+    pub synth_saw_fine: FloatParam,
     #[id = "synth_saw_fold"]
     pub synth_saw_fold: FloatParam,
     #[id = "synth_saw_fold_range"]
@@ -666,6 +670,8 @@ pub struct DeviceParams {
     pub looper_input_saw: BoolParam,
     #[id = "looper_input_filter"]
     pub looper_input_filter: BoolParam,
+    #[id = "looper_input_premaster"]
+    pub looper_input_premaster: BoolParam,
 
     #[id = "limiter_enable"]
     pub limiter_enable: BoolParam,
@@ -688,6 +694,12 @@ pub struct DeviceParams {
     pub comp_sc_hpf: IntParam,
     #[id = "comp_lookahead"]
     pub comp_lookahead: IntParam,
+    #[id = "comp_knee"]
+    pub comp_knee: FloatParam,
+    #[id = "comp_stereo_link"]
+    pub comp_stereo_link: FloatParam,
+    #[id = "comp_auto_makeup"]
+    pub comp_auto_makeup: BoolParam,
     #[id = "comp_route_master"]
     pub comp_route_master: BoolParam,
     #[id = "comp_route_looper"]
@@ -1790,6 +1802,7 @@ impl Default for DeviceParams {
                 0,
                 IntRange::Linear { min: 0, max: 1 }
             ),
+            synth_vps_formant: BoolParam::new("VPS Formant".to_string(), false),
             synth_vps_phase_mode: IntParam::new(
                 "VPS Phase Mode".to_string(),
                 0,
@@ -1818,6 +1831,11 @@ impl Default for DeviceParams {
                 0,
                 IntRange::Linear { min: -12, max: 12 }
             ),
+            synth_saw_fine: FloatParam::new(
+                "Saw Fine".to_string(),
+                0.0,
+                FloatRange::Linear { min: -1.0, max: 1.0 }
+            ).with_smoother(SmoothingStyle::Linear(20.0)),
             synth_saw_fold: FloatParam::new(
                 "Saw Fold".to_string(),
                 0.0,
@@ -2311,6 +2329,7 @@ impl Default for DeviceParams {
             looper_input_pll: BoolParam::new("Looper Input PLL".to_string(), false),
             looper_input_saw: BoolParam::new("Looper Input SAW".to_string(), false),
             looper_input_filter: BoolParam::new("Looper Input Filter".to_string(), true),
+            looper_input_premaster: BoolParam::new("Looper Input Premaster".to_string(), false),
 
             limiter_enable: BoolParam::new("Limiter".to_string(), true),
 
@@ -2355,6 +2374,17 @@ impl Default for DeviceParams {
                 0,
                 IntRange::Linear { min: 0, max: 3 },
             ),
+            comp_knee: FloatParam::new(
+                "Comp Knee".to_string(),
+                6.0,
+                FloatRange::Linear { min: 0.0, max: 12.0 },
+            ).with_step_size(0.1),
+            comp_stereo_link: FloatParam::new(
+                "Comp Stereo Link".to_string(),
+                1.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            ).with_step_size(0.01),
+            comp_auto_makeup: BoolParam::new("Comp Auto Makeup".to_string(), false),
             comp_route_master: BoolParam::new("Comp Route Master".to_string(), true),
             comp_route_looper: BoolParam::new("Comp Route Looper".to_string(), false),
             comp_route_reverb: BoolParam::new("Comp Route Reverb".to_string(), false),
@@ -2803,12 +2833,14 @@ impl DeviceParams {
             "synth_osc_tune" => set_int!(self.synth_osc_tune),
             "synth_vps_shape_type" => set_int!(self.synth_vps_shape_type),
             "synth_vps_fold_range" => set_int!(self.synth_vps_fold_range),
+            "synth_vps_formant" => set_bool!(self.synth_vps_formant),
             "synth_vps_shape_amount" => set_float!(self.synth_vps_shape_amount),
             "synth_sub_volume" => set_float!(self.synth_sub_volume),
             "synth_sub_filter_route" => set_bool!(self.synth_sub_filter_route),
             "synth_saw_volume" => set_float!(self.synth_saw_volume),
             "synth_saw_octave" => set_int!(self.synth_saw_octave),
             "synth_saw_tune" => set_int!(self.synth_saw_tune),
+            "synth_saw_fine" => set_float!(self.synth_saw_fine),
             "synth_saw_fold" => set_float!(self.synth_saw_fold),
             "synth_saw_tight" => set_float!(self.synth_saw_tight),
             "synth_saw_shape_type" => set_int!(self.synth_saw_shape_type),
@@ -2915,12 +2947,14 @@ impl DeviceParams {
             "synth_osc_tune" => read_int!(self.synth_osc_tune),
             "synth_vps_shape_type" => read_int!(self.synth_vps_shape_type),
             "synth_vps_fold_range" => read_int!(self.synth_vps_fold_range),
+            "synth_vps_formant" => read_bool!(self.synth_vps_formant),
             "synth_vps_shape_amount" => read_float!(self.synth_vps_shape_amount),
             "synth_sub_volume" => read_float!(self.synth_sub_volume),
             "synth_sub_filter_route" => read_bool!(self.synth_sub_filter_route),
             "synth_saw_volume" => read_float!(self.synth_saw_volume),
             "synth_saw_octave" => read_int!(self.synth_saw_octave),
             "synth_saw_tune" => read_int!(self.synth_saw_tune),
+            "synth_saw_fine" => read_float!(self.synth_saw_fine),
             "synth_saw_fold" => read_float!(self.synth_saw_fold),
             "synth_saw_tight" => read_float!(self.synth_saw_tight),
             "synth_saw_shape_type" => read_int!(self.synth_saw_shape_type),

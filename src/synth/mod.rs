@@ -275,6 +275,10 @@ impl SynthEngine {
         self.voice.set_bypass_switches(pll, vps, reverb, saw);
     }
 
+    pub fn set_vps_formant(&mut self, enabled: bool) {
+        self.voice.set_vps_formant(enabled);
+    }
+
     pub fn set_oversampling(&mut self, factor: i32) {
         self.voice.set_oversampling(factor);
     }
@@ -312,8 +316,8 @@ impl SynthEngine {
         self.voice.set_saw_octave(octave);
     }
 
-    pub fn set_saw_tune(&mut self, tune: i32) {
-        self.voice.set_saw_tune(tune);
+    pub fn set_saw_tune(&mut self, tune: i32, fine: f32) {
+        self.voice.set_saw_tune(tune, fine as f64);
     }
 
     pub fn set_saw_shape(&mut self, shape_type: i32, shape_amount: f32) {
