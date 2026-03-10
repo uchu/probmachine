@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-BUFFER_SIZE="${BUFFER_SIZE:-256}"
+BUFFER_SIZE="${BUFFER_SIZE:-512}"
 BACKEND="${BACKEND:-auto}"
 
 cd "$PROJECT_DIR"

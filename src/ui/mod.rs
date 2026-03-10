@@ -1,3 +1,4 @@
+pub mod grid_picker;
 pub mod navigation;
 pub mod page;
 pub mod pages;

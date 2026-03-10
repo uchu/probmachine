@@ -759,6 +759,7 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_osc_volume, data.synth_osc_volume);
 
     setter.set_parameter(&params.synth_sub_volume, data.synth_sub_volume);
+    setter.set_parameter(&params.synth_sub_filter_route, data.synth_sub_filter_route);
 
     setter.set_parameter(&params.synth_saw_enable, data.synth_saw_enable);
     setter.set_parameter(&params.synth_saw_volume, data.synth_saw_volume);
@@ -769,6 +770,35 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_saw_tight, data.synth_saw_tight);
     setter.set_parameter(&params.synth_saw_shape_type, data.synth_saw_shape_type);
     setter.set_parameter(&params.synth_saw_shape_amount, data.synth_saw_shape_amount);
+
+    setter.set_parameter(&params.synth_filter_enable, data.synth_filter_enable);
+    setter.set_parameter(&params.synth_filter_cutoff, data.synth_filter_cutoff);
+    setter.set_parameter(&params.synth_filter_resonance, data.synth_filter_resonance);
+    setter.set_parameter(&params.synth_filter_drive, data.synth_filter_drive);
+    setter.set_parameter(&params.synth_filter_mode, data.synth_filter_mode);
+    setter.set_parameter(&params.synth_filter_key_track, data.synth_filter_key_track);
+    setter.set_parameter(&params.synth_filter_env_amount, data.synth_filter_env_amount);
+    setter.set_parameter(&params.synth_filter_stereo_sep, data.synth_filter_stereo_sep);
+    setter.set_parameter(&params.synth_filter_env_attack, data.synth_filter_env_attack);
+    setter.set_parameter(&params.synth_filter_env_attack_shape, data.synth_filter_env_attack_shape);
+    setter.set_parameter(&params.synth_filter_env_decay, data.synth_filter_env_decay);
+    setter.set_parameter(&params.synth_filter_env_decay_shape, data.synth_filter_env_decay_shape);
+    setter.set_parameter(&params.synth_filter_env_sustain, data.synth_filter_env_sustain);
+    setter.set_parameter(&params.synth_filter_env_release, data.synth_filter_env_release);
+    setter.set_parameter(&params.synth_filter_env_release_shape, data.synth_filter_env_release_shape);
+    setter.set_parameter(&params.synth_filter_env_dip, data.synth_filter_env_dip);
+    setter.set_parameter(&params.synth_filter_env_range, data.synth_filter_env_range);
+    setter.set_parameter(&params.synth_filter_drive_boost, data.synth_filter_drive_boost);
+    setter.set_parameter(&params.synth_filter_sat_type, data.synth_filter_sat_type);
+    setter.set_parameter(&params.synth_filter_morph, data.synth_filter_morph);
+    setter.set_parameter(&params.synth_filter_fm, data.synth_filter_fm);
+    setter.set_parameter(&params.synth_filter_feedback, data.synth_filter_feedback);
+    setter.set_parameter(&params.synth_filter_bass_lock, data.synth_filter_bass_lock);
+    setter.set_parameter(&params.synth_filter_pole_spread, data.synth_filter_pole_spread);
+    setter.set_parameter(&params.synth_filter_res_character, data.synth_filter_res_character);
+    setter.set_parameter(&params.synth_filter_res_tilt, data.synth_filter_res_tilt);
+    setter.set_parameter(&params.synth_filter_cutoff_slew, data.synth_filter_cutoff_slew);
+    setter.set_parameter(&params.synth_filter_poles, data.synth_filter_poles);
 
     setter.set_parameter(&params.synth_vol_attack, data.synth_vol_attack);
     setter.set_parameter(&params.synth_vol_decay, data.synth_vol_decay);
@@ -791,6 +821,11 @@ fn load_preset_to_params(
     setter.set_parameter(&params.synth_reverb_input_hpf, data.synth_reverb_input_hpf);
     setter.set_parameter(&params.synth_reverb_input_lpf, data.synth_reverb_input_lpf);
     setter.set_parameter(&params.synth_reverb_mod_shape, data.synth_reverb_mod_shape);
+    setter.set_parameter(&params.synth_reverb_stereo_width, data.synth_reverb_stereo_width);
+    setter.set_parameter(&params.synth_reverb_saturation, data.synth_reverb_saturation);
+    setter.set_parameter(&params.synth_reverb_rhythm_duck_depth, data.synth_reverb_rhythm_duck_depth);
+    setter.set_parameter(&params.synth_reverb_rhythm_duck_division, data.synth_reverb_rhythm_duck_division);
+    setter.set_parameter(&params.synth_reverb_rhythm_duck_smooth, data.synth_reverb_rhythm_duck_smooth);
 
     setter.set_parameter(&params.lfo1_rate, data.lfo1_rate);
     setter.set_parameter(&params.lfo1_waveform, data.lfo1_waveform);
@@ -1254,6 +1289,7 @@ fn save_params_to_preset_data(
     data.synth_osc_volume = params.synth_osc_volume.modulated_plain_value();
 
     data.synth_sub_volume = params.synth_sub_volume.modulated_plain_value();
+    data.synth_sub_filter_route = params.synth_sub_filter_route.value();
 
     data.synth_saw_enable = params.synth_saw_enable.value();
     data.synth_saw_volume = params.synth_saw_volume.modulated_plain_value();
@@ -1264,6 +1300,35 @@ fn save_params_to_preset_data(
     data.synth_saw_tight = params.synth_saw_tight.modulated_plain_value();
     data.synth_saw_shape_type = params.synth_saw_shape_type.value();
     data.synth_saw_shape_amount = params.synth_saw_shape_amount.modulated_plain_value();
+
+    data.synth_filter_enable = params.synth_filter_enable.value();
+    data.synth_filter_cutoff = params.synth_filter_cutoff.modulated_plain_value();
+    data.synth_filter_resonance = params.synth_filter_resonance.modulated_plain_value();
+    data.synth_filter_drive = params.synth_filter_drive.modulated_plain_value();
+    data.synth_filter_mode = params.synth_filter_mode.value();
+    data.synth_filter_key_track = params.synth_filter_key_track.modulated_plain_value();
+    data.synth_filter_env_amount = params.synth_filter_env_amount.modulated_plain_value();
+    data.synth_filter_stereo_sep = params.synth_filter_stereo_sep.modulated_plain_value();
+    data.synth_filter_env_attack = params.synth_filter_env_attack.modulated_plain_value();
+    data.synth_filter_env_attack_shape = params.synth_filter_env_attack_shape.modulated_plain_value();
+    data.synth_filter_env_decay = params.synth_filter_env_decay.modulated_plain_value();
+    data.synth_filter_env_decay_shape = params.synth_filter_env_decay_shape.modulated_plain_value();
+    data.synth_filter_env_sustain = params.synth_filter_env_sustain.modulated_plain_value();
+    data.synth_filter_env_release = params.synth_filter_env_release.modulated_plain_value();
+    data.synth_filter_env_release_shape = params.synth_filter_env_release_shape.modulated_plain_value();
+    data.synth_filter_env_dip = params.synth_filter_env_dip.modulated_plain_value();
+    data.synth_filter_env_range = params.synth_filter_env_range.modulated_plain_value();
+    data.synth_filter_drive_boost = params.synth_filter_drive_boost.value();
+    data.synth_filter_sat_type = params.synth_filter_sat_type.value();
+    data.synth_filter_morph = params.synth_filter_morph.modulated_plain_value();
+    data.synth_filter_fm = params.synth_filter_fm.modulated_plain_value();
+    data.synth_filter_feedback = params.synth_filter_feedback.modulated_plain_value();
+    data.synth_filter_bass_lock = params.synth_filter_bass_lock.modulated_plain_value();
+    data.synth_filter_pole_spread = params.synth_filter_pole_spread.modulated_plain_value();
+    data.synth_filter_res_character = params.synth_filter_res_character.modulated_plain_value();
+    data.synth_filter_res_tilt = params.synth_filter_res_tilt.modulated_plain_value();
+    data.synth_filter_cutoff_slew = params.synth_filter_cutoff_slew.modulated_plain_value();
+    data.synth_filter_poles = params.synth_filter_poles.value();
 
     data.synth_vol_attack = params.synth_vol_attack.modulated_plain_value();
     data.synth_vol_decay = params.synth_vol_decay.modulated_plain_value();
@@ -1286,6 +1351,11 @@ fn save_params_to_preset_data(
     data.synth_reverb_input_hpf = params.synth_reverb_input_hpf.modulated_plain_value();
     data.synth_reverb_input_lpf = params.synth_reverb_input_lpf.modulated_plain_value();
     data.synth_reverb_mod_shape = params.synth_reverb_mod_shape.modulated_plain_value();
+    data.synth_reverb_stereo_width = params.synth_reverb_stereo_width.modulated_plain_value();
+    data.synth_reverb_saturation = params.synth_reverb_saturation.modulated_plain_value();
+    data.synth_reverb_rhythm_duck_depth = params.synth_reverb_rhythm_duck_depth.modulated_plain_value();
+    data.synth_reverb_rhythm_duck_division = params.synth_reverb_rhythm_duck_division.value();
+    data.synth_reverb_rhythm_duck_smooth = params.synth_reverb_rhythm_duck_smooth.modulated_plain_value();
 
     data.lfo1_rate = params.lfo1_rate.modulated_plain_value();
     data.lfo1_waveform = params.lfo1_waveform.value();

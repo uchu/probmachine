@@ -284,6 +284,8 @@ pub struct PresetData {
     pub synth_osc_volume: f32,
 
     pub synth_sub_volume: f32,
+    #[serde(default)]
+    pub synth_sub_filter_route: bool,
 
     #[serde(default)]
     pub synth_saw_enable: bool,
@@ -303,6 +305,63 @@ pub struct PresetData {
     pub synth_saw_shape_type: i32,
     #[serde(default)]
     pub synth_saw_shape_amount: f32,
+
+    #[serde(default)]
+    pub synth_filter_enable: bool,
+    #[serde(default = "default_filter_cutoff")]
+    pub synth_filter_cutoff: f32,
+    #[serde(default)]
+    pub synth_filter_resonance: f32,
+    #[serde(default)]
+    pub synth_filter_drive: f32,
+    #[serde(default)]
+    pub synth_filter_mode: i32,
+    #[serde(default)]
+    pub synth_filter_key_track: f32,
+    #[serde(default)]
+    pub synth_filter_env_amount: f32,
+    #[serde(default)]
+    pub synth_filter_stereo_sep: f32,
+    #[serde(default = "default_filter_env_attack")]
+    pub synth_filter_env_attack: f32,
+    #[serde(default)]
+    pub synth_filter_env_attack_shape: f32,
+    #[serde(default = "default_filter_env_decay")]
+    pub synth_filter_env_decay: f32,
+    #[serde(default)]
+    pub synth_filter_env_decay_shape: f32,
+    #[serde(default = "default_filter_env_sustain")]
+    pub synth_filter_env_sustain: f32,
+    #[serde(default = "default_filter_env_release")]
+    pub synth_filter_env_release: f32,
+    #[serde(default)]
+    pub synth_filter_env_release_shape: f32,
+    #[serde(default)]
+    pub synth_filter_env_dip: f32,
+    #[serde(default = "default_filter_env_range")]
+    pub synth_filter_env_range: f32,
+    #[serde(default)]
+    pub synth_filter_drive_boost: i32,
+    #[serde(default)]
+    pub synth_filter_sat_type: i32,
+    #[serde(default)]
+    pub synth_filter_morph: f32,
+    #[serde(default)]
+    pub synth_filter_fm: f32,
+    #[serde(default)]
+    pub synth_filter_feedback: f32,
+    #[serde(default)]
+    pub synth_filter_bass_lock: f32,
+    #[serde(default)]
+    pub synth_filter_pole_spread: f32,
+    #[serde(default)]
+    pub synth_filter_res_character: f32,
+    #[serde(default)]
+    pub synth_filter_res_tilt: f32,
+    #[serde(default)]
+    pub synth_filter_cutoff_slew: f32,
+    #[serde(default)]
+    pub synth_filter_poles: i32,
 
     pub synth_vol_attack: f32,
     pub synth_vol_decay: f32,
@@ -334,6 +393,16 @@ pub struct PresetData {
     pub synth_reverb_input_lpf: f32,
     #[serde(default = "default_reverb_mod_shape")]
     pub synth_reverb_mod_shape: f32,
+    #[serde(default = "default_reverb_stereo_width")]
+    pub synth_reverb_stereo_width: f32,
+    #[serde(default)]
+    pub synth_reverb_saturation: f32,
+    #[serde(default)]
+    pub synth_reverb_rhythm_duck_depth: f32,
+    #[serde(default = "default_rhythm_duck_division")]
+    pub synth_reverb_rhythm_duck_division: i32,
+    #[serde(default = "default_rhythm_duck_smooth")]
+    pub synth_reverb_rhythm_duck_smooth: f32,
 
     #[serde(default)]
     pub lfo1_rate: f32,
@@ -528,7 +597,16 @@ fn default_pll_range() -> f32 { 1.0 }
 fn default_reverb_input_hpf() -> f32 { 20.0 }
 fn default_reverb_input_lpf() -> f32 { 18000.0 }
 fn default_reverb_mod_shape() -> f32 { 0.5 }
+fn default_rhythm_duck_division() -> i32 { 2 }
+fn default_reverb_stereo_width() -> f32 { 1.0 }
+fn default_rhythm_duck_smooth() -> f32 { 75.0 }
 fn default_stereo_width() -> f32 { 1.0 }
+fn default_filter_cutoff() -> f32 { 20000.0 }
+fn default_filter_env_attack() -> f32 { 10.0 }
+fn default_filter_env_decay() -> f32 { 100.0 }
+fn default_filter_env_sustain() -> f32 { 0.7 }
+fn default_filter_env_release() -> f32 { 200.0 }
+fn default_filter_env_range() -> f32 { 4.0 }
 fn default_mseq_division() -> i32 { 3 }
 fn default_fm_ratio_float() -> f32 { 1.0 }
 fn default_mseq_slew() -> f32 { 5.0 }
@@ -642,6 +720,7 @@ impl Default for PresetData {
             synth_osc_volume: 0.0,
 
             synth_sub_volume: 0.0,
+            synth_sub_filter_route: false,
 
             synth_saw_enable: false,
             synth_saw_volume: 0.0,
@@ -652,6 +731,35 @@ impl Default for PresetData {
             synth_saw_tight: 0.0,
             synth_saw_shape_type: 0,
             synth_saw_shape_amount: 0.0,
+
+            synth_filter_enable: false,
+            synth_filter_cutoff: 20000.0,
+            synth_filter_resonance: 0.0,
+            synth_filter_drive: 0.0,
+            synth_filter_mode: 0,
+            synth_filter_key_track: 0.0,
+            synth_filter_env_amount: 0.0,
+            synth_filter_stereo_sep: 0.0,
+            synth_filter_env_attack: 10.0,
+            synth_filter_env_attack_shape: 0.0,
+            synth_filter_env_decay: 100.0,
+            synth_filter_env_decay_shape: 0.0,
+            synth_filter_env_sustain: 0.7,
+            synth_filter_env_release: 200.0,
+            synth_filter_env_release_shape: 0.0,
+            synth_filter_env_dip: 0.0,
+            synth_filter_env_range: 4.0,
+            synth_filter_drive_boost: 0,
+            synth_filter_sat_type: 0,
+            synth_filter_morph: 0.0,
+            synth_filter_fm: 0.0,
+            synth_filter_feedback: 0.0,
+            synth_filter_bass_lock: 0.0,
+            synth_filter_pole_spread: 0.0,
+            synth_filter_res_character: 0.0,
+            synth_filter_res_tilt: 0.0,
+            synth_filter_cutoff_slew: 0.0,
+            synth_filter_poles: 0,
 
             synth_vol_attack: 10.0,
             synth_vol_decay: 100.0,
@@ -675,6 +783,11 @@ impl Default for PresetData {
             synth_reverb_input_hpf: 20.0,
             synth_reverb_input_lpf: 18000.0,
             synth_reverb_mod_shape: 0.5,
+            synth_reverb_stereo_width: 1.0,
+            synth_reverb_saturation: 0.0,
+            synth_reverb_rhythm_duck_depth: 0.0,
+            synth_reverb_rhythm_duck_division: 2,
+            synth_reverb_rhythm_duck_smooth: 75.0,
 
             lfo1_rate: 1.0,
             lfo1_waveform: 0,

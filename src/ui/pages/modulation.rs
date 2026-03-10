@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use nih_plug_egui::egui::{self, Color32};
 use crate::params::DeviceParams;
+use crate::ui::grid_picker::{self, GridPickerGroup};
 use nih_plug::prelude::*;
 
 const WAVE_BTN_SIZE: f32 = 56.0;
@@ -24,24 +25,62 @@ const DIVISION_DISPLAY_ORDER: [usize; 16] = [
     6, 7, 8, 9,
     10, 11, 12, 13,
 ];
-const DEST_ENTRIES: [(&str, i32); 34] = [
-    ("None", 0),
-    // PLL
-    ("PLL Damp", 1), ("PLL Infl", 2), ("PLL Track", 3), ("PLL FM", 4),
-    ("PLL XFB", 5), ("PLL OT", 6), ("PLL Rng", 7), ("PLL Vol", 17),
-    ("PLL Mult", 20), ("PLL Mult D", 21), ("PLL INJ", 26), ("PLL Slew", 27),
-    // Sub
-    ("Sub Vol", 19),
-    // VPS
-    ("VPS D", 8), ("VPS V", 9), ("VPS VΔ", 25), ("VPS DΔ", 23),
-    ("VPS Fold", 24), ("VPS SHP", 22), ("VPS Vol", 18),
-    // SAW
-    ("Saw Fold", 28), ("Saw SHP", 29), ("Saw Vol", 30),
-    // Envelope
-    ("Env Atk", 31), ("Env A SH", 32), ("Env Dec", 33), ("Env D SH", 34),
-    ("Env Sus", 35), ("Env Rel", 36), ("Env R SH", 37), ("Env Dip", 38),
-    // Coloration
-    ("Drift", 13), ("Tube", 14),
+const DEST_GROUPS: &[GridPickerGroup] = &[
+    GridPickerGroup {
+        name: "",
+        tint: Color32::TRANSPARENT,
+        entries: &[("None", 0)],
+    },
+    GridPickerGroup {
+        name: "PLL",
+        tint: Color32::from_rgba_premultiplied(8, 8, 0, 6),
+        entries: &[
+            ("PLL Damp", 1), ("PLL Infl", 2), ("PLL Track", 3), ("PLL FM", 4),
+            ("PLL XFB", 5), ("PLL OT", 6), ("PLL Rng", 7), ("PLL Vol", 17),
+            ("PLL Mult", 20), ("PLL Mult D", 21), ("PLL INJ", 26), ("PLL Slew", 27),
+        ],
+    },
+    GridPickerGroup {
+        name: "SUB",
+        tint: Color32::from_rgba_premultiplied(8, 0, 0, 6),
+        entries: &[("Sub Vol", 19)],
+    },
+    GridPickerGroup {
+        name: "VPS",
+        tint: Color32::from_rgba_premultiplied(0, 0, 8, 6),
+        entries: &[
+            ("VPS D", 8), ("VPS V", 9), ("VPS VΔ", 25), ("VPS DΔ", 23),
+            ("VPS Fold", 24), ("VPS SHP", 22), ("VPS Vol", 18),
+        ],
+    },
+    GridPickerGroup {
+        name: "SAW",
+        tint: Color32::from_rgba_premultiplied(0, 8, 0, 6),
+        entries: &[("Saw Fold", 28), ("Saw SHP", 29), ("Saw Vol", 30)],
+    },
+    GridPickerGroup {
+        name: "ENVELOPE",
+        tint: Color32::from_rgba_premultiplied(6, 4, 0, 6),
+        entries: &[
+            ("Env Atk", 31), ("Env A SH", 32), ("Env Dec", 33), ("Env D SH", 34),
+            ("Env Sus", 35), ("Env Rel", 36), ("Env R SH", 37), ("Env Dip", 38),
+            ("Env Rng", 39), ("Tail Amt", 40), ("Tail Time", 41),
+        ],
+    },
+    GridPickerGroup {
+        name: "FILTER",
+        tint: Color32::from_rgba_premultiplied(4, 0, 6, 6),
+        entries: &[
+            ("Flt Cut", 42), ("Flt Res", 43), ("Flt Drv", 44), ("Flt Env", 45),
+            ("Flt Mrph", 46), ("Flt FM", 47), ("Flt FB", 48),
+            ("Flt Bass", 49), ("Flt Sprd", 50), ("Flt Char", 51), ("Flt Tilt", 52),
+        ],
+    },
+    GridPickerGroup {
+        name: "COLOR",
+        tint: Color32::from_rgba_premultiplied(0, 6, 6, 6),
+        entries: &[("Drift", 13), ("Tube", 14)],
+    },
 ];
 
 const FONT: f32 = 17.0;
@@ -85,6 +124,7 @@ pub fn render_ui(
     ui.add_space(16.0);
 
     let full_rect = ui.available_rect_before_wrap();
+    grid_picker::set_content_rect(ui, full_rect);
 
     ui.horizontal(|ui| {
         ui.add_space(COL_LEFT_PAD);
@@ -125,6 +165,7 @@ pub fn render_step_mod_ui(
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
 ) {
+    grid_picker::set_content_rect(ui, ui.available_rect_before_wrap());
     ui.add_space(6.0);
     render_step_seq_panel(ui, params, setter);
 }
@@ -410,7 +451,7 @@ fn render_route_slot_horizontal(
 ) {
     paint_arrow(ui);
 
-    render_dest_combo(ui, &format!("{}_{}_dest", id_prefix, slot), dest_width,
+    render_dest_picker(ui, &format!("{}_{}_dest", id_prefix, slot), dest_width,
         dest.value(), |v| setter.set_parameter(dest, v));
 
     ui.add_space(8.0);
@@ -427,37 +468,14 @@ fn render_route_slot_horizontal(
     }
 }
 
-fn render_dest_combo<F: FnOnce(i32)>(
+fn render_dest_picker<F: FnOnce(i32)>(
     ui: &mut egui::Ui,
     id: &str,
     width: f32,
     current_value: i32,
     on_select: F,
 ) {
-    let current_name = DEST_ENTRIES.iter()
-        .find(|(_, v)| *v == current_value)
-        .map(|(n, _)| *n)
-        .unwrap_or("?");
-
-    let mut selected = None;
-    ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
-    egui::ComboBox::from_id_salt(id)
-        .width(width)
-        .height(420.0)
-        .selected_text(egui::RichText::new(current_name).size(COMBO_FONT))
-        .show_ui(ui, |ui| {
-            ui.style_mut().spacing.item_spacing.y = 3.0;
-            for &(name, value) in &DEST_ENTRIES {
-                let btn = egui::Button::new(egui::RichText::new(name).size(COMBO_FONT))
-                    .min_size(egui::vec2(width - 10.0, COMBO_BTN_HEIGHT))
-                    .selected(current_value == value);
-                if ui.add(btn).clicked() {
-                    selected = Some(value);
-                    ui.close_menu();
-                }
-            }
-        });
-    if let Some(v) = selected {
+    if let Some(v) = grid_picker::grid_picker_button(ui, id, width, current_value, DEST_GROUPS) {
         on_select(v);
     }
 }

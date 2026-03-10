@@ -15,6 +15,10 @@ pub const SOUND_PARAMS: &[&str] = &[
     // SAW
     "synth_saw_octave", "synth_saw_tune", "synth_saw_fold", "synth_saw_tight",
     "synth_saw_shape_type", "synth_saw_shape_amount", "synth_saw_volume",
+    // FILTER
+    "synth_filter_cutoff", "synth_filter_resonance", "synth_filter_drive",
+    "synth_filter_key_track", "synth_filter_env_amount", "synth_filter_stereo_sep",
+    "synth_filter_enable",
     // VPS
     "synth_osc_octave", "synth_osc_tune", "synth_osc_d", "synth_osc_v",
     "synth_osc_stereo_v_offset", "synth_osc_stereo_d_offset", "synth_osc_fold",

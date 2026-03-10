@@ -5,6 +5,7 @@ use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, SawOscillato
 use super::envelope::{Envelope, TailEnvelope};
 use super::lfo::ModulationValues;
 use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_wavefold_pi, OnePoleSlewValue, StereoDCBlocker};
+use super::ladder_filter::{LadderFilter, FilterParams};
 
 struct SawTightFilter {
     ic1eq: f64,
@@ -165,6 +166,7 @@ pub struct Voice {
 
     // ===== Sub Oscillator =====
     sub_volume: f64,
+    sub_filter_route: bool,
 
     // ===== Saw Oscillator =====
     saw_enabled: bool,
@@ -179,6 +181,89 @@ pub struct Voice {
     target_saw_tight: f64,
     saw_tight_slew: OnePoleSlewValue,
     saw_tight_filter: SawTightFilter,
+
+    // ===== Ladder Filter =====
+    ladder_filter: LadderFilter,
+    filter_enabled: bool,
+    filter_cutoff: f64,
+    filter_resonance: f64,
+    filter_drive: f64,
+    filter_stereo_sep: f64,
+    filter_mode: u8,
+    filter_key_track: f64,
+    filter_env_amount: f64,
+    target_filter_cutoff: f64,
+    target_filter_resonance: f64,
+    target_filter_drive: f64,
+    target_filter_stereo_sep: f64,
+    target_filter_key_track: f64,
+    target_filter_env_amount: f64,
+    filter_cutoff_slew: SlewValue,
+    filter_resonance_slew: SlewValue,
+    filter_drive_slew: SlewValue,
+    filter_stereo_sep_slew: SlewValue,
+    filter_key_track_slew: SlewValue,
+    filter_env_amount_slew: SlewValue,
+    mod_filter_cutoff: f64,
+    mod_filter_resonance: f64,
+    mod_filter_drive: f64,
+    mod_filter_env_amount: f64,
+    mod_slew_filter_cutoff: SlewValue,
+    mod_slew_filter_resonance: SlewValue,
+    mod_slew_filter_drive: SlewValue,
+    mod_slew_filter_env_amount: SlewValue,
+
+    filter_sat_type: u8,
+    filter_morph: f64,
+    target_filter_morph: f64,
+    filter_morph_slew: SlewValue,
+    filter_fm: f64,
+    target_filter_fm: f64,
+    filter_fm_slew: SlewValue,
+    filter_feedback: f64,
+    target_filter_feedback: f64,
+    filter_feedback_slew: SlewValue,
+    filter_bass_lock: f64,
+    target_filter_bass_lock: f64,
+    filter_bass_lock_slew: SlewValue,
+    filter_pole_spread: f64,
+    target_filter_pole_spread: f64,
+    filter_pole_spread_slew: SlewValue,
+    filter_res_character: f64,
+    target_filter_res_character: f64,
+    filter_res_character_slew: SlewValue,
+    filter_res_tilt: f64,
+    target_filter_res_tilt: f64,
+    filter_res_tilt_slew: SlewValue,
+    filter_cutoff_slew_amt: f64,
+    target_filter_cutoff_slew_amt: f64,
+    filter_cutoff_slew_amt_slew: SlewValue,
+    filter_poles: usize,
+    mod_filter_morph: f64,
+    mod_filter_fm: f64,
+    mod_filter_feedback: f64,
+    mod_filter_bass_lock: f64,
+    mod_filter_pole_spread: f64,
+    mod_filter_res_character: f64,
+    mod_filter_res_tilt: f64,
+    mod_slew_filter_morph: SlewValue,
+    mod_slew_filter_fm: SlewValue,
+    mod_slew_filter_feedback: SlewValue,
+    mod_slew_filter_bass_lock: SlewValue,
+    mod_slew_filter_pole_spread: SlewValue,
+    mod_slew_filter_res_character: SlewValue,
+    mod_slew_filter_res_tilt: SlewValue,
+    filter_envelope: Envelope,
+    filt_env_attack: f64,
+    filt_env_attack_shape: f64,
+    filt_env_decay: f64,
+    filt_env_decay_shape: f64,
+    filt_env_sustain: f64,
+    filt_env_release: f64,
+    filt_env_release_shape: f64,
+    filt_env_dip: f64,
+    filt_env_range: f64,
+    filter_drive_boost: i32,
 
     // ===== PLL =====
     pll_volume: f64,
@@ -413,6 +498,19 @@ pub struct Voice {
     bpm: f64,
     target_pll_multiplier: f64,
     pll_mult_slew_state: SlewValue,
+
+    // ===== Reverb Send Levels =====
+    reverb_send_vps: f64,
+    reverb_send_pll: f64,
+    reverb_send_saw: f64,
+    reverb_send_sub: f64,
+    reverb_send_filter: f64,
+
+    last_vps_l: f64,
+    last_vps_r: f64,
+    last_pll_l: f64,
+    last_pll_r: f64,
+    last_saw: f64,
 }
 
 impl Voice {
@@ -559,6 +657,7 @@ impl Voice {
             vps_fold_range: 0,
 
             sub_volume: 0.0,
+            sub_filter_route: false,
 
             saw_enabled: false,
             saw_octave: 0,
@@ -572,6 +671,88 @@ impl Voice {
             target_saw_tight: 0.0,
             saw_tight_slew: make_one_pole_slew(),
             saw_tight_filter: SawTightFilter::new(sample_rate_f64),
+
+            ladder_filter: LadderFilter::new(sample_rate),
+            filter_enabled: false,
+            filter_cutoff: 20000.0,
+            filter_resonance: 0.0,
+            filter_drive: 0.0,
+            filter_stereo_sep: 0.0,
+            filter_mode: 0,
+            filter_key_track: 0.0,
+            filter_env_amount: 0.0,
+            target_filter_cutoff: 20000.0,
+            target_filter_resonance: 0.0,
+            target_filter_drive: 0.0,
+            target_filter_stereo_sep: 0.0,
+            target_filter_key_track: 0.0,
+            target_filter_env_amount: 0.0,
+            filter_cutoff_slew: make_slew(),
+            filter_resonance_slew: make_slew(),
+            filter_drive_slew: make_slew(),
+            filter_stereo_sep_slew: make_slew(),
+            filter_key_track_slew: make_slew(),
+            filter_env_amount_slew: make_slew(),
+            mod_filter_cutoff: 0.0,
+            mod_filter_resonance: 0.0,
+            mod_filter_drive: 0.0,
+            mod_filter_env_amount: 0.0,
+            mod_slew_filter_cutoff: make_slew(),
+            mod_slew_filter_resonance: make_slew(),
+            mod_slew_filter_drive: make_slew(),
+            mod_slew_filter_env_amount: make_slew(),
+
+            filter_sat_type: 0,
+            filter_morph: 0.0,
+            target_filter_morph: 0.0,
+            filter_morph_slew: make_slew(),
+            filter_fm: 0.0,
+            target_filter_fm: 0.0,
+            filter_fm_slew: make_slew(),
+            filter_feedback: 0.0,
+            target_filter_feedback: 0.0,
+            filter_feedback_slew: make_slew(),
+            filter_bass_lock: 0.0,
+            target_filter_bass_lock: 0.0,
+            filter_bass_lock_slew: make_slew(),
+            filter_pole_spread: 0.0,
+            target_filter_pole_spread: 0.0,
+            filter_pole_spread_slew: make_slew(),
+            filter_res_character: 0.0,
+            target_filter_res_character: 0.0,
+            filter_res_character_slew: make_slew(),
+            filter_res_tilt: 0.0,
+            target_filter_res_tilt: 0.0,
+            filter_res_tilt_slew: make_slew(),
+            filter_cutoff_slew_amt: 0.0,
+            target_filter_cutoff_slew_amt: 0.0,
+            filter_cutoff_slew_amt_slew: make_slew(),
+            filter_poles: 0,
+            mod_filter_morph: 0.0,
+            mod_filter_fm: 0.0,
+            mod_filter_feedback: 0.0,
+            mod_filter_bass_lock: 0.0,
+            mod_filter_pole_spread: 0.0,
+            mod_filter_res_character: 0.0,
+            mod_filter_res_tilt: 0.0,
+            mod_slew_filter_morph: make_slew(),
+            mod_slew_filter_fm: make_slew(),
+            mod_slew_filter_feedback: make_slew(),
+            mod_slew_filter_bass_lock: make_slew(),
+            mod_slew_filter_pole_spread: make_slew(),
+            mod_slew_filter_res_character: make_slew(),
+            mod_slew_filter_res_tilt: make_slew(),
+            filter_envelope: Envelope::new(sample_rate_f64),
+            filt_env_attack: 10.0,
+            filt_env_attack_shape: 0.0,
+            filt_env_decay: 100.0,
+            filt_env_decay_shape: 0.0,
+            filt_env_sustain: 0.7,
+            filt_env_release: 200.0,
+            filt_env_release_shape: 0.0,
+            filt_env_dip: 0.0,
+            filt_env_range: 4.0,
+            filter_drive_boost: 0,
 
             pll_volume: 0.0,
             pll_track_speed: 0.5,
@@ -785,6 +966,16 @@ impl Voice {
             bpm: 120.0,
             target_pll_multiplier: 1.0,
             pll_mult_slew_state: make_slew(),
+            reverb_send_vps: 0.0,
+            reverb_send_pll: 0.0,
+            reverb_send_saw: 0.0,
+            reverb_send_sub: 0.0,
+            reverb_send_filter: 0.0,
+            last_vps_l: 0.0,
+            last_vps_r: 0.0,
+            last_pll_l: 0.0,
+            last_pll_r: 0.0,
+            last_saw: 0.0,
         }
     }
 
@@ -799,6 +990,14 @@ impl Voice {
         self.pll_enabled = pll;
         self.vps_enabled = vps;
         self.saw_enabled = saw;
+    }
+
+    pub fn set_reverb_sends(&mut self, vps: f64, pll: f64, saw: f64, sub: f64, filter: f64) {
+        self.reverb_send_vps = vps;
+        self.reverb_send_pll = pll;
+        self.reverb_send_saw = saw;
+        self.reverb_send_sub = sub;
+        self.reverb_send_filter = filter;
     }
 
     pub fn set_oversampling(&mut self, factor: i32) {
@@ -859,6 +1058,7 @@ impl Voice {
             self.vps_os_128x_right.set_sample_rate(new_rate);
             // Update envelopes with DAW rate (they run at DAW rate, not oversampled)
             self.volume_envelope.set_sample_rate(new_rate);
+            self.filter_envelope.set_sample_rate(new_rate);
 
             // Update all slew limiters
             let update_slew = |s: &mut SlewValue| s.set_sample_rate(new_rate);
@@ -923,6 +1123,17 @@ impl Voice {
             update_slew(&mut self.mod_slew_saw_volume);
             self.saw_tight_slew.set_sample_rate(new_rate);
             self.saw_tight_filter.set_sample_rate(new_rate);
+            self.ladder_filter.set_sample_rate(new_rate as f32);
+            update_slew(&mut self.filter_cutoff_slew);
+            update_slew(&mut self.filter_resonance_slew);
+            update_slew(&mut self.filter_drive_slew);
+            update_slew(&mut self.filter_stereo_sep_slew);
+            update_slew(&mut self.filter_key_track_slew);
+            update_slew(&mut self.filter_env_amount_slew);
+            update_slew(&mut self.mod_slew_filter_cutoff);
+            update_slew(&mut self.mod_slew_filter_resonance);
+            update_slew(&mut self.mod_slew_filter_drive);
+            update_slew(&mut self.mod_slew_filter_env_amount);
             self.pll_mult_slew_state.set_sample_rate(new_rate);
 
             // Now update processing sample rate (oscillators, filters, etc.)
@@ -993,6 +1204,16 @@ impl Voice {
         self.vca_mode = enabled;
     }
 
+    pub fn base_frequency(&self) -> f64 {
+        self.base_frequency
+    }
+
+    pub fn vps_l(&self) -> f64 { self.last_vps_l }
+    pub fn vps_r(&self) -> f64 { self.last_vps_r }
+    pub fn pll_l(&self) -> f64 { self.last_pll_l }
+    pub fn pll_r(&self) -> f64 { self.last_pll_r }
+    pub fn saw_val(&self) -> f64 { self.last_saw }
+
     pub fn set_frequency(&mut self, freq: f64, _pll_feedback: f64, feedback_amount: f64) {
         self.target_frequency = freq;
         self.target_pll_feedback = feedback_amount;
@@ -1041,6 +1262,10 @@ impl Voice {
         self.target_sub_volume = volume;
     }
 
+    pub fn set_sub_filter_route(&mut self, through_filter: bool) {
+        self.sub_filter_route = through_filter;
+    }
+
     pub fn set_saw_volume(&mut self, volume: f64) {
         self.target_saw_volume = volume;
     }
@@ -1069,6 +1294,68 @@ impl Voice {
     pub fn set_saw_fold_range(&mut self, range: i32) {
         self.saw_fold_range = range;
     }
+
+    pub fn set_filter_enabled(&mut self, enabled: bool) {
+        self.filter_enabled = enabled;
+    }
+
+    pub fn set_filter_params(&mut self, cutoff: f64, resonance: f64, drive: f64, mode: u8) {
+        self.target_filter_cutoff = cutoff;
+        self.target_filter_resonance = resonance;
+        self.target_filter_drive = drive;
+        self.filter_mode = mode;
+    }
+
+    pub fn set_filter_key_track(&mut self, amount: f64) {
+        self.target_filter_key_track = amount;
+    }
+
+    pub fn set_filter_env_amount(&mut self, amount: f64) {
+        self.target_filter_env_amount = amount;
+    }
+
+    pub fn set_filter_stereo_sep(&mut self, amount: f64) {
+        self.target_filter_stereo_sep = amount;
+    }
+
+    pub fn set_filter_envelope(
+        &mut self,
+        attack: f64, attack_shape: f64,
+        decay: f64, decay_shape: f64,
+        sustain: f64,
+        release: f64, release_shape: f64,
+    ) {
+        self.filt_env_attack = attack;
+        self.filt_env_attack_shape = attack_shape;
+        self.filt_env_decay = decay;
+        self.filt_env_decay_shape = decay_shape;
+        self.filt_env_sustain = sustain;
+        self.filt_env_release = release;
+        self.filt_env_release_shape = release_shape;
+    }
+
+    pub fn set_filter_env_dip(&mut self, dip: f64) {
+        self.filt_env_dip = dip.clamp(0.0, 1.0);
+    }
+
+    pub fn set_filter_env_range(&mut self, range: f64) {
+        self.filt_env_range = range.clamp(1.0, 8.0);
+    }
+
+    pub fn set_filter_drive_boost(&mut self, boost: i32) {
+        self.filter_drive_boost = boost;
+    }
+
+    pub fn set_filter_sat_type(&mut self, t: i32) { self.filter_sat_type = t as u8; }
+    pub fn set_filter_morph(&mut self, m: f64) { self.target_filter_morph = m; }
+    pub fn set_filter_fm(&mut self, fm: f64) { self.target_filter_fm = fm; }
+    pub fn set_filter_feedback(&mut self, fb: f64) { self.target_filter_feedback = fb; }
+    pub fn set_filter_bass_lock(&mut self, bl: f64) { self.target_filter_bass_lock = bl; }
+    pub fn set_filter_pole_spread(&mut self, ps: f64) { self.target_filter_pole_spread = ps; }
+    pub fn set_filter_res_character(&mut self, rc: f64) { self.target_filter_res_character = rc; }
+    pub fn set_filter_res_tilt(&mut self, tilt: f64) { self.target_filter_res_tilt = tilt; }
+    pub fn set_filter_cutoff_slew(&mut self, s: f64) { self.target_filter_cutoff_slew_amt = s; }
+    pub fn set_filter_poles(&mut self, p: i32) { self.filter_poles = p as usize; }
 
     pub fn set_bpm(&mut self, bpm: f64) {
         self.bpm = bpm.max(1.0);
@@ -1202,6 +1489,17 @@ impl Voice {
         self.mod_env_range = self.mod_slew_env_range.next(mod_values.env_range, MOD_SLEW_MS);
         self.mod_pll_tail_amount = self.mod_slew_pll_tail_amount.next(mod_values.pll_tail_amount, MOD_SLEW_MS);
         self.mod_pll_tail_time = self.mod_slew_pll_tail_time.next(mod_values.pll_tail_time, MOD_SLEW_MS);
+        self.mod_filter_cutoff = self.mod_slew_filter_cutoff.next(mod_values.filter_cutoff, MOD_SLEW_MS);
+        self.mod_filter_resonance = self.mod_slew_filter_resonance.next(mod_values.filter_resonance, MOD_SLEW_MS);
+        self.mod_filter_drive = self.mod_slew_filter_drive.next(mod_values.filter_drive, MOD_SLEW_MS);
+        self.mod_filter_env_amount = self.mod_slew_filter_env_amount.next(mod_values.filter_env_amount, MOD_SLEW_MS);
+        self.mod_filter_morph = self.mod_slew_filter_morph.next(mod_values.filter_morph, MOD_SLEW_MS);
+        self.mod_filter_fm = self.mod_slew_filter_fm.next(mod_values.filter_fm, MOD_SLEW_MS);
+        self.mod_filter_feedback = self.mod_slew_filter_feedback.next(mod_values.filter_feedback, MOD_SLEW_MS);
+        self.mod_filter_bass_lock = self.mod_slew_filter_bass_lock.next(mod_values.filter_bass_lock, MOD_SLEW_MS);
+        self.mod_filter_pole_spread = self.mod_slew_filter_pole_spread.next(mod_values.filter_pole_spread, MOD_SLEW_MS);
+        self.mod_filter_res_character = self.mod_slew_filter_res_character.next(mod_values.filter_res_character, MOD_SLEW_MS);
+        self.mod_filter_res_tilt = self.mod_slew_filter_res_tilt.next(mod_values.filter_res_tilt, MOD_SLEW_MS);
     }
 
     pub fn set_volume(&mut self, volume: f64) {
@@ -1263,6 +1561,12 @@ impl Voice {
             self.vol_env_release,
             self.vol_env_release_shape,
         );
+        self.filter_envelope.trigger(
+            self.filt_env_attack, self.filt_env_attack_shape,
+            self.filt_env_decay, self.filt_env_decay_shape,
+            self.filt_env_sustain,
+            self.filt_env_release, self.filt_env_release_shape,
+        );
 
         if was_idle {
             self.reset_oscillator_phases();
@@ -1280,6 +1584,13 @@ impl Voice {
             self.vol_env_release,
             self.vol_env_release_shape,
             effective_dip,
+        );
+        self.filter_envelope.trigger_with_dip(
+            self.filt_env_attack, self.filt_env_attack_shape,
+            self.filt_env_decay, self.filt_env_decay_shape,
+            self.filt_env_sustain,
+            self.filt_env_release, self.filt_env_release_shape,
+            self.filt_env_dip,
         );
     }
 
@@ -1301,6 +1612,7 @@ impl Voice {
             return;
         }
         self.volume_envelope.release();
+        self.filter_envelope.release();
         if self.pll_tail_enabled {
             self.pll_tail_envelope.trigger_tail(
                 self.pll_tail_time_ms,
@@ -1315,10 +1627,12 @@ impl Voice {
             return;
         }
         self.volume_envelope.release();
+        self.filter_envelope.release();
     }
 
     pub fn reset(&mut self) {
         self.volume_envelope.force_off();
+        self.filter_envelope.force_off();
         self.pll_tail_envelope.reset();
 
         self.pll_feedback_state = 0.0;
@@ -1330,7 +1644,7 @@ impl Voice {
         self.drift_phase_r = 0.33;
     }
 
-    pub fn process(&mut self, _pll_feedback: f64) -> (f64, f64, f64) {
+    pub fn process(&mut self, _pll_feedback: f64) -> (f64, f64, f64, f64, f64) {
         let volume_env = if self.vca_mode {
             1.0
         } else {
@@ -1393,6 +1707,22 @@ impl Voice {
         self.saw_shape_amount = (self.saw_shape_amount_slew.next(self.target_saw_shape_amount, 50.0) + self.mod_saw_shape_amount).clamp(0.0, 1.0);
         self.saw_tight = self.saw_tight_slew.next(self.target_saw_tight, 50.0).clamp(0.0, 1.0);
 
+        // Filter slews + modulation
+        self.filter_cutoff = (self.filter_cutoff_slew.next(self.target_filter_cutoff, 0.001) + self.mod_filter_cutoff * 10000.0).clamp(20.0, 20000.0);
+        self.filter_resonance = (self.filter_resonance_slew.next(self.target_filter_resonance, 20.0) + self.mod_filter_resonance).clamp(0.0, 1.05);
+        self.filter_drive = (self.filter_drive_slew.next(self.target_filter_drive, 20.0) + self.mod_filter_drive).clamp(0.0, 1.0);
+        self.filter_stereo_sep = self.filter_stereo_sep_slew.next(self.target_filter_stereo_sep, 20.0).clamp(0.0, 0.50);
+        self.filter_key_track = self.filter_key_track_slew.next(self.target_filter_key_track, 20.0).clamp(0.0, 1.0);
+        self.filter_env_amount = (self.filter_env_amount_slew.next(self.target_filter_env_amount, 20.0) + self.mod_filter_env_amount).clamp(-1.0, 1.0);
+        self.filter_morph = (self.filter_morph_slew.next(self.target_filter_morph, 20.0) + self.mod_filter_morph).clamp(0.0, 1.0);
+        self.filter_fm = (self.filter_fm_slew.next(self.target_filter_fm, 20.0) + self.mod_filter_fm).clamp(0.0, 1.0);
+        self.filter_feedback = (self.filter_feedback_slew.next(self.target_filter_feedback, 20.0) + self.mod_filter_feedback).clamp(-1.0, 1.0);
+        self.filter_bass_lock = (self.filter_bass_lock_slew.next(self.target_filter_bass_lock, 20.0) + self.mod_filter_bass_lock).clamp(0.0, 1.0);
+        self.filter_pole_spread = (self.filter_pole_spread_slew.next(self.target_filter_pole_spread, 20.0) + self.mod_filter_pole_spread).clamp(0.0, 1.0);
+        self.filter_res_character = (self.filter_res_character_slew.next(self.target_filter_res_character, 20.0) + self.mod_filter_res_character).clamp(0.0, 1.0);
+        self.filter_res_tilt = (self.filter_res_tilt_slew.next(self.target_filter_res_tilt, 20.0) + self.mod_filter_res_tilt).clamp(-1.0, 1.0);
+        self.filter_cutoff_slew_amt = self.filter_cutoff_slew_amt_slew.next(self.target_filter_cutoff_slew_amt, 20.0).clamp(0.0, 1.0);
+
         // Sub slew + modulation
         self.sub_volume = (self.sub_volume_slew.next(self.target_sub_volume, 20.0) + self.mod_sub_volume).clamp(0.0, 1.0);
 
@@ -1421,7 +1751,7 @@ impl Voice {
         self.master_volume = self.master_volume_slew.next(self.target_master_volume, 20.0);
 
         if !self.vca_mode && !self.volume_envelope.is_active() && !self.pll_tail_envelope.is_active() {
-            return (0.0, 0.0, 0.0);
+            return (0.0, 0.0, 0.0, 0.0, 0.0);
         }
 
         // ===== PLL OVERSAMPLED BLOCK =====
@@ -1763,11 +2093,58 @@ impl Voice {
         let pll_out_final_l = pll_sample_l * self.pll_volume * pll_env;
         let pll_out_final_r = pll_sample_r * self.pll_volume * pll_env;
 
-        let mixed_l = vps_out_l + pll_out_final_l + saw_out;
-        let mixed_r = vps_out_r + pll_out_final_r + saw_out;
+        let sub_pre = if self.sub_filter_route && self.sub_volume > 0.001 {
+            let sub_freq = self.base_frequency * 0.5;
+            self.sub_oscillator.next(sub_freq) * self.sub_volume * volume_env
+        } else {
+            0.0
+        };
 
-        // ===== SUB AT DAW RATE (single sample, returned separately for HPF routing) =====
-        let sub_sample = if self.sub_volume > 0.001 {
+        let pre_filter_l = vps_out_l + pll_out_final_l + saw_out + sub_pre;
+        let pre_filter_r = vps_out_r + pll_out_final_r + saw_out + sub_pre;
+
+        let (mixed_l, mixed_r) = if self.filter_enabled {
+            let filter_env = if self.filter_envelope.is_active() {
+                self.filter_envelope.update_params(
+                    self.filt_env_attack, self.filt_env_attack_shape,
+                    self.filt_env_decay, self.filt_env_decay_shape,
+                    self.filt_env_sustain,
+                    self.filt_env_release, self.filt_env_release_shape,
+                );
+                self.filter_envelope.next()
+            } else {
+                0.0
+            };
+            self.ladder_filter.set_params(&FilterParams {
+                cutoff: self.filter_cutoff,
+                resonance: self.filter_resonance,
+                drive: self.filter_drive,
+                boost: self.filter_drive_boost,
+                stereo_sep: self.filter_stereo_sep,
+                mode: self.filter_mode,
+                key_track_hz: self.base_frequency,
+                key_track_amount: self.filter_key_track,
+                sat_type: self.filter_sat_type,
+                morph: self.filter_morph,
+                filter_fm: self.filter_fm,
+                feedback: self.filter_feedback,
+                bass_lock: self.filter_bass_lock,
+                pole_spread: self.filter_pole_spread,
+                res_character: self.filter_res_character,
+                res_tilt: self.filter_res_tilt,
+                cutoff_slew: self.filter_cutoff_slew_amt,
+                poles: self.filter_poles,
+                env_mod: self.filter_env_amount * filter_env,
+            });
+            self.ladder_filter.process(pre_filter_l, pre_filter_r)
+        } else {
+            (pre_filter_l, pre_filter_r)
+        };
+
+        // ===== SUB AT DAW RATE (separate output for HPF routing, or 0 if routed through filter) =====
+        let sub_sample = if self.sub_filter_route {
+            0.0
+        } else if self.sub_volume > 0.001 {
             let sub_freq = self.base_frequency * 0.5;
             self.sub_oscillator.next(sub_freq) * self.sub_volume * volume_env
         } else {
@@ -1776,10 +2153,29 @@ impl Voice {
 
         // ===== OUTPUT =====
         let vel_scale = self.velocity;
+        self.last_vps_l = vps_out_l * self.master_volume * vel_scale;
+        self.last_vps_r = vps_out_r * self.master_volume * vel_scale;
+        self.last_pll_l = pll_out_final_l * self.master_volume * vel_scale;
+        self.last_pll_r = pll_out_final_r * self.master_volume * vel_scale;
+        self.last_saw = saw_out * self.master_volume * vel_scale;
         let final_l = mixed_l * self.master_volume * vel_scale;
         let final_r = mixed_r * self.master_volume * vel_scale;
         let final_sub = sub_sample * self.master_volume * vel_scale;
 
-        (final_l, final_r, final_sub)
+        // ===== REVERB SEND =====
+        let rev_send_l = (vps_out_l * self.reverb_send_vps
+            + pll_out_final_l * self.reverb_send_pll
+            + saw_out * self.reverb_send_saw
+            + sub_pre * self.reverb_send_sub
+            + mixed_l * self.reverb_send_filter)
+            * vel_scale;
+        let rev_send_r = (vps_out_r * self.reverb_send_vps
+            + pll_out_final_r * self.reverb_send_pll
+            + saw_out * self.reverb_send_saw
+            + sub_pre * self.reverb_send_sub
+            + mixed_r * self.reverb_send_filter)
+            * vel_scale;
+
+        (final_l, final_r, final_sub, rev_send_l, rev_send_r)
     }
 }

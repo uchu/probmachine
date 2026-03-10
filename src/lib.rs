@@ -21,9 +21,12 @@ use nih_plug_egui::{create_egui_editor, egui};
 use params::DeviceParams;
 use std::sync::Arc;
 use ui::{Page, SharedUiState};
-use synth::{SynthEngine, MasterLimiter, MasterHpf, BoxCutFilter, BrillianceFilter, StereoControl};
+use synth::{SynthEngine, MasterLimiter, MasterHpf, BoxCutFilter, BrillianceFilter, StereoControl, PitchedLooper, LushReverb, Compressor};
+use synth::compressor::{ScHpfMode, LookaheadMode};
 use synth::master_hpf::{HpfMode, HpfBoost};
 use synth::box_cut::BoxCutMode;
+use synth::looper::LoopDirection;
+use synth::lfo::LfoSyncDivision;
 use midi::MidiProcessor;
 use midi_modes::{MidiInputMode, MidiModeProcessor, MidiModeResult};
 
@@ -43,6 +46,13 @@ pub struct PhaseBurn {
     sub_box_cut: BoxCutFilter,
     brilliance: BrillianceFilter,
     stereo_control: StereoControl,
+    looper: PitchedLooper,
+    reverb: LushReverb,
+    compressor: Compressor,
+    comp_pre_looper_l: Vec<f32>,
+    comp_pre_looper_r: Vec<f32>,
+    comp_pre_reverb_l: Vec<f32>,
+    comp_pre_reverb_r: Vec<f32>,
     midi_events_buffer: Vec<(bool, bool, u8, u8, usize)>,
     midi_mode_processor: MidiModeProcessor,
     midi_clock_pll: midi_clock::MidiClockPll,
@@ -54,6 +64,10 @@ pub struct PhaseBurn {
     output_buffer_l: Vec<f32>,
     output_buffer_r: Vec<f32>,
     sub_buffer: Vec<f32>,
+    reverb_send_l: Vec<f32>,
+    reverb_send_r: Vec<f32>,
+    looper_input_l: Vec<f32>,
+    looper_input_r: Vec<f32>,
     cpu_measure_counter: u32,
 }
 
@@ -75,6 +89,13 @@ impl Default for PhaseBurn {
             sub_box_cut: BoxCutFilter::new(44100.0),
             brilliance: BrillianceFilter::new(44100.0),
             stereo_control: StereoControl::new(44100.0),
+            looper: PitchedLooper::new(44100.0),
+            reverb: LushReverb::new(44100.0),
+            compressor: Compressor::new(44100.0),
+            comp_pre_looper_l: Vec::new(),
+            comp_pre_looper_r: Vec::new(),
+            comp_pre_reverb_l: Vec::new(),
+            comp_pre_reverb_r: Vec::new(),
             midi_events_buffer: Vec::with_capacity(64),
             midi_mode_processor: MidiModeProcessor::new(),
             midi_clock_pll: midi_clock::MidiClockPll::new(),
@@ -86,6 +107,10 @@ impl Default for PhaseBurn {
             output_buffer_l: Vec::new(),
             output_buffer_r: Vec::new(),
             sub_buffer: Vec::new(),
+            reverb_send_l: Vec::new(),
+            reverb_send_r: Vec::new(),
+            looper_input_l: Vec::new(),
+            looper_input_r: Vec::new(),
             cpu_measure_counter: 0,
         }
     }
@@ -228,6 +253,9 @@ impl Plugin for PhaseBurn {
             self.sub_box_cut.set_sample_rate(new_sample_rate);
             self.brilliance.set_sample_rate(new_sample_rate);
             self.stereo_control.set_sample_rate(new_sample_rate);
+            self.looper.set_sample_rate(new_sample_rate);
+            self.reverb.set_sample_rate(new_sample_rate);
+            self.compressor.set_sample_rate(new_sample_rate as f64);
         }
 
         true
@@ -403,6 +431,7 @@ impl Plugin for PhaseBurn {
 
 
             synth.set_sub_volume(self.params.synth_sub_volume.modulated_plain_value());
+            synth.set_sub_filter_route(self.params.synth_sub_filter_route.value());
 
             synth.set_saw_volume(self.params.synth_saw_volume.modulated_plain_value());
             synth.set_saw_octave(self.params.synth_saw_octave.value());
@@ -414,6 +443,39 @@ impl Plugin for PhaseBurn {
                 self.params.synth_saw_shape_type.value(),
                 self.params.synth_saw_shape_amount.modulated_plain_value(),
             );
+
+            synth.set_filter_enabled(self.params.synth_filter_enable.value());
+            synth.set_filter_params(
+                self.params.synth_filter_cutoff.modulated_plain_value(),
+                self.params.synth_filter_resonance.modulated_plain_value(),
+                self.params.synth_filter_drive.modulated_plain_value(),
+                self.params.synth_filter_mode.value(),
+            );
+            synth.set_filter_key_track(self.params.synth_filter_key_track.modulated_plain_value());
+            synth.set_filter_env_amount(self.params.synth_filter_env_amount.modulated_plain_value());
+            synth.set_filter_stereo_sep(self.params.synth_filter_stereo_sep.modulated_plain_value());
+            synth.set_filter_envelope(
+                self.params.synth_filter_env_attack.modulated_plain_value(),
+                self.params.synth_filter_env_attack_shape.modulated_plain_value(),
+                self.params.synth_filter_env_decay.modulated_plain_value(),
+                self.params.synth_filter_env_decay_shape.modulated_plain_value(),
+                self.params.synth_filter_env_sustain.modulated_plain_value(),
+                self.params.synth_filter_env_release.modulated_plain_value(),
+                self.params.synth_filter_env_release_shape.modulated_plain_value(),
+            );
+            synth.set_filter_env_dip(self.params.synth_filter_env_dip.modulated_plain_value());
+            synth.set_filter_env_range(self.params.synth_filter_env_range.modulated_plain_value());
+            synth.set_filter_drive_boost(self.params.synth_filter_drive_boost.value());
+            synth.set_filter_sat_type(self.params.synth_filter_sat_type.value());
+            synth.set_filter_morph(self.params.synth_filter_morph.modulated_plain_value());
+            synth.set_filter_fm(self.params.synth_filter_fm.modulated_plain_value());
+            synth.set_filter_feedback(self.params.synth_filter_feedback.modulated_plain_value());
+            synth.set_filter_bass_lock(self.params.synth_filter_bass_lock.modulated_plain_value());
+            synth.set_filter_pole_spread(self.params.synth_filter_pole_spread.modulated_plain_value());
+            synth.set_filter_res_character(self.params.synth_filter_res_character.modulated_plain_value());
+            synth.set_filter_res_tilt(self.params.synth_filter_res_tilt.modulated_plain_value());
+            synth.set_filter_cutoff_slew(self.params.synth_filter_cutoff_slew.modulated_plain_value());
+            synth.set_filter_poles(self.params.synth_filter_poles.value());
 
             synth.set_pll_fm_params(
                 self.params.synth_pll_fm_amount.modulated_plain_value(),
@@ -584,9 +646,19 @@ impl Plugin for PhaseBurn {
             self.output_buffer_l.resize(num_samples, 0.0);
             self.output_buffer_r.resize(num_samples, 0.0);
             self.sub_buffer.resize(num_samples, 0.0);
+            self.reverb_send_l.resize(num_samples, 0.0);
+            self.reverb_send_r.resize(num_samples, 0.0);
+            self.looper_input_l.resize(num_samples, 0.0);
+            self.looper_input_r.resize(num_samples, 0.0);
+            self.comp_pre_looper_l.resize(num_samples, 0.0);
+            self.comp_pre_looper_r.resize(num_samples, 0.0);
+            self.comp_pre_reverb_l.resize(num_samples, 0.0);
+            self.comp_pre_reverb_r.resize(num_samples, 0.0);
             self.output_buffer_l.fill(0.0);
             self.output_buffer_r.fill(0.0);
             self.sub_buffer.fill(0.0);
+            self.reverb_send_l.fill(0.0);
+            self.reverb_send_r.fill(0.0);
 
             let pll_feedback_amt = self.params.synth_pll_feedback.modulated_plain_value();
             let base_freq = 220.0;
@@ -641,10 +713,19 @@ impl Plugin for PhaseBurn {
             self.cpu_measure_counter = (self.cpu_measure_counter + 1) % 32;
 
             let start_time = if measure_cpu { Some(std::time::Instant::now()) } else { None };
+            synth.set_reverb_sends(
+                if self.params.synth_reverb_send_vps.value() { 1.0 } else { 0.0 },
+                if self.params.synth_reverb_send_pll.value() { 1.0 } else { 0.0 },
+                if self.params.synth_reverb_send_saw.value() { 1.0 } else { 0.0 },
+                if self.params.synth_reverb_send_sub.value() { 1.0 } else { 0.0 },
+                if self.params.synth_reverb_send_filter.value() { 1.0 } else { 0.0 },
+            );
             synth.process_block(
                 &mut self.output_buffer_l,
                 &mut self.output_buffer_r,
                 &mut self.sub_buffer,
+                &mut self.reverb_send_l,
+                &mut self.reverb_send_r,
                 &self.params,
                 pll_feedback_amt,
                 base_freq,
@@ -652,6 +733,22 @@ impl Plugin for PhaseBurn {
                 seq_playing,
                 passthrough_notes,
             );
+
+            let (vps_l, vps_r, pll_l, pll_r, saw) = synth.source_buffers();
+            let lp_vps = self.params.looper_input_vps.value();
+            let lp_pll = self.params.looper_input_pll.value();
+            let lp_saw = self.params.looper_input_saw.value();
+            let lp_flt = self.params.looper_input_filter.value();
+            for i in 0..num_samples {
+                let mut l = 0.0f32;
+                let mut r = 0.0f32;
+                if lp_vps { l += vps_l[i]; r += vps_r[i]; }
+                if lp_pll { l += pll_l[i]; r += pll_r[i]; }
+                if lp_saw { l += saw[i]; r += saw[i]; }
+                if lp_flt { l += self.output_buffer_l[i]; r += self.output_buffer_r[i]; }
+                self.looper_input_l[i] = l;
+                self.looper_input_r[i] = r;
+            }
 
             for (is_note_on, is_note_off, midi_note, velocity, sample_idx) in &self.midi_events_buffer {
                 if *is_note_on {
@@ -731,6 +828,158 @@ impl Plugin for PhaseBurn {
             self.brilliance.set_amount(brill_amount);
             self.brilliance.set_drive(brill_amount);
             self.brilliance.process_block(&mut self.output_buffer_l, &mut self.output_buffer_r);
+
+            let comp_enabled = self.params.comp_enable.value();
+            if comp_enabled {
+                self.comp_pre_looper_l[..num_samples].copy_from_slice(&self.output_buffer_l[..num_samples]);
+                self.comp_pre_looper_r[..num_samples].copy_from_slice(&self.output_buffer_r[..num_samples]);
+            }
+
+            let current_freq = self.synth_engine.as_ref()
+                .map(|s| s.current_frequency())
+                .unwrap_or(440.0);
+            let looper_length_beats = LfoSyncDivision::from_index(self.params.looper_length.value()).beats();
+            let auto_rec_beats = LfoSyncDivision::from_index(self.params.looper_auto_rec_len.value()).beats();
+            self.looper.process_block(
+                &mut self.output_buffer_l[..num_samples],
+                &mut self.output_buffer_r[..num_samples],
+                &self.looper_input_l[..num_samples],
+                &self.looper_input_r[..num_samples],
+                self.params.looper_enabled.value(),
+                self.params.looper_pitch.modulated_plain_value() as f64,
+                looper_length_beats,
+                self.params.looper_start.modulated_plain_value() as f64,
+                LoopDirection::from_index(self.params.looper_direction.value()),
+                self.params.looper_mix.modulated_plain_value() as f64,
+                self.params.looper_decay.modulated_plain_value() as f64,
+                self.params.looper_stutter.value(),
+                self.params.looper_key_track.value(),
+                self.params.looper_freeze.value(),
+                bar_index,
+                tempo,
+                current_freq,
+                seq_playing,
+                auto_rec_beats,
+                self.params.looper_auto_rec_interval.value(),
+                self.params.looper_doppler.modulated_plain_value() as f64,
+            );
+
+            if comp_enabled {
+                self.comp_pre_reverb_l[..num_samples].copy_from_slice(&self.output_buffer_l[..num_samples]);
+                self.comp_pre_reverb_r[..num_samples].copy_from_slice(&self.output_buffer_r[..num_samples]);
+            }
+
+            if self.params.synth_reverb_enable.value() {
+                if self.params.synth_reverb_send_looper.value() && self.params.looper_enabled.value() {
+                    for i in 0..num_samples {
+                        self.reverb_send_l[i] += self.output_buffer_l[i];
+                        self.reverb_send_r[i] += self.output_buffer_r[i];
+                    }
+                }
+
+                let duck_div = LfoSyncDivision::from_index(self.params.synth_reverb_duck_division.value());
+                let duck_release_ms = duck_div.beats() / tempo * 60000.0;
+                let pre_delay_ms = if self.params.synth_reverb_pre_delay_sync.value() {
+                    let div = LfoSyncDivision::from_index(self.params.synth_reverb_pre_delay_division.value());
+                    (div.beats() / tempo * 60000.0).min(500.0)
+                } else {
+                    self.params.synth_reverb_pre_delay.modulated_plain_value() as f64
+                };
+                self.reverb.set_params(
+                    self.params.synth_reverb_mix.modulated_plain_value() as f64,
+                    pre_delay_ms,
+                    self.params.synth_reverb_time_scale.modulated_plain_value() as f64,
+                    self.params.synth_reverb_input_hpf.modulated_plain_value() as f64,
+                    self.params.synth_reverb_input_lpf.modulated_plain_value() as f64,
+                    self.params.synth_reverb_hpf.modulated_plain_value() as f64,
+                    self.params.synth_reverb_lpf.modulated_plain_value() as f64,
+                    self.params.synth_reverb_mod_speed.modulated_plain_value() as f64,
+                    self.params.synth_reverb_mod_depth.modulated_plain_value() as f64,
+                    self.params.synth_reverb_mod_shape.modulated_plain_value() as f64,
+                    self.params.synth_reverb_diffusion_mix.modulated_plain_value() as f64,
+                    self.params.synth_reverb_diffusion.modulated_plain_value() as f64,
+                    self.params.synth_reverb_decay.modulated_plain_value() as f64,
+                    self.params.synth_reverb_ducking.modulated_plain_value() as f64,
+                    duck_release_ms,
+                    self.params.synth_reverb_stereo_width.modulated_plain_value() as f64,
+                    self.params.synth_reverb_saturation.modulated_plain_value() as f64,
+                );
+                let rhythm_div = LfoSyncDivision::from_index(self.params.synth_reverb_rhythm_duck_division.value());
+                let rhythm_duck_freq = tempo / 60.0 / rhythm_div.beats();
+                self.reverb.set_rhythm_duck_params(
+                    self.params.synth_reverb_rhythm_duck_depth.modulated_plain_value() as f64,
+                    rhythm_duck_freq,
+                    self.params.synth_reverb_rhythm_duck_smooth.modulated_plain_value() as f64,
+                );
+                self.reverb.process_block(
+                    &mut self.output_buffer_l[..num_samples],
+                    &mut self.output_buffer_r[..num_samples],
+                    &self.reverb_send_l[..num_samples],
+                    &self.reverb_send_r[..num_samples],
+                );
+            }
+
+            if comp_enabled {
+                self.compressor.set_params(
+                    self.params.comp_threshold.modulated_plain_value() as f64,
+                    self.params.comp_ratio.modulated_plain_value() as f64,
+                    self.params.comp_attack.modulated_plain_value() as f64,
+                    self.params.comp_release.modulated_plain_value() as f64,
+                    self.params.comp_makeup.modulated_plain_value() as f64,
+                    self.params.comp_mix.modulated_plain_value() as f64,
+                    ScHpfMode::from_index(self.params.comp_sc_hpf.value()),
+                    LookaheadMode::from_index(self.params.comp_lookahead.value()),
+                );
+
+                let route_master = self.params.comp_route_master.value();
+                let route_looper = self.params.comp_route_looper.value();
+                let route_reverb = self.params.comp_route_reverb.value();
+
+                if route_master && route_looper && route_reverb {
+                    self.compressor.process_block(
+                        &mut self.output_buffer_l[..num_samples],
+                        &mut self.output_buffer_r[..num_samples],
+                    );
+                } else {
+                    for i in 0..num_samples {
+                        let master_l = self.comp_pre_looper_l[i];
+                        let master_r = self.comp_pre_looper_r[i];
+                        let looper_l = self.comp_pre_reverb_l[i] - self.comp_pre_looper_l[i];
+                        let looper_r = self.comp_pre_reverb_r[i] - self.comp_pre_looper_r[i];
+                        let reverb_l = self.output_buffer_l[i] - self.comp_pre_reverb_l[i];
+                        let reverb_r = self.output_buffer_r[i] - self.comp_pre_reverb_r[i];
+
+                        let mut comp_l = 0.0_f32;
+                        let mut comp_r = 0.0_f32;
+                        let mut bypass_l = 0.0_f32;
+                        let mut bypass_r = 0.0_f32;
+
+                        if route_master { comp_l += master_l; comp_r += master_r; }
+                        else { bypass_l += master_l; bypass_r += master_r; }
+
+                        if route_looper { comp_l += looper_l; comp_r += looper_r; }
+                        else { bypass_l += looper_l; bypass_r += looper_r; }
+
+                        if route_reverb { comp_l += reverb_l; comp_r += reverb_r; }
+                        else { bypass_l += reverb_l; bypass_r += reverb_r; }
+
+                        self.comp_pre_looper_l[i] = comp_l;
+                        self.comp_pre_looper_r[i] = comp_r;
+                        self.comp_pre_reverb_l[i] = bypass_l;
+                        self.comp_pre_reverb_r[i] = bypass_r;
+                    }
+
+                    self.compressor.process_block(
+                        &mut self.comp_pre_looper_l[..num_samples],
+                        &mut self.comp_pre_looper_r[..num_samples],
+                    );
+
+                    for i in 0..num_samples {
+                        self.output_buffer_l[i] = self.comp_pre_looper_l[i] + self.comp_pre_reverb_l[i];
+                        self.output_buffer_r[i] = self.comp_pre_looper_r[i] + self.comp_pre_reverb_r[i];
+                    }
+                }
+            }
 
             self.stereo_control.set_crossover_hz(self.params.stereo_mono_bass.modulated_plain_value() as f64);
             self.stereo_control.set_width(self.params.stereo_width.modulated_plain_value() as f64);

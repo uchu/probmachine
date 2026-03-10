@@ -5,7 +5,7 @@ use crate::ui::SharedUiState;
 use crate::midi_learn::{MidiLearnState, SOUND_PARAMS};
 use egui_taffy::taffy::{prelude::*, style::{AlignItems, FlexDirection, Overflow}, geometry::Point};
 use egui_taffy::TuiBuilderLogic;
-use nih_plug::prelude::{Param, ParamSetter};
+use nih_plug::prelude::{BoolParam, Param, ParamSetter};
 use nih_plug_egui::egui;
 use nih_plug_egui::egui::Color32;
 use std::f32::consts::FRAC_PI_2;
@@ -91,21 +91,24 @@ pub fn render(
         .ui(|ui| {
             match current_tab {
                 0 => render_sound_tab(ui, params, setter, ui_state),
-                1 => render_filter_tab(ui, params, setter, ui_state),
-                2 => render_envelopes_tab(ui, params, setter, ui_state),
-                3 => super::modulation::render_ui(ui, params, setter),
+                1 => render_envelopes_tab(ui, params, setter, ui_state),
+                2 => render_filter_tab(ui, params, setter, ui_state),
+                3 => render_fx_tab(ui, params, setter),
+                4 => render_lush_tab(ui, params, setter),
+                5 => render_comp_tab(ui, params, setter),
+                6 => super::modulation::render_ui(ui, params, setter),
                 _ => super::modulation::render_step_mod_ui(ui, params, setter),
             }
         });
     });
 }
 
-const TAB_HEIGHT: f32 = 126.0;
-const TAB_GAP: f32 = 4.0;
+const TAB_HEIGHT: f32 = 76.0;
+const TAB_GAP: f32 = 3.0;
 
 fn render_tab_bar(ui: &mut egui::Ui, current_tab: u8) {
     let rect = ui.max_rect();
-    let tab_names = ["OSCs", "FILTER", "ENV & EQ", "LFOs", "STEP MOD"];
+    let tab_names = ["OSCs", "ENVs", "FILTER", "FX", "LUSH", "COMP", "LFOs", "STEP"];
 
     for (i, name) in tab_names.iter().enumerate() {
         let y = rect.min.y + i as f32 * (TAB_HEIGHT + TAB_GAP);
@@ -629,15 +632,908 @@ fn render_sound_tab(
 
 fn render_filter_tab(
     ui: &mut egui::Ui,
-    _params: &Arc<DeviceParams>,
-    _setter: &ParamSetter,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
     _ui_state: &Arc<SharedUiState>,
 ) {
-    egui::Frame::NONE
-        .inner_margin(FRAME_MARGIN)
-        .show(ui, |ui| {
-            ui.label(egui::RichText::new("FILTER").size(HEADER_FONT).strong());
+    let content_rect = ui.max_rect();
+    let half_w = content_rect.width() / 2.0;
+    let sep_x = content_rect.left() + half_w;
+    let margin = FRAME_MARGIN;
+
+    let left_rect = egui::Rect::from_min_max(
+        egui::pos2(content_rect.left() + margin.left as f32 + 5.0, content_rect.top() + margin.top as f32),
+        egui::pos2(sep_x - 10.0, content_rect.bottom()),
+    );
+    let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
+    left_ui.vertical(|ui| {
+        ui.label(egui::RichText::new("FILTER").size(HEADER_FONT).strong());
+        ui.add_space(9.0);
+        {
+            let filter_on = params.synth_filter_enable.value();
+            let btn_w = 80.0;
+            let btn_h = 48.0;
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                for (label, active) in &[("OFF", false), ("ON", true)] {
+                    let is_selected = filter_on == *active;
+                    let (bg, text_col) = if is_selected {
+                        if *active {
+                            (Color32::from_rgb(80, 160, 80), Color32::WHITE)
+                        } else {
+                            (Color32::from_rgb(180, 60, 60), Color32::WHITE)
+                        }
+                    } else {
+                        (Color32::from_rgb(40, 40, 48), Color32::from_gray(160))
+                    };
+                    let (rect, response) = ui.allocate_exact_size(
+                        egui::vec2(btn_w, btn_h),
+                        egui::Sense::click(),
+                    );
+                    let hover_bg = if response.hovered() && !is_selected {
+                        Color32::from_rgb(55, 55, 65)
+                    } else {
+                        bg
+                    };
+                    ui.painter().rect_filled(rect, 4.0, hover_bg);
+                    if is_selected {
+                        let stroke_col = if *active {
+                            Color32::from_rgb(100, 190, 100)
+                        } else {
+                            Color32::from_rgb(210, 80, 80)
+                        };
+                        ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, stroke_col), egui::epaint::StrokeKind::Inside);
+                    }
+                    let font = egui::FontId::proportional(LABEL_FONT);
+                    let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+                    let text_pos = rect.center() - galley.size() / 2.0;
+                    ui.painter().galley(text_pos, galley, text_col);
+                    if response.clicked() {
+                        setter.set_parameter(&params.synth_filter_enable, *active);
+                    }
+                }
+            });
+        }
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("TYPE").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        render_filter_sat_type_buttons(ui, params, setter);
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("POLES").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        render_filter_poles_buttons(ui, params, setter);
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("MODE").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        render_filter_mode_buttons(ui, params, setter);
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("DRIVE BOOST").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        render_drive_boost_buttons(ui, params, setter);
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("SUB").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        render_sub_filter_route_toggle(ui, params, setter);
+
+    });
+
+    ui.painter().line_segment(
+        [egui::pos2(sep_x, content_rect.top()), egui::pos2(sep_x, content_rect.bottom())],
+        egui::Stroke::new(1.0, Color32::BLACK),
+    );
+
+    let right_rect = egui::Rect::from_min_max(
+        egui::pos2(sep_x - 90.0 + margin.left as f32, content_rect.top() + margin.top as f32),
+        egui::pos2(content_rect.right() - margin.right as f32, content_rect.bottom()),
+    );
+    let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
+    right_ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("TONE").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_cutoff, "CUT",
+                        20.0, 20000.0, SliderScale::Exponential(3.0),
+                        Some(Color32::from_rgb(130, 80, 160)),
+                        &[(20.0, "20"), (200.0, "200"), (1000.0, "1k"), (5000.0, "5k"), (20000.0, "20k")],
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_resonance, "RES",
+                        0.0, 1.05, SliderScale::Linear,
+                        Some(Color32::from_rgb(80, 90, 160)),
+                        &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                        None,
+                    );
+                    let boost_db = match params.synth_filter_drive_boost.value() {
+                        1 => 12,
+                        2 => 24,
+                        3 => 48,
+                        _ => 0,
+                    };
+                    let t0 = format!("{}dB", boost_db);
+                    let t1 = format!("{}dB", boost_db + 3);
+                    let t2 = format!("{}dB", boost_db + 6);
+                    let t3 = format!("{}dB", boost_db + 9);
+                    let t4 = format!("{}dB", boost_db + 12);
+                    let drive_ticks: [(f32, &str); 5] = [
+                        (0.0, &t0), (0.25, &t1), (0.5, &t2), (0.75, &t3), (1.0, &t4),
+                    ];
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_drive, "DRV",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(150, 70, 80)),
+                        &drive_ticks,
+                        None,
+                    );
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("MODULATION").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_key_track, "KEY",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(60, 120, 110)),
+                        &[(0.0, "OFF"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_env_amount, "ENV",
+                        -1.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(140, 110, 50)),
+                        &[(-1.0, "-100%"), (-0.5, "-50%"), (0.0, "0%"), (0.5, "+50%"), (1.0, "+100%")],
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_stereo_sep, "SEP",
+                        0.0, 0.50, SliderScale::Linear,
+                        Some(Color32::from_rgb(60, 90, 150)),
+                        &[(0.0, "0%"), (0.125, "25%"), (0.25, "50%"), (0.375, "75%"), (0.50, "100%")],
+                        None,
+                    );
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("CHARACTER").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    let is_8pole = params.synth_filter_poles.value() == 1;
+                    let morph_ticks_4: [(f32, &str); 5] = [(0.0, "LP24"), (0.25, "LP12"), (0.5, "BP12"), (0.75, "NTCH"), (1.0, "HP24")];
+                    let morph_ticks_8: [(f32, &str); 5] = [(0.0, "LP48"), (0.25, "LP24"), (0.5, "BP24"), (0.75, "NTCH"), (1.0, "HP48")];
+                    let morph_ticks: &[(f32, &str)] = if is_8pole { &morph_ticks_8 } else { &morph_ticks_4 };
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_morph, "MRPH",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(120, 100, 160)),
+                        morph_ticks,
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_fm, "FM",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(160, 120, 60)),
+                        &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_feedback, "FB",
+                        -1.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(160, 80, 80)),
+                        &[(-1.0, "-100%"), (-0.5, "-50%"), (0.0, "0%"), (0.5, "+50%"), (1.0, "+100%")],
+                        None,
+                    );
+                });
+            });
         });
+
+        ui.add_space(15.0);
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("DYNAMICS").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_bass_lock, "BASS",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(80, 130, 80)),
+                        &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_res_character, "CHAR",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(140, 90, 110)),
+                        &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_cutoff_slew, "SLEW",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(100, 100, 140)),
+                        &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                        None,
+                    );
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("SPREAD").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_pole_spread, "SPRD",
+                        0.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(100, 120, 80)),
+                        &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                        None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter,
+                        &params.synth_filter_res_tilt, "TILT",
+                        -1.0, 1.0, SliderScale::Linear,
+                        Some(Color32::from_rgb(60, 100, 150)),
+                        &[(-1.0, "-100%"), (-0.5, "-50%"), (0.0, "0%"), (0.5, "+50%"), (1.0, "+100%")],
+                        None,
+                    );
+                });
+            });
+
+        });
+    });
+}
+
+fn render_filter_envelope_controls(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let range_val = params.synth_filter_env_range.modulated_plain_value().max(1.0);
+    let range_ms = range_val * 1000.0;
+    let time_max_a = range_ms.min(5000.0).max(1.0);
+    let time_max_dr = range_ms.min(10000.0).max(1.0);
+    let shape_ticks: &[(f32, &str)] = &[(-1.0, "EXP"), (0.0, "LIN"), (1.0, "LOG")];
+    let atk_color = Some(Color32::from_rgb(140, 100, 60));
+    let dec_color = Some(Color32::from_rgb(100, 80, 120));
+    let sus_color = Some(Color32::from_rgb(60, 100, 80));
+    let rel_color = Some(Color32::from_rgb(80, 80, 140));
+    let dip_color = Some(Color32::from_rgb(140, 80, 80));
+
+    let time_ticks_a = build_time_ticks(0.5, time_max_a);
+    let time_ticks_a_ref: Vec<(f32, &str)> = time_ticks_a.iter().map(|(v, s)| (*v, s.as_str())).collect();
+    let time_ticks_dr = build_time_ticks(0.5, time_max_dr);
+    let time_ticks_dr_ref: Vec<(f32, &str)> = time_ticks_dr.iter().map(|(v, s)| (*v, s.as_str())).collect();
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        render_vertical_slider_with_ticks(
+            ui, params, setter,
+            &params.synth_filter_env_attack, "A",
+            0.5, time_max_a, SliderScale::Exponential(2.0),
+            atk_color, &time_ticks_a_ref, None,
+        );
+        ui.add_space(2.0);
+        render_vertical_slider_with_ticks(
+            ui, params, setter,
+            &params.synth_filter_env_attack_shape, "A\u{2009}SH",
+            -1.0, 1.0, SliderScale::Linear,
+            atk_color, shape_ticks, None,
+        );
+        ui.add_space(4.0);
+        render_vertical_slider_with_ticks(
+            ui, params, setter,
+            &params.synth_filter_env_decay, "D",
+            0.5, time_max_dr, SliderScale::Exponential(2.0),
+            dec_color, &time_ticks_dr_ref, None,
+        );
+        ui.add_space(2.0);
+        render_vertical_slider_with_ticks(
+            ui, params, setter,
+            &params.synth_filter_env_decay_shape, "D\u{2009}SH",
+            -1.0, 1.0, SliderScale::Linear,
+            dec_color, shape_ticks, None,
+        );
+        ui.add_space(4.0);
+        render_vertical_slider(
+            ui, params, setter,
+            &params.synth_filter_env_sustain, "S",
+            0.0, 1.0, SliderScale::Linear,
+            sus_color, None,
+        );
+        ui.add_space(4.0);
+        render_vertical_slider_with_ticks(
+            ui, params, setter,
+            &params.synth_filter_env_release, "R",
+            0.5, time_max_dr, SliderScale::Exponential(2.0),
+            rel_color, &time_ticks_dr_ref, None,
+        );
+        ui.add_space(2.0);
+        render_vertical_slider_with_ticks(
+            ui, params, setter,
+            &params.synth_filter_env_release_shape, "R\u{2009}SH",
+            -1.0, 1.0, SliderScale::Linear,
+            rel_color, shape_ticks, None,
+        );
+        ui.add_space(6.0);
+        render_vertical_slider(
+            ui, params, setter,
+            &params.synth_filter_env_dip, "DIP",
+            0.0, 1.0, SliderScale::Linear,
+            dip_color, None,
+        );
+    });
+
+    ui.add_space(36.0);
+    let row_left = ui.cursor().left();
+    let row_top = ui.cursor().top();
+
+    let range_ticks: &[(f32, &str)] = &[(1.0, "1"), (2.0, "2"), (4.0, "4"), (8.0, "8")];
+
+    let rng_x = row_left + 2.0;
+    let mut rng_ui = ui.new_child(egui::UiBuilder::new().max_rect(
+        egui::Rect::from_min_size(egui::pos2(rng_x, row_top + 25.0), egui::vec2(80.0, 300.0)),
+    ));
+    rng_ui.horizontal(|ui| {
+        let range_color = Some(Color32::from_rgb(100, 100, 80));
+        render_vertical_slider_with_ticks(
+            ui, params, setter,
+            &params.synth_filter_env_range, "RNG",
+            1.0, 8.0, SliderScale::Linear,
+            range_color, range_ticks, None,
+        );
+    });
+
+    let viz_x = row_left + 65.0;
+    let viz_y = row_top + 35.0;
+    render_filter_adsr_visualization(ui, params, viz_x, viz_y);
+
+    let btn_x = row_left + 380.0;
+    let btn_y = row_top + 35.0;
+    let btn_size = egui::vec2(120.0, 48.0);
+    let mut btn_ui = ui.new_child(egui::UiBuilder::new().max_rect(
+        egui::Rect::from_min_size(egui::pos2(btn_x, btn_y), egui::vec2(130.0, 58.0)),
+    ));
+    let (btn_rect, response) = btn_ui.allocate_exact_size(btn_size, egui::Sense::click());
+    let bg = if response.hovered() {
+        Color32::from_rgb(55, 55, 65)
+    } else {
+        Color32::from_rgb(40, 40, 48)
+    };
+    btn_ui.painter().rect_filled(btn_rect, 4.0, bg);
+    let font = egui::FontId::proportional(LABEL_FONT);
+    let galley = btn_ui.painter().layout_no_wrap("COPY VOL".to_string(), font, Color32::from_gray(160));
+    let text_pos = btn_rect.center() - galley.size() / 2.0;
+    btn_ui.painter().galley(text_pos, galley, Color32::from_gray(160));
+    if response.clicked() {
+        setter.set_parameter(&params.synth_filter_env_attack, params.synth_vol_attack.modulated_plain_value());
+        setter.set_parameter(&params.synth_filter_env_attack_shape, params.synth_vol_attack_shape.modulated_plain_value());
+        setter.set_parameter(&params.synth_filter_env_decay, params.synth_vol_decay.modulated_plain_value());
+        setter.set_parameter(&params.synth_filter_env_decay_shape, params.synth_vol_decay_shape.modulated_plain_value());
+        setter.set_parameter(&params.synth_filter_env_sustain, params.synth_vol_sustain.modulated_plain_value());
+        setter.set_parameter(&params.synth_filter_env_release, params.synth_vol_release.modulated_plain_value());
+        setter.set_parameter(&params.synth_filter_env_release_shape, params.synth_vol_release_shape.modulated_plain_value());
+        setter.set_parameter(&params.synth_filter_env_dip, params.synth_retrigger_dip.modulated_plain_value());
+    }
+}
+
+fn render_filter_adsr_visualization(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    viz_x: f32,
+    viz_y: f32,
+) {
+    let viz_w: f32 = 295.0;
+    let viz_h: f32 = 200.0;
+    let pad: f32 = 10.0;
+
+    let rect = egui::Rect::from_min_size(egui::pos2(viz_x, viz_y), egui::vec2(viz_w, viz_h));
+
+    let bg_color = Color32::from_rgb(25, 25, 30);
+    let border_color = Color32::from_rgb(50, 50, 60);
+    let curve_color = Color32::from_rgb(140, 100, 200);
+    let sustain_color = Color32::from_rgb(60, 100, 80);
+    let grid_color = Color32::from_rgb(35, 35, 42);
+
+    ui.painter().rect_filled(rect, 4.0, bg_color);
+    ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(1.0, border_color), egui::epaint::StrokeKind::Inside);
+
+    let inner = rect.shrink(pad);
+    let w = inner.width();
+    let h = inner.height();
+
+    for i in 1..4 {
+        let y = inner.top() + h * i as f32 / 4.0;
+        ui.painter().line_segment(
+            [egui::pos2(inner.left(), y), egui::pos2(inner.right(), y)],
+            egui::Stroke::new(0.5, grid_color),
+        );
+    }
+
+    let range_val = params.synth_filter_env_range.modulated_plain_value().max(1.0);
+    let range_ms = range_val * 1000.0;
+    let max_a = range_ms.min(5000.0).max(1.0);
+    let max_dr = range_ms.min(10000.0).max(1.0);
+
+    let attack_ms = params.synth_filter_env_attack.modulated_plain_value().clamp(0.5, max_a);
+    let decay_ms = params.synth_filter_env_decay.modulated_plain_value().clamp(0.5, max_dr);
+    let sustain = params.synth_filter_env_sustain.modulated_plain_value().clamp(0.0, 1.0);
+    let release_ms = params.synth_filter_env_release.modulated_plain_value().clamp(0.5, max_dr);
+    let attack_shape = params.synth_filter_env_attack_shape.modulated_plain_value().clamp(-1.0, 1.0);
+    let decay_shape = params.synth_filter_env_decay_shape.modulated_plain_value().clamp(-1.0, 1.0);
+    let release_shape = params.synth_filter_env_release_shape.modulated_plain_value().clamp(-1.0, 1.0);
+
+    let dip = params.synth_filter_env_dip.modulated_plain_value().clamp(0.0, 1.0);
+    let dip_ms: f32 = 2.0;
+    let has_dip = dip > 0.001;
+
+    let adsr_total = attack_ms + decay_ms + release_ms;
+    let sustain_ms = adsr_total * 0.2;
+    let effective_dip_ms = if has_dip { dip_ms } else { 0.0 };
+    let total_ms = effective_dip_ms + adsr_total + sustain_ms;
+    let time_scale = if total_ms > 0.001 { 1.0 / total_ms } else { 1.0 };
+
+    let dip_w = effective_dip_ms * time_scale * w;
+    let a_w = attack_ms * time_scale * w;
+    let d_w = decay_ms * time_scale * w;
+    let s_w = sustain_ms * time_scale * w;
+    let r_w = release_ms * time_scale * w;
+
+    let x0 = inner.left();
+    let y_bot = inner.bottom();
+
+    let shaped_curve = |t: f32, shape: f32| -> f32 {
+        if shape > 0.0 {
+            1.0 - (1.0 - t).powf(1.0 + shape * 3.0)
+        } else if shape < 0.0 {
+            t.powf(1.0 + (-shape) * 3.0)
+        } else {
+            t
+        }
+    };
+
+    let segments = 16;
+    let mut points = Vec::with_capacity(segments * 4 + 10);
+    let dip_color = Color32::from_rgb(140, 80, 80);
+
+    if has_dip {
+        let dip_start_v = sustain;
+        let dip_target_v = sustain * (1.0 - dip);
+        points.push(egui::pos2(x0, y_bot - dip_start_v * h));
+        points.push(egui::pos2(x0 + dip_w, y_bot - dip_target_v * h));
+
+        for i in 0..points.len().saturating_sub(1) {
+            ui.painter().line_segment(
+                [points[i], points[i + 1]],
+                egui::Stroke::new(1.5, dip_color),
+            );
+        }
+
+        let dip_x_end = x0 + dip_w;
+        points.clear();
+        points.push(egui::pos2(dip_x_end, y_bot - dip_target_v * h));
+
+        for i in 0..=segments {
+            let t = i as f32 / segments as f32;
+            let v = dip_target_v + shaped_curve(t, attack_shape) * (1.0 - dip_target_v);
+            points.push(egui::pos2(dip_x_end + t * a_w, y_bot - v * h));
+        }
+    } else {
+        points.push(egui::pos2(x0, y_bot));
+
+        for i in 0..=segments {
+            let t = i as f32 / segments as f32;
+            let v = shaped_curve(t, attack_shape);
+            points.push(egui::pos2(x0 + t * a_w, y_bot - v * h));
+        }
+    }
+
+    let x_d_start = x0 + dip_w + a_w;
+    for i in 1..=segments {
+        let t = i as f32 / segments as f32;
+        let v = 1.0 - shaped_curve(t, decay_shape) * (1.0 - sustain);
+        points.push(egui::pos2(x_d_start + t * d_w, y_bot - v * h));
+    }
+
+    let x_s_end = x_d_start + d_w + s_w;
+    points.push(egui::pos2(x_s_end, y_bot - sustain * h));
+
+    let x_r_start = x_s_end;
+    for i in 1..=segments {
+        let t = i as f32 / segments as f32;
+        let v = sustain * (1.0 - shaped_curve(t, release_shape));
+        points.push(egui::pos2(x_r_start + t * r_w, y_bot - v * h));
+    }
+
+    for i in 0..points.len().saturating_sub(1) {
+        ui.painter().line_segment(
+            [points[i], points[i + 1]],
+            egui::Stroke::new(1.5, curve_color),
+        );
+    }
+
+    let sus_y = y_bot - sustain * h;
+    ui.painter().line_segment(
+        [egui::pos2(inner.left(), sus_y), egui::pos2(x_s_end, sus_y)],
+        egui::Stroke::new(0.5, sustain_color),
+    );
+
+    let total_adsr_ms = attack_ms + decay_ms + release_ms;
+    let duration_str = if total_adsr_ms >= 1000.0 {
+        format!("{:.1}s", total_adsr_ms / 1000.0)
+    } else {
+        format!("{:.0}ms", total_adsr_ms)
+    };
+    ui.painter().text(
+        egui::pos2(rect.center().x, rect.bottom() + 4.0),
+        egui::Align2::CENTER_TOP,
+        duration_str,
+        egui::FontId::proportional(14.0),
+        Color32::from_gray(70),
+    );
+}
+
+fn render_drive_boost_buttons(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let current = params.synth_filter_drive_boost.value();
+    let options = [("OFF", 0), ("+12dB", 1), ("+24dB", 2), ("+48dB", 3)];
+    let btn_w = 80.0;
+    let btn_h = 48.0;
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        for (label, value) in &options {
+            let is_selected = current == *value;
+            let (bg, text_col) = if is_selected {
+                (Color32::from_rgb(140, 80, 160), Color32::WHITE)
+            } else {
+                (Color32::from_rgb(40, 40, 48), Color32::from_gray(160))
+            };
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(btn_w, btn_h),
+                egui::Sense::click(),
+            );
+
+            let hover_bg = if response.hovered() && !is_selected {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                bg
+            };
+
+            ui.painter().rect_filled(rect, 4.0, hover_bg);
+            if is_selected {
+                ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, Color32::from_rgb(160, 100, 190)), egui::epaint::StrokeKind::Inside);
+            }
+
+            let font = egui::FontId::proportional(LABEL_FONT);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+            let text_pos = rect.center() - galley.size() / 2.0;
+            ui.painter().galley(text_pos, galley, text_col);
+
+            if response.clicked() {
+                setter.set_parameter(&params.synth_filter_drive_boost, *value);
+            }
+        }
+    });
+}
+
+fn render_filter_poles_buttons(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let current = params.synth_filter_poles.value();
+    let options = [("4-POLE", 0), ("8-POLE", 1)];
+    let btn_w = 80.0;
+    let btn_h = 48.0;
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        for (label, value) in &options {
+            let is_selected = current == *value;
+            let (bg, text_col) = if is_selected {
+                (Color32::from_rgb(140, 80, 160), Color32::WHITE)
+            } else {
+                (Color32::from_rgb(40, 40, 48), Color32::from_gray(160))
+            };
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(btn_w, btn_h),
+                egui::Sense::click(),
+            );
+
+            let hover_bg = if response.hovered() && !is_selected {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                bg
+            };
+
+            ui.painter().rect_filled(rect, 4.0, hover_bg);
+            if is_selected {
+                ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, Color32::from_rgb(160, 100, 190)), egui::epaint::StrokeKind::Inside);
+            }
+
+            let font = egui::FontId::proportional(LABEL_FONT);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+            let text_pos = rect.center() - galley.size() / 2.0;
+            ui.painter().galley(text_pos, galley, text_col);
+
+            if response.clicked() {
+                setter.set_parameter(&params.synth_filter_poles, *value);
+            }
+        }
+    });
+}
+
+fn render_filter_mode_buttons(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let morph_val = params.synth_filter_morph.unmodulated_plain_value();
+    let is_8pole = params.synth_filter_poles.value() == 1;
+    let options: [(&str, f32); 5] = if is_8pole {
+        [("LP48", 0.0), ("LP24", 0.25), ("BP24", 0.5), ("NTCH", 0.75), ("HP48", 1.0)]
+    } else {
+        [("LP24", 0.0), ("LP12", 0.25), ("BP12", 0.5), ("NTCH", 0.75), ("HP24", 1.0)]
+    };
+    let btn_w = 80.0;
+    let btn_h = 48.0;
+    let bg_off = [40u8, 40, 48];
+    let bg_on = [140u8, 80, 160];
+    let stroke_on = [160u8, 100, 190];
+    let text_off = 160u8;
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        for (label, morph_pos) in &options {
+            let dist = (morph_val - morph_pos).abs();
+            let t = (1.0 - dist * 4.0).clamp(0.0, 1.0) as f64;
+
+            let bg = Color32::from_rgb(
+                (bg_off[0] as f64 + t * (bg_on[0] as f64 - bg_off[0] as f64)) as u8,
+                (bg_off[1] as f64 + t * (bg_on[1] as f64 - bg_off[1] as f64)) as u8,
+                (bg_off[2] as f64 + t * (bg_on[2] as f64 - bg_off[2] as f64)) as u8,
+            );
+            let text_col = Color32::from_gray(
+                (text_off as f64 + t * (255.0 - text_off as f64)) as u8,
+            );
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(btn_w, btn_h),
+                egui::Sense::click(),
+            );
+
+            let fill = if response.hovered() && t < 0.01 {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                bg
+            };
+
+            ui.painter().rect_filled(rect, 4.0, fill);
+            if t > 0.01 {
+                let stroke_alpha = (t * 255.0) as u8;
+                ui.painter().rect_stroke(
+                    rect, 4.0,
+                    egui::Stroke::new(2.0, Color32::from_rgba_unmultiplied(
+                        stroke_on[0], stroke_on[1], stroke_on[2], stroke_alpha,
+                    )),
+                    egui::epaint::StrokeKind::Inside,
+                );
+            }
+
+            let font = egui::FontId::proportional(LABEL_FONT);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+            let text_pos = rect.center() - galley.size() / 2.0;
+            ui.painter().galley(text_pos, galley, text_col);
+
+            if response.clicked() {
+                setter.set_parameter(&params.synth_filter_morph, *morph_pos);
+            }
+        }
+    });
+}
+
+fn render_sub_filter_route_toggle(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let through_filter = params.synth_sub_filter_route.value();
+    let btn_w = 56.0;
+    let btn_h = 36.0;
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        for (label, active) in &[("OUT", false), ("IN", true)] {
+            let is_selected = through_filter == *active;
+            let (bg, text_col) = if is_selected {
+                if *active {
+                    (Color32::from_rgb(60, 100, 60), Color32::WHITE)
+                } else {
+                    (Color32::from_rgb(60, 60, 68), Color32::from_gray(180))
+                }
+            } else {
+                (Color32::from_rgb(40, 40, 48), Color32::from_gray(140))
+            };
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(btn_w, btn_h),
+                egui::Sense::click(),
+            );
+
+            let hover_bg = if response.hovered() && !is_selected {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                bg
+            };
+
+            ui.painter().rect_filled(rect, 4.0, hover_bg);
+            if is_selected {
+                let stroke_col = if *active {
+                    Color32::from_rgb(80, 140, 80)
+                } else {
+                    Color32::from_rgb(80, 80, 90)
+                };
+                ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, stroke_col), egui::epaint::StrokeKind::Inside);
+            }
+
+            let font = egui::FontId::proportional(LABEL_FONT);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+            let text_pos = rect.center() - galley.size() / 2.0;
+            ui.painter().galley(text_pos, galley, text_col);
+
+            if response.clicked() {
+                setter.set_parameter(&params.synth_sub_filter_route, *active);
+            }
+        }
+    });
+}
+
+fn render_route_toggle(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    param: &BoolParam,
+    label: &str,
+) {
+    let is_on = param.value();
+    let btn_w = 56.0;
+    let btn_h = 48.0;
+
+    ui.vertical(|ui| {
+        ui.label(egui::RichText::new(label).size(LABEL_FONT).color(Color32::from_gray(160)));
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            for (text, active) in &[("OUT", false), ("IN", true)] {
+                let is_selected = is_on == *active;
+                let (bg, text_col) = if is_selected {
+                    if *active {
+                        (Color32::from_rgb(60, 100, 60), Color32::WHITE)
+                    } else {
+                        (Color32::from_rgb(60, 60, 68), Color32::from_gray(180))
+                    }
+                } else {
+                    (Color32::from_rgb(40, 40, 48), Color32::from_gray(140))
+                };
+
+                let (rect, response) = ui.allocate_exact_size(
+                    egui::vec2(btn_w, btn_h),
+                    egui::Sense::click(),
+                );
+
+                let hover_bg = if response.hovered() && !is_selected {
+                    Color32::from_rgb(55, 55, 65)
+                } else {
+                    bg
+                };
+
+                ui.painter().rect_filled(rect, 4.0, hover_bg);
+                if is_selected {
+                    let stroke_col = if *active {
+                        Color32::from_rgb(80, 140, 80)
+                    } else {
+                        Color32::from_rgb(80, 80, 90)
+                    };
+                    ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, stroke_col), egui::epaint::StrokeKind::Inside);
+                }
+
+                let font = egui::FontId::proportional(LABEL_FONT);
+                let galley = ui.painter().layout_no_wrap(text.to_string(), font, text_col);
+                let text_pos = rect.center() - galley.size() / 2.0;
+                ui.painter().galley(text_pos, galley, text_col);
+
+                if response.clicked() {
+                    setter.set_parameter(param, *active);
+                }
+            }
+        });
+    });
+}
+
+fn render_filter_sat_type_buttons(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let current = params.synth_filter_sat_type.value();
+    let options = [("TRAN", 0), ("DIODE", 1), ("TUBE", 2)];
+    let btn_w = 80.0;
+    let btn_h = 48.0;
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        for (label, value) in &options {
+            let is_selected = current == *value;
+            let (bg, text_col) = if is_selected {
+                (Color32::from_rgb(140, 80, 160), Color32::WHITE)
+            } else {
+                (Color32::from_rgb(40, 40, 48), Color32::from_gray(160))
+            };
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(btn_w, btn_h),
+                egui::Sense::click(),
+            );
+
+            let hover_bg = if response.hovered() && !is_selected {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                bg
+            };
+
+            ui.painter().rect_filled(rect, 4.0, hover_bg);
+            if is_selected {
+                ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, Color32::from_rgb(160, 100, 190)), egui::epaint::StrokeKind::Inside);
+            }
+
+            let font = egui::FontId::proportional(LABEL_FONT);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+            let text_pos = rect.center() - galley.size() / 2.0;
+            ui.painter().galley(text_pos, galley, text_col);
+
+            if response.clicked() {
+                setter.set_parameter(&params.synth_filter_sat_type, *value);
+            }
+        }
+    });
 }
 
 fn render_envelopes_tab(
@@ -646,26 +1542,55 @@ fn render_envelopes_tab(
     setter: &ParamSetter,
     _ui_state: &Arc<SharedUiState>,
 ) {
+    let content_rect = ui.max_rect();
+    let half_w = content_rect.width() / 2.0;
+    let sep_x = content_rect.left() + half_w;
+    let margin = FRAME_MARGIN;
+
+    let left_rect = egui::Rect::from_min_max(
+        egui::pos2(content_rect.left() + margin.left as f32 + 5.0, content_rect.top() + margin.top as f32),
+        egui::pos2(sep_x - 10.0, content_rect.bottom()),
+    );
+    let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
+    left_ui.vertical(|ui| {
+        ui.label(egui::RichText::new("VOLUME ENVELOPE").size(HEADER_FONT).strong());
+        ui.add_space(10.0);
+        render_envelope_controls_compact(ui, params, setter);
+    });
+
+    ui.painter().line_segment(
+        [egui::pos2(sep_x, content_rect.top()), egui::pos2(sep_x, content_rect.bottom())],
+        egui::Stroke::new(1.0, Color32::BLACK),
+    );
+
+    let right_rect = egui::Rect::from_min_max(
+        egui::pos2(sep_x + 10.0 + margin.left as f32, content_rect.top() + margin.top as f32),
+        egui::pos2(content_rect.right() - margin.right as f32, content_rect.bottom()),
+    );
+    let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
+    right_ui.vertical(|ui| {
+        ui.label(egui::RichText::new("FILTER ENVELOPE").size(HEADER_FONT).strong());
+        ui.add_space(10.0);
+        render_filter_envelope_controls(ui, params, setter);
+    });
+}
+
+fn render_fx_tab(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
     ui.horizontal(|ui| {
         egui::Frame::NONE
             .inner_margin(egui::Margin { left: FRAME_MARGIN.left + 5, ..FRAME_MARGIN })
             .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("VOLUME ENVELOPE").size(HEADER_FONT).strong());
-                    ui.add_space(10.0);
-                    render_envelope_controls_compact(ui, params, setter);
-                });
+                render_looper_section(ui, params, setter);
             });
 
-        let line_rect = ui.available_rect_before_wrap();
-        let sep_x = line_rect.left() - 7.0;
-        ui.painter().line_segment(
-            [egui::pos2(sep_x, line_rect.top() - 10.0), egui::pos2(sep_x, line_rect.bottom() + 400.0)],
-            egui::Stroke::new(1.0, Color32::BLACK),
-        );
+        ui.add_space(10.0);
 
         egui::Frame::NONE
-            .inner_margin(egui::Margin { left: 40, right: 0, ..FRAME_MARGIN })
+            .inner_margin(egui::Margin { left: 5, ..FRAME_MARGIN })
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.label(egui::RichText::new("MASTER HPF").size(HEADER_FONT).strong());
@@ -679,28 +1604,11 @@ fn render_envelopes_tab(
                     ui.label(egui::RichText::new("BOX CUT").size(LABEL_FONT).color(Color32::from_gray(140)));
                     ui.add_space(6.0);
                     render_box_cut_buttons(ui, params, setter);
-                    ui.add_space(28.0);
+                    ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new("SUB").size(LABEL_FONT).color(Color32::from_gray(140)));
                         ui.add_space(6.0);
-                        let mut sub_in = params.master_hpf_sub.value() == 1;
-                        let label_off = "OUT";
-                        let label_on = "IN";
-                        let desired_size = egui::vec2(48.0, 24.0);
-                        let (alloc_rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
-                        if response.clicked() {
-                            sub_in = !sub_in;
-                            setter.set_parameter(&params.master_hpf_sub, if sub_in { 1 } else { 0 });
-                        }
-                        let rect = alloc_rect.translate(egui::vec2(0.0, -2.0));
-                        let anim_t = ui.ctx().animate_bool_with_time(response.id, sub_in, 0.15);
-                        let bg_color = Color32::from_gray(50).lerp_to_gamma(Color32::from_rgb(80, 130, 190), anim_t);
-                        let circle_x = egui::lerp(rect.left() + 12.0..=rect.right() - 12.0, anim_t);
-                        let circle_color = Color32::from_gray(220).lerp_to_gamma(Color32::WHITE, anim_t);
-                        ui.painter().rect_filled(rect, rect.height() / 2.0, bg_color);
-                        ui.painter().circle_filled(egui::pos2(circle_x, rect.center().y), 9.0, circle_color);
-                        let toggle_label = if sub_in { label_on } else { label_off };
-                        ui.label(egui::RichText::new(toggle_label).size(LABEL_FONT).color(Color32::from_gray(140)));
+                        render_toggle_switch(ui, params, setter, &params.master_hpf_sub, "OUT", "IN");
                     });
                     ui.add_space(20.0);
                     let chart_x = ui.cursor().left();
@@ -710,6 +1618,7 @@ fn render_envelopes_tab(
             });
 
         ui.add_space(20.0);
+
         egui::Frame::NONE
             .inner_margin(egui::Margin { left: 5, right: 0, ..FRAME_MARGIN })
             .show(ui, |ui| {
@@ -728,7 +1637,7 @@ fn render_envelopes_tab(
                             &params.brilliance_amount, "BRILL",
                             0.0, 1.0, SliderScale::Linear,
                             brill_color,
-                            &[(0.0, "OFF"), (0.25, "25"), (0.5, "50"), (0.75, "75"), (1.0, "100")],
+                            &[(0.0, "OFF"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
                             None,
                         );
                         let stereo_color = Some(Color32::from_rgb(50, 130, 110));
@@ -738,7 +1647,7 @@ fn render_envelopes_tab(
                             &params.stereo_mono_bass, "MON",
                             0.0, 300.0, SliderScale::Linear,
                             stereo_color,
-                            &[(0.0, "OFF"), (80.0, "80"), (120.0, "120"), (200.0, "200"), (300.0, "300")],
+                            &[(0.0, "OFF"), (80.0, "80Hz"), (120.0, "120"), (200.0, "200"), (300.0, "300Hz")],
                             None,
                         );
                         render_vertical_slider_with_ticks(
@@ -753,6 +1662,867 @@ fn render_envelopes_tab(
                 });
             });
     });
+}
+
+fn render_lush_tab(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let reverb_color = Some(Color32::from_rgb(90, 110, 190));
+    let tone_color = Some(Color32::from_rgb(80, 140, 140));
+    let input_color = Some(Color32::from_rgb(140, 100, 160));
+    let mod_color = Some(Color32::from_rgb(130, 130, 80));
+    let duck_color = Some(Color32::from_rgb(160, 120, 80));
+
+    let content_rect = ui.max_rect();
+    let half_w = content_rect.width() / 2.0;
+    let sep_x = content_rect.left() + half_w;
+    let margin = FRAME_MARGIN;
+
+    // ===== LEFT PANEL: BUTTONS & TOGGLES =====
+    let left_rect = egui::Rect::from_min_max(
+        egui::pos2(content_rect.left() + margin.left as f32 + 5.0, content_rect.top() + margin.top as f32),
+        egui::pos2(sep_x - 10.0, content_rect.bottom()),
+    );
+    let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
+    left_ui.vertical(|ui| {
+        ui.label(egui::RichText::new("REVERB").size(HEADER_FONT).strong());
+        ui.add_space(9.0);
+        {
+            let on = params.synth_reverb_enable.value();
+            let btn_w = 80.0;
+            let btn_h = 48.0;
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                for (label, active) in &[("OFF", false), ("ON", true)] {
+                    let is_selected = on == *active;
+                    let (bg, text_col) = if is_selected {
+                        if *active {
+                            (Color32::from_rgb(80, 160, 80), Color32::WHITE)
+                        } else {
+                            (Color32::from_rgb(180, 60, 60), Color32::WHITE)
+                        }
+                    } else {
+                        (Color32::from_rgb(40, 40, 48), Color32::from_gray(160))
+                    };
+                    let (rect, response) = ui.allocate_exact_size(
+                        egui::vec2(btn_w, btn_h),
+                        egui::Sense::click(),
+                    );
+                    let hover_bg = if response.hovered() && !is_selected {
+                        Color32::from_rgb(55, 55, 65)
+                    } else {
+                        bg
+                    };
+                    ui.painter().rect_filled(rect, 4.0, hover_bg);
+                    if is_selected {
+                        let stroke_col = if *active {
+                            Color32::from_rgb(100, 190, 100)
+                        } else {
+                            Color32::from_rgb(210, 80, 80)
+                        };
+                        ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, stroke_col), egui::epaint::StrokeKind::Inside);
+                    }
+                    let font = egui::FontId::proportional(LABEL_FONT);
+                    let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+                    let text_pos = rect.center() - galley.size() / 2.0;
+                    ui.painter().galley(text_pos, galley, text_col);
+                    if response.clicked() {
+                        setter.set_parameter(&params.synth_reverb_enable, *active);
+                    }
+                }
+            });
+        }
+
+        ui.add_space(13.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 16.0;
+            render_route_toggle(ui, setter, &params.synth_reverb_send_vps, "VPS");
+            render_route_toggle(ui, setter, &params.synth_reverb_send_pll, "PLL");
+            render_route_toggle(ui, setter, &params.synth_reverb_send_saw, "SAW");
+        });
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 16.0;
+            render_route_toggle(ui, setter, &params.synth_reverb_send_sub, "SUB");
+            render_route_toggle(ui, setter, &params.synth_reverb_send_filter, "FLTR");
+            render_route_toggle(ui, setter, &params.synth_reverb_send_looper, "LOOP");
+        });
+
+        ui.add_space(13.0);
+        render_route_toggle(ui, setter, &params.synth_reverb_pre_delay_sync, "PRE-DELAY SYNC");
+        if params.synth_reverb_pre_delay_sync.value() {
+            ui.add_space(6.0);
+            render_looper_division_combo(ui, setter, &params.synth_reverb_pre_delay_division,
+                "predly_div", 100.0, Color32::from_rgb(90, 110, 190));
+        }
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("DUCKING").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("REL").size(12.0).color(Color32::from_gray(120)));
+            ui.add_space(2.0);
+            render_looper_division_combo(ui, setter, &params.synth_reverb_duck_division,
+                "duck_div", 80.0, Color32::from_rgb(160, 120, 80));
+        });
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("SIDECHAIN").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("RATE").size(12.0).color(Color32::from_gray(120)));
+            ui.add_space(2.0);
+            render_looper_division_combo(ui, setter, &params.synth_reverb_rhythm_duck_division,
+                "rhythm_duck_div", 80.0, Color32::from_rgb(160, 120, 80));
+        });
+    });
+
+    // ===== SEPARATOR =====
+    ui.painter().line_segment(
+        [egui::pos2(sep_x, content_rect.top()), egui::pos2(sep_x, content_rect.bottom())],
+        egui::Stroke::new(1.0, Color32::BLACK),
+    );
+
+    // ===== RIGHT PANEL: ALL SLIDERS =====
+    let right_rect = egui::Rect::from_min_max(
+        egui::pos2(sep_x - 90.0 + margin.left as f32, content_rect.top() + margin.top as f32),
+        egui::pos2(content_rect.right() - margin.right as f32, content_rect.bottom()),
+    );
+    let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
+    right_ui.vertical(|ui| {
+        // ===== ROW 1: REVERB + TONE =====
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("REVERB").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_mix, "MIX",
+                        0.0, 1.0, SliderScale::Linear, reverb_color,
+                        &[(0.0, "DRY"), (0.25, "-12dB"), (0.5, "-6dB"), (0.75, "-3dB"), (1.0, "WET")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_decay, "DCY",
+                        0.0, 1.0, SliderScale::Linear, reverb_color,
+                        &[(0.0, "SHORT"), (0.25, "1s"), (0.5, "3s"), (0.75, "8s"), (1.0, "INF")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_time_scale, "SIZE",
+                        0.0, 1.0, SliderScale::Linear, reverb_color,
+                        &[(0.0, "TINY"), (0.25, "SM"), (0.5, "MED"), (0.75, "LG"), (1.0, "HALL")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_stereo_width, "WDTH",
+                        0.0, 1.0, SliderScale::Linear, reverb_color,
+                        &[(0.0, "MONO"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "FULL")], None,
+                    );
+                    if !params.synth_reverb_pre_delay_sync.value() {
+                        render_vertical_slider_with_ticks(
+                            ui, params, setter, &params.synth_reverb_pre_delay, "DLY",
+                            0.0, 500.0, SliderScale::Linear, reverb_color,
+                            &[(0.0, "0ms"), (50.0, "50"), (125.0, "125"), (250.0, "250"), (500.0, "500")], None,
+                        );
+                    }
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("TONE").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_lpf, "LPF",
+                        20.0, 22000.0, SliderScale::Logarithmic, tone_color,
+                        &[(20.0, "20"), (200.0, "200"), (2000.0, "2k"), (10000.0, "10k"), (22000.0, "22k")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_hpf, "HPF",
+                        20.0, 22000.0, SliderScale::Logarithmic, tone_color,
+                        &[(20.0, "20"), (100.0, "100"), (500.0, "500"), (2000.0, "2k"), (10000.0, "10k")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_diffusion, "DIFF",
+                        0.0, 1.0, SliderScale::Linear, tone_color,
+                        &[(0.0, "CLEAN"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "LUSH")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_diffusion_mix, "DIFM",
+                        0.0, 1.0, SliderScale::Linear, tone_color,
+                        &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_saturation, "SAT",
+                        0.0, 1.0, SliderScale::Linear, tone_color,
+                        &[(0.0, "CLEAN"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "WARM")], None,
+                    );
+                });
+            });
+        });
+
+        ui.add_space(15.0);
+
+        // ===== ROW 2: INPUT + MOD + DUCKING + SIDECHAIN =====
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("INPUT").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_input_hpf, "IHPF",
+                        20.0, 22000.0, SliderScale::Logarithmic, input_color,
+                        &[(20.0, "20"), (100.0, "100"), (500.0, "500"), (2000.0, "2k"), (10000.0, "10k")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_input_lpf, "ILPF",
+                        20.0, 22000.0, SliderScale::Logarithmic, input_color,
+                        &[(20.0, "20"), (200.0, "200"), (2000.0, "2k"), (10000.0, "10k"), (22000.0, "22k")], None,
+                    );
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("MOD").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_mod_depth, "DPTH",
+                        0.0, 1.0, SliderScale::Linear, mod_color,
+                        &[(0.0, "OFF"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_mod_speed, "SPD",
+                        0.0, 1.0, SliderScale::Linear, mod_color,
+                        &[(0.0, "SLOW"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "FAST")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_mod_shape, "SHPE",
+                        0.0, 1.0, SliderScale::Linear, mod_color,
+                        &[(0.0, "SIN"), (0.5, "MIX"), (1.0, "RND")], None,
+                    );
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("DUCKING").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_ducking, "DUCK",
+                        0.0, 1.0, SliderScale::Linear, duck_color,
+                        &[(0.0, "OFF"), (0.25, "-3dB"), (0.5, "-6dB"), (0.75, "-12dB"), (1.0, "-∞")], None,
+                    );
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("SIDECHAIN").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_rhythm_duck_depth, "DPTH",
+                        0.0, 1.0, SliderScale::Linear, duck_color,
+                        &[(0.0, "OFF"), (0.25, "-3dB"), (0.5, "-6dB"), (0.75, "-12dB"), (1.0, "-∞")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.synth_reverb_rhythm_duck_smooth, "SMTH",
+                        10.0, 300.0, SliderScale::Logarithmic, duck_color,
+                        &[(10.0, "10ms"), (50.0, "50"), (100.0, "100"), (200.0, "200"), (300.0, "300")], None,
+                    );
+                });
+            });
+        });
+    });
+}
+
+fn render_comp_tab(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let comp_color = Some(Color32::from_rgb(160, 90, 130));
+
+    let content_rect = ui.max_rect();
+    let half_w = content_rect.width() / 2.0;
+    let sep_x = content_rect.left() + half_w;
+    let margin = FRAME_MARGIN;
+
+    // ===== LEFT PANEL: BUTTONS & TOGGLES =====
+    let left_rect = egui::Rect::from_min_max(
+        egui::pos2(content_rect.left() + margin.left as f32 + 5.0, content_rect.top() + margin.top as f32),
+        egui::pos2(sep_x - 10.0, content_rect.bottom()),
+    );
+    let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
+    left_ui.vertical(|ui| {
+        ui.label(egui::RichText::new("COMPRESSOR").size(HEADER_FONT).strong());
+        ui.add_space(9.0);
+        {
+            let on = params.comp_enable.value();
+            let btn_w = 80.0;
+            let btn_h = 48.0;
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                for (label, active) in &[("OFF", false), ("ON", true)] {
+                    let is_selected = on == *active;
+                    let (bg, text_col) = if is_selected {
+                        if *active {
+                            (Color32::from_rgb(80, 160, 80), Color32::WHITE)
+                        } else {
+                            (Color32::from_rgb(180, 60, 60), Color32::WHITE)
+                        }
+                    } else {
+                        (Color32::from_rgb(40, 40, 48), Color32::from_gray(160))
+                    };
+                    let (rect, response) = ui.allocate_exact_size(
+                        egui::vec2(btn_w, btn_h),
+                        egui::Sense::click(),
+                    );
+                    let hover_bg = if response.hovered() && !is_selected {
+                        Color32::from_rgb(55, 55, 65)
+                    } else {
+                        bg
+                    };
+                    ui.painter().rect_filled(rect, 4.0, hover_bg);
+                    if is_selected {
+                        let stroke_col = if *active {
+                            Color32::from_rgb(100, 190, 100)
+                        } else {
+                            Color32::from_rgb(210, 80, 80)
+                        };
+                        ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, stroke_col), egui::epaint::StrokeKind::Inside);
+                    }
+                    let font = egui::FontId::proportional(LABEL_FONT);
+                    let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+                    let text_pos = rect.center() - galley.size() / 2.0;
+                    ui.painter().galley(text_pos, galley, text_col);
+                    if response.clicked() {
+                        setter.set_parameter(&params.comp_enable, *active);
+                    }
+                }
+            });
+        }
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("SIDECHAIN").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        render_comp_sc_hpf_buttons(ui, params, setter);
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("LOOKAHEAD").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        render_comp_lookahead_buttons(ui, params, setter);
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("ROUTE").size(LABEL_FONT).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 16.0;
+            render_route_toggle(ui, setter, &params.comp_route_master, "MSTR");
+            render_route_toggle(ui, setter, &params.comp_route_looper, "LOOP");
+            render_route_toggle(ui, setter, &params.comp_route_reverb, "VERB");
+        });
+    });
+
+    // ===== SEPARATOR =====
+    ui.painter().line_segment(
+        [egui::pos2(sep_x, content_rect.top()), egui::pos2(sep_x, content_rect.bottom())],
+        egui::Stroke::new(1.0, Color32::BLACK),
+    );
+
+    // ===== RIGHT PANEL: ALL SLIDERS =====
+    let right_rect = egui::Rect::from_min_max(
+        egui::pos2(sep_x - 90.0 + margin.left as f32, content_rect.top() + margin.top as f32),
+        egui::pos2(content_rect.right() - margin.right as f32, content_rect.bottom()),
+    );
+    let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
+    right_ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("DYNAMICS").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_threshold, "THRS",
+                        -40.0, 0.0, SliderScale::Linear, comp_color,
+                        &[(-40.0, "-40dB"), (-30.0, "-30"), (-20.0, "-20"), (-10.0, "-10"), (0.0, "0dB")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_ratio, "RTO",
+                        1.0, 20.0, SliderScale::Exponential(0.5), comp_color,
+                        &[(1.0, "1:1"), (2.0, "2:1"), (4.0, "4:1"), (8.0, "8:1"), (20.0, "20:1")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_attack, "ATK",
+                        0.1, 100.0, SliderScale::Logarithmic, comp_color,
+                        &[(0.1, "0.1ms"), (1.0, "1"), (10.0, "10"), (50.0, "50"), (100.0, "100")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_release, "REL",
+                        5.0, 2000.0, SliderScale::Logarithmic, comp_color,
+                        &[(5.0, "5ms"), (50.0, "50"), (200.0, "200"), (1000.0, "1k"), (2000.0, "2k")], None,
+                    );
+                });
+            });
+
+            ui.add_space(25.0);
+
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("OUTPUT").size(LABEL_FONT).color(Color32::from_gray(140)));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_makeup, "MKUP",
+                        0.0, 24.0, SliderScale::Linear, comp_color,
+                        &[(0.0, "0dB"), (6.0, "6"), (12.0, "12"), (18.0, "18"), (24.0, "24dB")], None,
+                    );
+                    render_vertical_slider_with_ticks(
+                        ui, params, setter, &params.comp_mix, "MIX",
+                        0.0, 1.0, SliderScale::Linear, comp_color,
+                        &[(0.0, "DRY"), (0.25, "-12dB"), (0.5, "-6dB"), (0.75, "-3dB"), (1.0, "WET")], None,
+                    );
+                });
+            });
+        });
+    });
+}
+
+fn render_comp_sc_hpf_buttons(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let current = params.comp_sc_hpf.value();
+    let labels = ["OFF", "80", "150", "250"];
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        for (i, label) in labels.iter().enumerate() {
+            let is_selected = current == i as i32;
+            let (bg, text_col) = if is_selected {
+                (Color32::from_rgb(80, 60, 70), Color32::WHITE)
+            } else {
+                (Color32::from_rgb(40, 40, 48), Color32::from_gray(140))
+            };
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(48.0, 32.0),
+                egui::Sense::click(),
+            );
+
+            let hover_bg = if response.hovered() && !is_selected {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                bg
+            };
+
+            ui.painter().rect_filled(rect, 4.0, hover_bg);
+            if is_selected {
+                ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, Color32::from_rgb(160, 90, 130)), egui::epaint::StrokeKind::Inside);
+            }
+
+            let font = egui::FontId::proportional(14.0);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+            ui.painter().galley(
+                egui::pos2(rect.center().x - galley.size().x / 2.0, rect.center().y - galley.size().y / 2.0),
+                galley,
+                text_col,
+            );
+
+            if response.clicked() {
+                setter.set_parameter(&params.comp_sc_hpf, i as i32);
+            }
+        }
+    });
+}
+
+fn render_comp_lookahead_buttons(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let current = params.comp_lookahead.value();
+    let labels = ["OFF", "1ms", "2.5", "5ms"];
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        for (i, label) in labels.iter().enumerate() {
+            let is_selected = current == i as i32;
+            let (bg, text_col) = if is_selected {
+                (Color32::from_rgb(80, 60, 70), Color32::WHITE)
+            } else {
+                (Color32::from_rgb(40, 40, 48), Color32::from_gray(140))
+            };
+
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(48.0, 32.0),
+                egui::Sense::click(),
+            );
+
+            let hover_bg = if response.hovered() && !is_selected {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                bg
+            };
+
+            ui.painter().rect_filled(rect, 4.0, hover_bg);
+            if is_selected {
+                ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, Color32::from_rgb(160, 90, 130)), egui::epaint::StrokeKind::Inside);
+            }
+
+            let font = egui::FontId::proportional(14.0);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+            ui.painter().galley(
+                egui::pos2(rect.center().x - galley.size().x / 2.0, rect.center().y - galley.size().y / 2.0),
+                galley,
+                text_col,
+            );
+
+            if response.clicked() {
+                setter.set_parameter(&params.comp_lookahead, i as i32);
+            }
+        }
+    });
+}
+
+fn render_toggle_switch(
+    ui: &mut egui::Ui,
+    _params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+    param: &nih_plug::prelude::IntParam,
+    label_off: &str,
+    label_on: &str,
+) {
+    let mut is_on = param.value() == 1;
+    let desired_size = egui::vec2(48.0, 24.0);
+    let (alloc_rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if response.clicked() {
+        is_on = !is_on;
+        setter.set_parameter(param, if is_on { 1 } else { 0 });
+    }
+    let rect = alloc_rect.translate(egui::vec2(0.0, -2.0));
+    let anim_t = ui.ctx().animate_bool_with_time(response.id, is_on, 0.15);
+    let bg = Color32::from_gray(50).lerp_to_gamma(Color32::from_rgb(80, 130, 190), anim_t);
+    let circle_x = egui::lerp(rect.left() + 12.0..=rect.right() - 12.0, anim_t);
+    let circle_color = Color32::from_gray(220).lerp_to_gamma(Color32::WHITE, anim_t);
+    ui.painter().rect_filled(rect, rect.height() / 2.0, bg);
+    ui.painter().circle_filled(egui::pos2(circle_x, rect.center().y), 9.0, circle_color);
+    let label = if is_on { label_on } else { label_off };
+    ui.label(egui::RichText::new(label).size(LABEL_FONT).color(Color32::from_gray(140)));
+}
+
+fn render_octave_buttons(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    param: &nih_plug::prelude::FloatParam,
+    color: Color32,
+) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        for (label, delta) in &[("-12", -12.0f32), ("+12", 12.0f32)] {
+            let (rect, response) = ui.allocate_exact_size(egui::vec2(28.0, 24.0), egui::Sense::click());
+            let bg = if response.hovered() {
+                Color32::from_rgb(55, 55, 65)
+            } else {
+                Color32::from_rgb(40, 40, 48)
+            };
+            ui.painter().rect_filled(rect, 3.0, bg);
+            let font = egui::FontId::proportional(11.0);
+            let galley = ui.painter().layout_no_wrap(label.to_string(), font, color);
+            let text_pos = rect.center() - galley.size() / 2.0;
+            ui.painter().galley(text_pos, galley, color);
+            if response.clicked() {
+                let current = param.modulated_plain_value();
+                let rounded = (current / 12.0).round() * 12.0;
+                let new_val = (rounded + delta).clamp(-24.0, 24.0);
+                setter.set_parameter(param, new_val);
+            }
+        }
+    });
+}
+
+fn render_looper_section(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+) {
+    let looper_color = Color32::from_rgb(200, 100, 50);
+
+    ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("LOOPER").size(HEADER_FONT).strong());
+            ui.add_space(8.0);
+            render_looper_bool_button(ui, setter, &params.looper_enabled, "ON",
+                Color32::from_rgb(60, 160, 60), 68.0, 48.0);
+        });
+
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            let current_dir = params.looper_direction.value();
+            for (label, val) in &[("FWD", 0), ("REV", 1), ("PING", 2)] {
+                render_looper_select_button(ui, setter, &params.looper_direction,
+                    label, *val, current_dir, looper_color, 68.0, 48.0);
+            }
+            ui.add_space(8.0);
+            render_looper_bool_button(ui, setter, &params.looper_freeze, "FRZ",
+                Color32::from_rgb(80, 140, 200), 68.0, 48.0);
+            render_looper_bool_button(ui, setter, &params.looper_key_track, "KEY",
+                Color32::from_rgb(180, 140, 60), 68.0, 48.0);
+        });
+
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            ui.vertical(|ui| {
+                render_vertical_slider_with_ticks(
+                    ui, params, setter,
+                    &params.looper_pitch, "PTCH",
+                    -24.0, 24.0, SliderScale::Linear,
+                    Some(Color32::from_rgb(130, 80, 160)),
+                    &[(-24.0, "-24"), (-12.0, "-12"), (0.0, "0"), (12.0, "+12"), (24.0, "+24")],
+                    None,
+                );
+                render_octave_buttons(ui, setter, &params.looper_pitch, Color32::from_rgb(130, 80, 160));
+            });
+            ui.vertical(|ui| {
+                render_vertical_slider_with_ticks(
+                    ui, params, setter,
+                    &params.looper_doppler, "DPLR",
+                    -24.0, 24.0, SliderScale::Linear,
+                    Some(Color32::from_rgb(160, 120, 60)),
+                    &[(-24.0, "-24"), (-12.0, "-12"), (0.0, "0"), (12.0, "+12"), (24.0, "+24")],
+                    None,
+                );
+                render_octave_buttons(ui, setter, &params.looper_doppler, Color32::from_rgb(160, 120, 60));
+            });
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.looper_decay, "DCY",
+                0.0, 1.0, SliderScale::Linear,
+                Some(Color32::from_rgb(100, 80, 120)),
+                &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                None,
+            );
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.looper_start, "STRT",
+                0.0, 1.0, SliderScale::Linear,
+                Some(Color32::from_rgb(60, 120, 110)),
+                &[(0.0, "0%"), (0.25, "25%"), (0.5, "50%"), (0.75, "75%"), (1.0, "100%")],
+                None,
+            );
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.looper_mix, "VOL",
+                0.0, 3.0, SliderScale::Linear,
+                Some(Color32::from_rgb(200, 100, 50)),
+                &[(0.0, "-∞"), (0.5, "-6dB"), (1.0, "0dB"), (2.0, "+6dB"), (3.0, "+10dB")],
+                None,
+            );
+        });
+
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("LEN").size(12.0).color(Color32::from_gray(120)));
+            ui.add_space(2.0);
+            render_looper_division_combo(ui, setter, &params.looper_length,
+                "looper_len", 100.0, looper_color);
+        });
+
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            ui.label(egui::RichText::new("STT").size(12.0).color(Color32::from_gray(120)));
+            ui.add_space(2.0);
+            let current_stt = params.looper_stutter.value();
+            for (label, val) in &[("OFF", 0), ("2", 1), ("4", 2), ("8", 3), ("16", 4)] {
+                render_looper_select_button(ui, setter, &params.looper_stutter,
+                    label, *val, current_stt, looper_color, 52.0, 48.0);
+            }
+        });
+
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            ui.label(egui::RichText::new("REC").size(12.0).color(Color32::from_gray(120)));
+            ui.add_space(2.0);
+            render_looper_division_combo(ui, setter, &params.looper_auto_rec_len,
+                "looper_auto_len", 80.0, looper_color);
+            ui.add_space(3.0);
+            ui.label(egui::RichText::new("/").size(12.0).color(Color32::from_gray(120)));
+            let current_int = params.looper_auto_rec_interval.value();
+            for (label, val) in &[("1", 0), ("2", 1), ("4", 2), ("8", 3)] {
+                render_looper_select_button(ui, setter, &params.looper_auto_rec_interval,
+                    label, *val, current_int, looper_color, 52.0, 48.0);
+            }
+            ui.label(egui::RichText::new("bar").size(12.0).color(Color32::from_gray(120)));
+        });
+
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 16.0;
+            render_route_toggle(ui, setter, &params.looper_input_vps, "VPS");
+            render_route_toggle(ui, setter, &params.looper_input_pll, "PLL");
+        });
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 16.0;
+            render_route_toggle(ui, setter, &params.looper_input_saw, "SAW");
+            render_route_toggle(ui, setter, &params.looper_input_filter, "FLTR");
+        });
+    });
+}
+
+fn render_looper_bool_button(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    param: &nih_plug::prelude::BoolParam,
+    label: &str,
+    on_color: Color32,
+    w: f32,
+    h: f32,
+) {
+    let is_on = param.value();
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(w, h), egui::Sense::click());
+
+    if response.clicked() {
+        setter.set_parameter(param, !is_on);
+    }
+
+    let (bg, text_col) = if is_on {
+        (on_color, Color32::WHITE)
+    } else {
+        let hover = if response.hovered() { Color32::from_rgb(55, 55, 65) } else { Color32::from_rgb(40, 40, 48) };
+        (hover, Color32::from_gray(160))
+    };
+
+    ui.painter().rect_filled(rect, 4.0, bg);
+    if is_on {
+        ui.painter().rect_stroke(rect, 4.0,
+            egui::Stroke::new(2.0, Color32::from_rgb(
+                on_color.r().saturating_add(40),
+                on_color.g().saturating_add(40),
+                on_color.b().saturating_add(40),
+            )),
+            egui::epaint::StrokeKind::Inside,
+        );
+    }
+
+    let font = egui::FontId::proportional(LABEL_FONT);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+    let text_pos = rect.center() - galley.size() / 2.0;
+    ui.painter().galley(text_pos, galley, text_col);
+}
+
+fn render_looper_select_button(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    param: &nih_plug::prelude::IntParam,
+    label: &str,
+    value: i32,
+    current: i32,
+    accent: Color32,
+    w: f32,
+    h: f32,
+) {
+    let is_selected = current == value;
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(w, h), egui::Sense::click());
+
+    let (bg, text_col) = if is_selected {
+        (accent, Color32::WHITE)
+    } else {
+        let hover = if response.hovered() { Color32::from_rgb(55, 55, 65) } else { Color32::from_rgb(40, 40, 48) };
+        (hover, Color32::from_gray(160))
+    };
+
+    ui.painter().rect_filled(rect, 4.0, bg);
+    if is_selected {
+        ui.painter().rect_stroke(rect, 4.0,
+            egui::Stroke::new(2.0, Color32::from_rgb(
+                accent.r().saturating_add(30),
+                accent.g().saturating_add(20),
+                accent.b().saturating_add(20),
+            )),
+            egui::epaint::StrokeKind::Inside,
+        );
+    }
+
+    let font = egui::FontId::proportional(LABEL_FONT);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+    let text_pos = rect.center() - galley.size() / 2.0;
+    ui.painter().galley(text_pos, galley, text_col);
+
+    if response.clicked() {
+        setter.set_parameter(param, value);
+    }
+}
+
+const LOOPER_DIV_NAMES: [&str; 16] = [
+    "1/1", "1/2", "1/4", "1/8", "1/16", "1/32",
+    "1/2.", "1/4.", "1/8.", "1/16.",
+    "1/2T", "1/4T", "1/8T", "1/16T",
+    "2/1", "4/1",
+];
+const LOOPER_DIV_ORDER: [usize; 16] = [
+    15, 14, 0, 1, 2, 3, 4, 5,
+    6, 7, 8, 9,
+    10, 11, 12, 13,
+];
+
+fn render_looper_division_combo(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    param: &nih_plug::prelude::IntParam,
+    id: &str,
+    width: f32,
+    accent: Color32,
+) {
+    let current = param.value() as usize;
+    let current_name = LOOPER_DIV_NAMES.get(current).copied().unwrap_or("?");
+    let mut selected = None;
+
+    ui.style_mut().visuals.widgets.inactive.bg_fill = Color32::from_rgb(
+        accent.r() / 3, accent.g() / 3, accent.b() / 3,
+    );
+    ui.style_mut().spacing.button_padding = egui::vec2(6.0, 4.0);
+
+    egui::ComboBox::from_id_salt(id)
+        .width(width)
+        .height(380.0)
+        .selected_text(egui::RichText::new(current_name).size(13.0))
+        .show_ui(ui, |ui| {
+            ui.style_mut().spacing.item_spacing.y = 2.0;
+            for &idx in &LOOPER_DIV_ORDER {
+                let name = LOOPER_DIV_NAMES[idx];
+                let btn = egui::Button::new(egui::RichText::new(name).size(13.0))
+                    .min_size(egui::vec2(width - 10.0, 28.0))
+                    .selected(current == idx);
+                if ui.add(btn).clicked() {
+                    selected = Some(idx);
+                    ui.close_menu();
+                }
+            }
+        });
+    if let Some(idx) = selected {
+        setter.set_parameter(param, idx as i32);
+    }
 }
 
 fn render_hpf_buttons(

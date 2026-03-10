@@ -12,6 +12,10 @@ pub mod master_hpf;
 pub mod box_cut;
 pub mod brilliance;
 pub mod stereo_control;
+pub mod ladder_filter;
+pub mod looper;
+pub mod reverb;
+pub mod compressor;
 
 pub use voice::Voice;
 pub use lfo::LfoBank;
@@ -20,6 +24,9 @@ pub use master_hpf::MasterHpf;
 pub use box_cut::BoxCutFilter;
 pub use brilliance::BrillianceFilter;
 pub use stereo_control::StereoControl;
+pub use looper::PitchedLooper;
+pub use reverb::LushReverb;
+pub use compressor::Compressor;
 use crate::sequencer::Sequencer;
 use crate::params::DeviceParams;
 use crate::midi::ExternalNoteEvent;
@@ -48,6 +55,11 @@ pub struct SynthEngine {
     note_priority: NotePriority,
     active_seq_note: Option<u8>,
     vca_mode: bool,
+    vps_buf_l: Vec<f32>,
+    vps_buf_r: Vec<f32>,
+    pll_buf_l: Vec<f32>,
+    pll_buf_r: Vec<f32>,
+    saw_buf: Vec<f32>,
 }
 
 impl SynthEngine {
@@ -66,6 +78,11 @@ impl SynthEngine {
             note_priority: NotePriority::Last,
             active_seq_note: None,
             vca_mode: false,
+            vps_buf_l: Vec::new(),
+            vps_buf_r: Vec::new(),
+            pll_buf_l: Vec::new(),
+            pll_buf_r: Vec::new(),
+            saw_buf: Vec::new(),
         }
     }
 
@@ -75,6 +92,10 @@ impl SynthEngine {
         self.sequencer.set_sample_rate(sample_rate as f64);
         self.lfo_bank.set_sample_rate(sample_rate as f64);
         self.mod_sequencer.set_sample_rate(sample_rate as f64);
+    }
+
+    pub fn current_frequency(&self) -> f64 {
+        self.voice.base_frequency()
     }
 
     pub fn stop(&mut self) {
@@ -278,6 +299,10 @@ impl SynthEngine {
         self.voice.set_sub_volume(volume as f64);
     }
 
+    pub fn set_sub_filter_route(&mut self, through_filter: bool) {
+        self.voice.set_sub_filter_route(through_filter);
+    }
+
 
     pub fn set_saw_volume(&mut self, volume: f32) {
         self.voice.set_saw_volume(volume as f64);
@@ -302,6 +327,53 @@ impl SynthEngine {
     pub fn set_saw_tight(&mut self, tight: f32) {
         self.voice.set_saw_tight(tight as f64);
     }
+
+    pub fn set_filter_enabled(&mut self, enabled: bool) {
+        self.voice.set_filter_enabled(enabled);
+    }
+
+    pub fn set_filter_params(&mut self, cutoff: f32, resonance: f32, drive: f32, mode: i32) {
+        self.voice.set_filter_params(cutoff as f64, resonance as f64, drive as f64, mode as u8);
+    }
+
+    pub fn set_filter_key_track(&mut self, amount: f32) {
+        self.voice.set_filter_key_track(amount as f64);
+    }
+
+    pub fn set_filter_env_amount(&mut self, amount: f32) {
+        self.voice.set_filter_env_amount(amount as f64);
+    }
+
+    pub fn set_filter_stereo_sep(&mut self, amount: f32) {
+        self.voice.set_filter_stereo_sep(amount as f64);
+    }
+
+    pub fn set_filter_envelope(&mut self, attack: f32, attack_shape: f32, decay: f32, decay_shape: f32, sustain: f32, release: f32, release_shape: f32) {
+        self.voice.set_filter_envelope(attack as f64, attack_shape as f64, decay as f64, decay_shape as f64, sustain as f64, release as f64, release_shape as f64);
+    }
+
+    pub fn set_filter_env_dip(&mut self, dip: f32) {
+        self.voice.set_filter_env_dip(dip as f64);
+    }
+
+    pub fn set_filter_env_range(&mut self, range: f32) {
+        self.voice.set_filter_env_range(range as f64);
+    }
+
+    pub fn set_filter_drive_boost(&mut self, boost: i32) {
+        self.voice.set_filter_drive_boost(boost);
+    }
+
+    pub fn set_filter_sat_type(&mut self, t: i32) { self.voice.set_filter_sat_type(t); }
+    pub fn set_filter_morph(&mut self, m: f32) { self.voice.set_filter_morph(m as f64); }
+    pub fn set_filter_fm(&mut self, fm: f32) { self.voice.set_filter_fm(fm as f64); }
+    pub fn set_filter_feedback(&mut self, fb: f32) { self.voice.set_filter_feedback(fb as f64); }
+    pub fn set_filter_bass_lock(&mut self, bl: f32) { self.voice.set_filter_bass_lock(bl as f64); }
+    pub fn set_filter_pole_spread(&mut self, ps: f32) { self.voice.set_filter_pole_spread(ps as f64); }
+    pub fn set_filter_res_character(&mut self, rc: f32) { self.voice.set_filter_res_character(rc as f64); }
+    pub fn set_filter_res_tilt(&mut self, tilt: f32) { self.voice.set_filter_res_tilt(tilt as f64); }
+    pub fn set_filter_cutoff_slew(&mut self, s: f32) { self.voice.set_filter_cutoff_slew(s as f64); }
+    pub fn set_filter_poles(&mut self, p: i32) { self.voice.set_filter_poles(p); }
 
     pub fn set_saw_fold_range(&mut self, range: i32) {
         self.voice.set_saw_fold_range(range);
@@ -419,11 +491,17 @@ impl SynthEngine {
         Some((entry.note, entry.frequency, entry.velocity))
     }
 
+    pub fn set_reverb_sends(&mut self, vps: f64, pll: f64, saw: f64, sub: f64, filter: f64) {
+        self.voice.set_reverb_sends(vps, pll, saw, sub, filter);
+    }
+
     pub fn process_block(
         &mut self,
         output_l: &mut [f32],
         output_r: &mut [f32],
         sub_output: &mut [f32],
+        reverb_send_l: &mut [f32],
+        reverb_send_r: &mut [f32],
         params: &DeviceParams,
         feedback_amount: f32,
         _base_freq: f32,
@@ -435,8 +513,15 @@ impl SynthEngine {
         self.voice.set_bpm(bpm);
         midi_events.clear();
 
+        let num_samples = output_l.len();
+        self.vps_buf_l.resize(num_samples, 0.0);
+        self.vps_buf_r.resize(num_samples, 0.0);
+        self.pll_buf_l.resize(num_samples, 0.0);
+        self.pll_buf_r.resize(num_samples, 0.0);
+        self.saw_buf.resize(num_samples, 0.0);
+
         if seq_playing {
-            self.sequencer.prepare(output_l.len(), params);
+            self.sequencer.prepare(num_samples, params);
         }
 
         let mut ext_idx = 0;
@@ -521,11 +606,22 @@ impl SynthEngine {
             mod_values.accumulate(&seq_mod);
             self.voice.apply_modulation(&mod_values);
 
-            let (left_sample, right_sample, sub_sample) = self.voice.process(self.pll_feedback);
+            let (left_sample, right_sample, sub_sample, rev_l, rev_r) = self.voice.process(self.pll_feedback);
 
             *l = left_sample as f32;
             *r = right_sample as f32;
             sub_output[sample_idx] = sub_sample as f32;
+            reverb_send_l[sample_idx] = rev_l as f32;
+            reverb_send_r[sample_idx] = rev_r as f32;
+            self.vps_buf_l[sample_idx] = self.voice.vps_l() as f32;
+            self.vps_buf_r[sample_idx] = self.voice.vps_r() as f32;
+            self.pll_buf_l[sample_idx] = self.voice.pll_l() as f32;
+            self.pll_buf_r[sample_idx] = self.voice.pll_r() as f32;
+            self.saw_buf[sample_idx] = self.voice.saw_val() as f32;
         }
+    }
+
+    pub fn source_buffers(&self) -> (&[f32], &[f32], &[f32], &[f32], &[f32]) {
+        (&self.vps_buf_l, &self.vps_buf_r, &self.pll_buf_l, &self.pll_buf_r, &self.saw_buf)
     }
 }

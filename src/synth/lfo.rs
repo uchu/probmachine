@@ -338,6 +338,17 @@ pub enum ModDestination {
     EnvRange,
     PllTailAmount,
     PllTailTime,
+    FilterCutoff,
+    FilterResonance,
+    FilterDrive,
+    FilterEnvAmount,
+    FilterMorph,
+    FilterFm,
+    FilterFeedback,
+    FilterBassLock,
+    FilterPoleSpread,
+    FilterResCharacter,
+    FilterResTilt,
 }
 
 impl ModDestination {
@@ -385,6 +396,17 @@ impl ModDestination {
             39 => ModDestination::EnvRange,
             40 => ModDestination::PllTailAmount,
             41 => ModDestination::PllTailTime,
+            42 => ModDestination::FilterCutoff,
+            43 => ModDestination::FilterResonance,
+            44 => ModDestination::FilterDrive,
+            45 => ModDestination::FilterEnvAmount,
+            46 => ModDestination::FilterMorph,
+            47 => ModDestination::FilterFm,
+            48 => ModDestination::FilterFeedback,
+            49 => ModDestination::FilterBassLock,
+            50 => ModDestination::FilterPoleSpread,
+            51 => ModDestination::FilterResCharacter,
+            52 => ModDestination::FilterResTilt,
             _ => ModDestination::None,
         }
     }
@@ -427,6 +449,17 @@ impl ModDestination {
             ModDestination::EnvRange => "Env Rng",
             ModDestination::PllTailAmount => "Tail Amt",
             ModDestination::PllTailTime => "Tail Time",
+            ModDestination::FilterCutoff => "Flt Cut",
+            ModDestination::FilterResonance => "Flt Res",
+            ModDestination::FilterDrive => "Flt Drv",
+            ModDestination::FilterEnvAmount => "Flt Env",
+            ModDestination::FilterMorph => "Flt Mrph",
+            ModDestination::FilterFm => "Flt FM",
+            ModDestination::FilterFeedback => "Flt FB",
+            ModDestination::FilterBassLock => "Flt Bass",
+            ModDestination::FilterPoleSpread => "Flt Sprd",
+            ModDestination::FilterResCharacter => "Flt Char",
+            ModDestination::FilterResTilt => "Flt Tilt",
         }
     }
 }
@@ -469,6 +502,17 @@ pub struct ModulationValues {
     pub env_range: f64,
     pub pll_tail_amount: f64,
     pub pll_tail_time: f64,
+    pub filter_cutoff: f64,
+    pub filter_resonance: f64,
+    pub filter_drive: f64,
+    pub filter_env_amount: f64,
+    pub filter_morph: f64,
+    pub filter_fm: f64,
+    pub filter_feedback: f64,
+    pub filter_bass_lock: f64,
+    pub filter_pole_spread: f64,
+    pub filter_res_character: f64,
+    pub filter_res_tilt: f64,
 }
 
 impl ModulationValues {
@@ -508,6 +552,17 @@ impl ModulationValues {
         self.env_range += other.env_range;
         self.pll_tail_amount += other.pll_tail_amount;
         self.pll_tail_time += other.pll_tail_time;
+        self.filter_cutoff += other.filter_cutoff;
+        self.filter_resonance += other.filter_resonance;
+        self.filter_drive += other.filter_drive;
+        self.filter_env_amount += other.filter_env_amount;
+        self.filter_morph += other.filter_morph;
+        self.filter_fm += other.filter_fm;
+        self.filter_feedback += other.filter_feedback;
+        self.filter_bass_lock += other.filter_bass_lock;
+        self.filter_pole_spread += other.filter_pole_spread;
+        self.filter_res_character += other.filter_res_character;
+        self.filter_res_tilt += other.filter_res_tilt;
     }
 
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
@@ -549,6 +604,17 @@ impl ModulationValues {
             ModDestination::EnvRange => self.env_range += mod_value,
             ModDestination::PllTailAmount => self.pll_tail_amount += mod_value,
             ModDestination::PllTailTime => self.pll_tail_time += mod_value,
+            ModDestination::FilterCutoff => self.filter_cutoff += mod_value,
+            ModDestination::FilterResonance => self.filter_resonance += mod_value,
+            ModDestination::FilterDrive => self.filter_drive += mod_value,
+            ModDestination::FilterEnvAmount => self.filter_env_amount += mod_value,
+            ModDestination::FilterMorph => self.filter_morph += mod_value,
+            ModDestination::FilterFm => self.filter_fm += mod_value,
+            ModDestination::FilterFeedback => self.filter_feedback += mod_value,
+            ModDestination::FilterBassLock => self.filter_bass_lock += mod_value,
+            ModDestination::FilterPoleSpread => self.filter_pole_spread += mod_value,
+            ModDestination::FilterResCharacter => self.filter_res_character += mod_value,
+            ModDestination::FilterResTilt => self.filter_res_tilt += mod_value,
         }
     }
 }

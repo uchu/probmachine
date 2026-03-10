@@ -29,8 +29,8 @@ Monophonic synthesizer + probability sequencer. Rust, nih-plug, egui.
 │              ┌───────────────────┐                    │
 │              │      Voice        │                    │
 │              │  VPS ──┐          │                    │
-│              │  PLL ──┼─▶ Mix → Coloration → Out     │
-│              │  Sub ──┘          │                    │
+│              │  PLL ──┼─▶ Mix → Filter → Out         │
+│              │  SAW ──┘          │                    │
 │              └───────────────────┘                    │
 └─────────────────────────────────────────────────────┘
 ```
@@ -42,14 +42,19 @@ Monophonic synthesizer + probability sequencer. Rust, nih-plug, egui.
 3. **Oversampling loop** (1x–128x configurable):
    - VPS oscillator (if enabled)
    - PLL oscillator with FM (if enabled)
+   - SAW oscillator (if enabled)
    - Mix oscillators
-   - Coloration (ring mod, wavefold, drift, noise, tube, distortion)
-   - Sub oscillator added post-coloration
 4. **Downsample** → Anti-aliased to DAW rate
-5. **Master HPF** → Butterworth (Off/35/80/120/220Hz)
-6. **Brilliance** → High-shelf exciter
-7. **Master Volume**
-8. **Limiter** → Output protection
+5. **Ladder Filter** (if enabled) → 4/8-pole ladder with 4× oversampling (polyphase FIR upsampling, Butterworth downsampling), dedicated filter envelope (ADSR with shapes), env range 1-8 octaves, drive boost (OFF/+12dB/+24dB/+48dB). Upsampler: 64-tap Kaiser-windowed sinc (16 taps/phase, beta=7.857, -89dB image rejection).
+6. **Coloration** → Sub oscillator added
+7. **Stereo Control** → Width, mono bass crossover
+8. **Box Cut** → Notch at ~400Hz
+9. **Master HPF** → Butterworth (Off/35/80/120/220Hz)
+10. **Brilliance** → High-shelf exciter
+11. **Reverb** (if enabled) → Early reflections + 8-channel FDN late reverb with Hadamard mixing, input diffusion, modulated delay lines, RT60-compensated decay, feedback saturation, ducking, stereo decorrelation
+12. **Pitched Looper** → Bar-synced pitched loop capture/playback
+13. **Compressor** (if enabled) → Feed-forward VCA with soft-knee, program-dependent release, assignable routing (master/looper/reverb IN/OUT)
+14. **Limiter** → Output protection
 
 PLL runs at oversampled rate; VPS, sub, coloration run at DAW rate.
 

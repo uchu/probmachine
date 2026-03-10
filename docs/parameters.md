@@ -96,6 +96,45 @@
 | ID | Name | Range | Default |
 |----|------|-------|---------|
 | synth_sub_volume | Sub | 0.0–1.0 | 0.0 |
+| synth_sub_filter_route | Filter Route | bool (false=OUT, true=IN) | false |
+
+## Ladder Filter
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_filter_enable | Enable | bool | false |
+| synth_filter_cutoff | Cutoff | 20–20000 Hz | 20000 |
+| synth_filter_resonance | Res | 0.0–1.05 | 0.0 |
+| synth_filter_drive | Drive | 0.0–1.0 | 0.0 |
+| synth_filter_mode | Mode | 0=LP24, 1=LP12, 2=BP12, 3=HP24 | 0 |
+| synth_filter_key_track | Key Track | 0.0–1.0 | 0.0 |
+| synth_filter_env_amount | Env Amount | -1.0–1.0 | 0.0 |
+| synth_filter_stereo_sep | Stereo Sep | 0.0–0.50 | 0.0 |
+| synth_filter_drive_boost | Drive Boost | 0=OFF, 1=+12dB, 2=+24dB, 3=+48dB | 0 |
+| synth_filter_sat_type | Sat Type | 0=Transistor, 1=Diode, 2=Tube | 0 |
+| synth_filter_morph | Morph | 0.0–1.0 | 0.0 |
+| synth_filter_fm | FM | 0.0–1.0 | 0.0 |
+| synth_filter_feedback | Feedback | -1.0–1.0 | 0.0 |
+| synth_filter_bass_lock | Bass Lock | 0.0–1.0 | 0.0 |
+| synth_filter_pole_spread | Pole Spread | 0.0–1.0 | 0.0 |
+| synth_filter_res_character | Res Char | 0.0–1.0 | 0.0 |
+| synth_filter_res_tilt | Res Tilt | -1.0–1.0 | 0.0 |
+| synth_filter_cutoff_slew | Cut Slew | 0.0–1.0 | 0.0 |
+| synth_filter_poles | Poles | 0=4-pole(24dB), 1=8-pole(48dB) | 0 |
+
+## Filter Envelope
+
+| ID | Name | Range | Default |
+|----|------|-------|---------|
+| synth_filter_env_attack | Atk | 0.5–5000ms | 10.0 |
+| synth_filter_env_attack_shape | AtkSh | -1.0..+1.0 | 0.0 |
+| synth_filter_env_decay | Dec | 0.5–10000ms | 100.0 |
+| synth_filter_env_decay_shape | DecSh | -1.0..+1.0 | 0.0 |
+| synth_filter_env_sustain | Sus | 0.0–1.0 | 0.7 |
+| synth_filter_env_release | Rel | 0.5–10000ms | 200.0 |
+| synth_filter_env_release_shape | RelSh | -1.0..+1.0 | 0.0 |
+| synth_filter_env_dip | Dip | 0.0–1.0 | 0.0 |
+| synth_filter_env_range | Range | 1.0–8.0 octaves | 4.0 |
 
 ## Coloration
 
@@ -164,7 +203,7 @@
 
 **Sync divisions:** 0=1/1, 1=1/2, 2=1/4, 3=1/8, 4=1/16, 5=1/32, 6=1/2D, 7=1/4D, 8=1/8D, 9=1/16D, 10=1/2T, 11=1/4T, 12=1/8T, 13=1/16T
 
-**Mod destinations:** 0=None | PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult, 21=MultD | Sub: 19=Vol | VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol | SAW: 28=Fold, 29=SHP, 30=Vol | Color: 13=Drift, 14=Tube
+**Mod destinations:** 0=None | PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult, 21=MultD | Sub: 19=Vol | VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol | SAW: 28=Fold, 29=SHP, 30=Vol | Color: 13=Drift, 14=Tube | Filter: 42=Cutoff, 43=Res, 44=Drive, 45=EnvAmt, 46=Morph, 47=FM, 48=Feedback, 49=BassLock, 50=PoleSpread, 51=ResChar, 52=ResTilt
 
 ## Step Modulator
 
