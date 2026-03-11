@@ -1325,7 +1325,7 @@ impl DeviceParams {
                     6 => 6.0 / 32.0,
                     11 => 3.0 / 32.0,
                     22 => 1.5 / 32.0,
-                    _ => panic!("Invalid dotted division: {}", beat_count),
+                    _ => 1.0 / 32.0,
                 };
                 let start = beat_index as f32 * dotted_duration;
                 let end = start + dotted_duration;
@@ -1409,19 +1409,19 @@ impl DeviceParams {
             BeatMode::Straight => match beat_count {
                 1 => match beat_index {
                     0 => &self.div1_beat1,
-                    _ => panic!("Invalid beat index {} for 1/1", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 2 => match beat_index {
                     0 => &self.div2_beat1,
                     1 => &self.div2_beat2,
-                    _ => panic!("Invalid beat index {} for 1/2", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 4 => match beat_index {
                     0 => &self.div4_beat1,
                     1 => &self.div4_beat2,
                     2 => &self.div4_beat3,
                     3 => &self.div4_beat4,
-                    _ => panic!("Invalid beat index {} for 1/4", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 8 => match beat_index {
                     0 => &self.div8_beat1,
@@ -1432,7 +1432,7 @@ impl DeviceParams {
                     5 => &self.div8_beat6,
                     6 => &self.div8_beat7,
                     7 => &self.div8_beat8,
-                    _ => panic!("Invalid beat index {} for 1/8", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 16 => match beat_index {
                     0 => &self.div16_beat1,
@@ -1451,7 +1451,7 @@ impl DeviceParams {
                     13 => &self.div16_beat14,
                     14 => &self.div16_beat15,
                     15 => &self.div16_beat16,
-                    _ => panic!("Invalid beat index {} for 1/16", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 32 => match beat_index {
                     0 => &self.div32_beat1,
@@ -1486,16 +1486,16 @@ impl DeviceParams {
                     29 => &self.div32_beat30,
                     30 => &self.div32_beat31,
                     31 => &self.div32_beat32,
-                    _ => panic!("Invalid beat index {} for 1/32", beat_index),
+                    _ => &self.div1_beat1,
                 },
-                _ => panic!("Invalid beat count {} for Straight mode", beat_count),
+                _ => &self.div1_beat1,
             },
             BeatMode::Triplet => match beat_count {
                 3 => match beat_index {
                     0 => &self.div3t_beat1,
                     1 => &self.div3t_beat2,
                     2 => &self.div3t_beat3,
-                    _ => panic!("Invalid beat index {} for 1/2T", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 6 => match beat_index {
                     0 => &self.div6t_beat1,
@@ -1504,7 +1504,7 @@ impl DeviceParams {
                     3 => &self.div6t_beat4,
                     4 => &self.div6t_beat5,
                     5 => &self.div6t_beat6,
-                    _ => panic!("Invalid beat index {} for 1/4T", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 12 => match beat_index {
                     0 => &self.div12t_beat1,
@@ -1519,7 +1519,7 @@ impl DeviceParams {
                     9 => &self.div12t_beat10,
                     10 => &self.div12t_beat11,
                     11 => &self.div12t_beat12,
-                    _ => panic!("Invalid beat index {} for 1/8T", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 24 => match beat_index {
                     0 => &self.div24t_beat1,
@@ -1546,21 +1546,21 @@ impl DeviceParams {
                     21 => &self.div24t_beat22,
                     22 => &self.div24t_beat23,
                     23 => &self.div24t_beat24,
-                    _ => panic!("Invalid beat index {} for 1/16T", beat_index),
+                    _ => &self.div1_beat1,
                 },
-                _ => panic!("Invalid beat count {} for Triplet mode", beat_count),
+                _ => &self.div1_beat1,
             },
             BeatMode::Dotted => match beat_count {
                 2 => match beat_index {
                     0 => &self.div2d_beat1,
                     1 => &self.div2d_beat2,
-                    _ => panic!("Invalid beat index {} for 1/2D", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 3 => match beat_index {
                     0 => &self.div3d_beat1,
                     1 => &self.div3d_beat2,
                     2 => &self.div3d_beat3,
-                    _ => panic!("Invalid beat index {} for 1/4D", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 6 => match beat_index {
                     0 => &self.div6d_beat1,
@@ -1569,7 +1569,7 @@ impl DeviceParams {
                     3 => &self.div6d_beat4,
                     4 => &self.div6d_beat5,
                     5 => &self.div6d_beat6,
-                    _ => panic!("Invalid beat index {} for 1/8D", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 11 => match beat_index {
                     0 => &self.div11d_beat1,
@@ -1583,7 +1583,7 @@ impl DeviceParams {
                     8 => &self.div11d_beat9,
                     9 => &self.div11d_beat10,
                     10 => &self.div11d_beat11,
-                    _ => panic!("Invalid beat index {} for 1/16D", beat_index),
+                    _ => &self.div1_beat1,
                 },
                 22 => match beat_index {
                     0 => &self.div22d_beat1,
@@ -1608,9 +1608,9 @@ impl DeviceParams {
                     19 => &self.div22d_beat20,
                     20 => &self.div22d_beat21,
                     21 => &self.div22d_beat22,
-                    _ => panic!("Invalid beat index {} for 1/32D", beat_index),
+                    _ => &self.div1_beat1,
                 },
-                _ => panic!("Invalid beat count {} for Dotted mode", beat_count),
+                _ => &self.div1_beat1,
             },
         }
     }

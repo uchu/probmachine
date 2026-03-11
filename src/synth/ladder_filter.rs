@@ -575,6 +575,15 @@ impl LadderFilter {
         self.os_right.resample_buffer().copy_from_slice(&buf_r);
         let mut out_r = self.os_right.downsample();
 
+        if !out_l.is_finite() {
+            out_l = 0.0;
+            self.left.reset();
+        }
+        if !out_r.is_finite() {
+            out_r = 0.0;
+            self.right.reset();
+        }
+
         self.feedback_state_l = fast_tanh(out_l);
         self.feedback_state_r = fast_tanh(out_r);
 

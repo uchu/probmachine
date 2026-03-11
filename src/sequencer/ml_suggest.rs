@@ -48,7 +48,7 @@ pub fn flat_index(mode: BeatMode, beat_count: usize, beat_index: usize) -> usize
         }
         offset += c;
     }
-    panic!("Invalid division: {:?} count={}", mode, beat_count);
+    0
 }
 
 pub fn reverse_flat_index(flat: usize) -> (BeatMode, usize, usize) {
@@ -59,7 +59,7 @@ pub fn reverse_flat_index(flat: usize) -> (BeatMode, usize, usize) {
         }
         offset += count;
     }
-    panic!("Invalid flat index: {}", flat);
+    (BeatMode::Straight, 1, 0)
 }
 
 struct BeatSlotSpan {

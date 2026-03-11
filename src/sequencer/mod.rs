@@ -11,6 +11,8 @@ use std::sync::Arc;
 use crate::params::{BeatMode, DeviceParams};
 use crate::sequencer::ml_suggest::flat_index;
 use rand::Rng;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use nih_plug::prelude::Param;
 pub use note_utils::{NotePool, midi_to_frequency};
 #[allow(unused_imports)]
@@ -126,6 +128,7 @@ pub struct Sequencer {
     beat_overrides: Option<[f32; 152]>,
     swing_override: Option<f32>,
     pub beat_links: BeatLinks,
+    rng: StdRng,
 }
 
 impl Sequencer {
@@ -164,6 +167,7 @@ impl Sequencer {
             beat_overrides: None,
             swing_override: None,
             beat_links: BeatLinks::new(),
+            rng: StdRng::from_entropy(),
         }
     }
 
@@ -428,7 +432,7 @@ impl Sequencer {
         self.scratch_events.clear();
         self.scratch_start_times.clear();
         self.scratch_lost_beats.clear();
-        let mut rng = rand::thread_rng();
+        let mut rng = StdRng::seed_from_u64(self.rng.gen());
 
         let strength_range = self.get_strength_range();
         let length_range = self.get_enabled_length_range(params);
@@ -566,7 +570,7 @@ impl Sequencer {
 
         self.scratch_events.sort_by(|a, b| a.sample_position.cmp(&b.sample_position));
 
-        let mut rng = rand::thread_rng();
+        let mut rng = StdRng::seed_from_u64(self.rng.gen());
         let mut pattern_remaining: Option<(Vec<u8>, usize)> = None;
         let finish_mode = self.style_config.mode == styles::StyleMode::Finish;
 
@@ -656,7 +660,7 @@ impl Sequencer {
                     self.apply_bar_slot(self.current_bar_slot);
                 }
             }
-            let mut rng = rand::thread_rng();
+            let mut rng = StdRng::seed_from_u64(self.rng.gen());
             self.prepare_melodic_notes(&mut rng);
             self.generate_bar_into(params);
             std::mem::swap(&mut self.current_bar, &mut self.scratch_events);
@@ -682,7 +686,7 @@ impl Sequencer {
                     self.apply_bar_slot(next_slot);
                 }
             }
-            let mut rng = rand::thread_rng();
+            let mut rng = StdRng::seed_from_u64(self.rng.gen());
             self.prepare_melodic_notes(&mut rng);
             self.generate_bar_into(params);
             std::mem::swap(&mut self.next_bar, &mut self.scratch_events);
@@ -690,12 +694,11 @@ impl Sequencer {
         }
     }
 
-    fn peek_next_bar_slot(&self) -> usize {
+    fn peek_next_bar_slot(&mut self) -> usize {
         if let Some(ref config) = self.multi_bar {
             if config.enabled && config.bar_count > 1 {
                 let next_counter = self.bar_counter + 1;
-                let mut rng = rand::thread_rng();
-                return config.next_bar_slot(next_counter, &mut rng);
+                return config.next_bar_slot(next_counter, &mut self.rng);
             }
         }
         0
@@ -750,8 +753,7 @@ impl Sequencer {
             if let Some(ref config) = self.multi_bar {
                 if config.enabled && config.bar_count > 1 {
                     self.bar_counter += 1;
-                    let mut rng = rand::thread_rng();
-                    self.current_bar_slot = config.next_bar_slot(self.bar_counter, &mut rng);
+                    self.current_bar_slot = config.next_bar_slot(self.bar_counter, &mut self.rng);
                 }
             }
         }

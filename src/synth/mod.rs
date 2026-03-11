@@ -78,11 +78,11 @@ impl SynthEngine {
             note_priority: NotePriority::Last,
             active_seq_note: None,
             vca_mode: false,
-            vps_buf_l: Vec::new(),
-            vps_buf_r: Vec::new(),
-            pll_buf_l: Vec::new(),
-            pll_buf_r: Vec::new(),
-            saw_buf: Vec::new(),
+            vps_buf_l: Vec::with_capacity(2048),
+            vps_buf_r: Vec::with_capacity(2048),
+            pll_buf_l: Vec::with_capacity(2048),
+            pll_buf_r: Vec::with_capacity(2048),
+            saw_buf: Vec::with_capacity(2048),
         }
     }
 

@@ -260,6 +260,19 @@ impl Plugin for PhaseBurn {
             self.compressor.set_sample_rate(new_sample_rate as f64);
         }
 
+        let max_block = buffer_config.max_buffer_size as usize;
+        self.output_buffer_l.resize(max_block, 0.0);
+        self.output_buffer_r.resize(max_block, 0.0);
+        self.sub_buffer.resize(max_block, 0.0);
+        self.reverb_send_l.resize(max_block, 0.0);
+        self.reverb_send_r.resize(max_block, 0.0);
+        self.looper_input_l.resize(max_block, 0.0);
+        self.looper_input_r.resize(max_block, 0.0);
+        self.comp_pre_looper_l.resize(max_block, 0.0);
+        self.comp_pre_looper_r.resize(max_block, 0.0);
+        self.comp_pre_reverb_l.resize(max_block, 0.0);
+        self.comp_pre_reverb_r.resize(max_block, 0.0);
+
         true
     }
 
