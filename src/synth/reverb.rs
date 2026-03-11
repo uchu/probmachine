@@ -296,7 +296,8 @@ pub struct LushReverb {
     er_tap_delays: [usize; EARLY_TAPS],
     er_lpf_l: OnePole,
     er_lpf_r: OnePole,
-    er_hf_filters: [OnePole; EARLY_TAPS],
+    er_hf_filters_l: [OnePole; EARLY_TAPS],
+    er_hf_filters_r: [OnePole; EARLY_TAPS],
 
     input_hpf_l: OnePole,
     input_hpf_r: OnePole,
@@ -384,7 +385,8 @@ impl LushReverb {
             er_tap_delays,
             er_lpf_l: OnePole::new(),
             er_lpf_r: OnePole::new(),
-            er_hf_filters: std::array::from_fn(|_| OnePole::new()),
+            er_hf_filters_l: std::array::from_fn(|_| OnePole::new()),
+            er_hf_filters_r: std::array::from_fn(|_| OnePole::new()),
             input_hpf_l: OnePole::new(),
             input_hpf_r: OnePole::new(),
             input_lpf_l: OnePole::new(),
@@ -431,7 +433,8 @@ impl LushReverb {
         self.er_delay_r.clear();
         self.er_lpf_l.reset();
         self.er_lpf_r.reset();
-        for f in &mut self.er_hf_filters { f.reset(); }
+        for f in &mut self.er_hf_filters_l { f.reset(); }
+        for f in &mut self.er_hf_filters_r { f.reset(); }
         self.input_hpf_l.reset();
         self.input_hpf_r.reset();
         self.input_lpf_l.reset();
@@ -515,7 +518,8 @@ impl LushReverb {
         for i in 0..EARLY_TAPS {
             self.er_tap_delays[i] = ((ER_TAP_DELAYS_MS[i] * 0.001 * self.sample_rate * er_scale) as usize).max(1);
             let tap_freq = tank_lpf * ER_HF_ROLLOFF[i];
-            self.er_hf_filters[i].set_freq(tap_freq, self.sample_rate);
+            self.er_hf_filters_l[i].set_freq(tap_freq, self.sample_rate);
+            self.er_hf_filters_r[i].set_freq(tap_freq, self.sample_rate);
         }
         self.er_lpf_l.set_freq(tank_lpf, self.sample_rate);
         self.er_lpf_r.set_freq(tank_lpf, self.sample_rate);
@@ -638,9 +642,10 @@ impl LushReverb {
             for t in 0..EARLY_TAPS {
                 let tap_l = self.er_delay_l.read(self.er_tap_delays[t]);
                 let tap_r = self.er_delay_r.read(self.er_tap_delays[t]);
-                let filtered_l = self.er_hf_filters[t].tick_lpf(tap_l + tap_r * ER_CROSS_FEED);
+                let filtered_l = self.er_hf_filters_l[t].tick_lpf(tap_l + tap_r * ER_CROSS_FEED);
+                let filtered_r = self.er_hf_filters_r[t].tick_lpf(tap_r + tap_l * ER_CROSS_FEED);
                 er_l += filtered_l * ER_TAP_GAINS_L[t];
-                er_r += self.er_hf_filters[t].tick_lpf(tap_r + tap_l * ER_CROSS_FEED) * ER_TAP_GAINS_R[t];
+                er_r += filtered_r * ER_TAP_GAINS_R[t];
             }
             er_l = self.er_lpf_l.tick_lpf(er_l);
             er_r = self.er_lpf_r.tick_lpf(er_r);

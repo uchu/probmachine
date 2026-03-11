@@ -391,6 +391,17 @@ impl SynthEngine {
         self.voice.set_volume_envelope(attack as f64, attack_shape as f64, decay as f64, decay_shape as f64, sustain as f64, release as f64, release_shape as f64);
     }
 
+    pub fn set_vol_env_hold(&mut self, hold: f32) { self.voice.set_vol_env_hold(hold as f64); }
+    pub fn set_vol_env_depth(&mut self, depth: f32) { self.voice.set_vol_env_depth(depth as f64); }
+    pub fn set_vol_env_loop_mode(&mut self, mode: i32) { self.voice.set_vol_env_loop_mode(mode); }
+    pub fn set_vol_env_s_curves(&mut self, a: bool, d: bool, r: bool) { self.voice.set_vol_env_s_curves(a, d, r); }
+    pub fn set_filt_env_s_curves(&mut self, a: bool, d: bool, r: bool) { self.voice.set_filt_env_s_curves(a, d, r); }
+    pub fn set_filt_env_hold(&mut self, hold: f32) { self.voice.set_filt_env_hold(hold as f64); }
+    pub fn set_filt_env_loop_mode(&mut self, mode: i32) { self.voice.set_filt_env_loop_mode(mode); }
+    pub fn set_env_key_track(&mut self, amount: f32) { self.voice.set_env_key_track(amount as f64); }
+    pub fn set_env_vel_to_attack(&mut self, amount: f32) { self.voice.set_env_vel_to_attack(amount as f64); }
+    pub fn set_env_vel_to_decay(&mut self, amount: f32) { self.voice.set_env_vel_to_decay(amount as f64); }
+    pub fn set_env_vel_to_sustain(&mut self, amount: f32) { self.voice.set_env_vel_to_sustain(amount as f64); }
     pub fn set_retrigger_dip(&mut self, dip: f32) {
         self.voice.set_retrigger_dip(dip as f64);
     }
@@ -468,14 +479,31 @@ impl SynthEngine {
         self.mod_sequencer.set_step(index, value as f64);
     }
 
-    pub fn set_mod_seq_params(&mut self, ties: i32, division: i32, slew: f32) {
-        self.mod_sequencer.set_ties(ties as u16);
+    pub fn set_mod_seq_params(&mut self, ties_lo: i32, ties_hi: i32, division: i32, slew: f32, length: i32, retrigger: bool, bipolar: bool) {
+        let ties = ties_lo as u16 as u32 | ((ties_hi as u16 as u32) << 16);
+        self.mod_sequencer.set_ties(ties);
         self.mod_sequencer.set_division(division);
         self.mod_sequencer.set_slew(slew as f64);
+        self.mod_sequencer.set_length(length as usize);
+        self.mod_sequencer.set_retrigger(retrigger);
+        self.mod_sequencer.set_bipolar(bipolar);
     }
 
     pub fn set_mod_seq_modulation(&mut self, slot: usize, destination: i32, amount: f32) {
         self.mod_sequencer.set_modulation(slot, destination, amount as f64);
+    }
+
+    pub fn set_mod_seq_playing(&mut self, playing: bool) {
+        self.mod_sequencer.set_playing(playing);
+    }
+
+    #[allow(dead_code)]
+    pub fn reset_mod_seq_phase(&mut self) {
+        self.mod_sequencer.reset_phase();
+    }
+
+    pub fn mod_seq_current_step(&self) -> usize {
+        self.mod_sequencer.current_step()
     }
 
     #[allow(dead_code)]
@@ -549,7 +577,11 @@ impl SynthEngine {
                                 feedback_amount as f64,
                             );
                             self.voice.set_velocity(vel);
+                            self.voice.set_midi_note(note);
                             self.voice.trigger();
+                            if self.mod_sequencer.should_retrigger() {
+                                self.mod_sequencer.reset_phase();
+                            }
                             midi_events.push((true, false, note, vel, sample_idx));
                         }
                     } else {
@@ -566,6 +598,7 @@ impl SynthEngine {
                                     feedback_amount as f64,
                                 );
                                 self.voice.set_velocity(vel);
+                                self.voice.set_midi_note(note);
                                 self.voice.trigger();
                                 midi_events.push((true, false, note, vel, sample_idx));
                             }
@@ -588,16 +621,21 @@ impl SynthEngine {
                     if self.vca_mode && self.active_seq_note.is_some() {
                         self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
                         self.voice.set_velocity(velocity);
+                        self.voice.set_midi_note(midi_note);
                     } else {
                         if let Some(old_note) = self.active_seq_note {
                             midi_events.push((false, true, old_note, 0, sample_idx));
                         }
                         self.voice.set_frequency(frequency, self.pll_feedback, feedback_amount as f64);
                         self.voice.set_velocity(velocity);
+                        self.voice.set_midi_note(midi_note);
                         if self.active_seq_note.is_some() {
                             self.voice.trigger_articulated();
                         } else {
                             self.voice.trigger();
+                        }
+                        if self.mod_sequencer.should_retrigger() {
+                            self.mod_sequencer.reset_phase();
                         }
                     }
                     self.active_seq_note = Some(midi_note);

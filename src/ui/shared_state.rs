@@ -51,6 +51,8 @@ pub struct SharedUiState {
     pub soft_takeover: Arc<AtomicBool>,
     pub beat_links: Arc<Mutex<BeatLinks>>,
     pub restored_oversampling: Arc<AtomicI32>,
+    pub mod_seq_step: Arc<AtomicU8>,
+    pub current_tempo: Arc<AtomicU32>,
 }
 
 impl SharedUiState {
@@ -111,6 +113,8 @@ impl SharedUiState {
             soft_takeover: Arc::new(AtomicBool::new(cfg.soft_takeover)),
             beat_links: Arc::new(Mutex::new(BeatLinks::new())),
             restored_oversampling: Arc::new(AtomicI32::new(cfg.oversampling)),
+            mod_seq_step: Arc::new(AtomicU8::new(0)),
+            current_tempo: Arc::new(AtomicU32::new(12000)),
         }
     }
 

@@ -35,6 +35,29 @@ Monophonic synthesizer + probability sequencer. Rust, nih-plug, egui.
 └─────────────────────────────────────────────────────┘
 ```
 
+## Parameter & Modulation Smoothing
+
+All parameter transitions are per-sample to prevent zipper noise and artifacts:
+
+- **`SlewValue`** (linear rate limiter): Most UI parameters. Rate = max change per sample for a given ms time.
+- **`OnePoleSlewValue`** (true exponential one-pole): VPS/SAW shape and fold params. Uses `1 - exp(-1/samples)` coefficient for natural exponential settling.
+- **`StereoSlewValue`** (stereo exponential one-pole): Stereo signal-path smoothing. Same exponential coefficient as OnePoleSlewValue.
+
+### Modulation slew architecture
+
+Three-tier design eliminates double-slewing while maintaining click protection:
+
+1. **Source-level slew** — Only where needed:
+   - LFO S&H: user-configurable slew (default 5ms) smooths random step jumps
+   - LFO continuous waveforms (Sine/Tri/Saw/Square): no output slew (waveform shape preserved)
+   - ModSequencer: user-configurable slew for non-tied steps; smoothstep (S-curve) interpolation for tied steps; per-step probability; variable length (1–16); note-on retrigger; 4 routing slots
+2. **Voice mod_slew** (0.5ms) — Minimal anti-click protection on all mod destinations. Prevents clicks from routing changes without reducing modulation depth or rounding waveform shapes.
+3. **Parameter slew** (20-60ms) — Smooths UI control changes. Only affects the base target value, not modulation.
+
+### Filter cutoff modulation
+
+LFO/ModSeq modulation uses **octave-based (logarithmic) scaling** (±5 octaves): `cutoff × 2^(mod × 5)`. This gives perceptually consistent modulation depth across the entire frequency range. Key tracking and filter envelope modulation use semitone-based scaling internally in the ladder filter.
+
 ## Audio Processing (per sample)
 
 1. **Envelope** → Volume envelope

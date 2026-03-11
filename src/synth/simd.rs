@@ -163,7 +163,7 @@ impl StereoSlewValue {
     #[inline(always)]
     pub fn next(&mut self, target: Stereo, time_ms: f64) -> Stereo {
         let samples = (time_ms * self.sample_rate / 1000.0).max(1.0);
-        let coeff = Stereo::splat(1.0 / samples);
+        let coeff = Stereo::splat(1.0 - (-1.0 / samples).exp());
         self.current = self.current + (target - self.current) * coeff;
         self.current
     }
@@ -202,7 +202,7 @@ impl OnePoleSlewValue {
     #[inline(always)]
     pub fn next(&mut self, target: f64, time_ms: f64) -> f64 {
         let samples = (time_ms * self.sample_rate / 1000.0).max(1.0);
-        let coeff = 1.0 / samples;
+        let coeff = 1.0 - (-1.0 / samples).exp();
         self.current += (target - self.current) * coeff;
         self.current
     }

@@ -342,6 +342,7 @@ impl Plugin for PhaseBurn {
         } else {
             transport.tempo.unwrap_or(120.0)
         };
+        self.ui_state.current_tempo.store((tempo * 100.0) as u32, std::sync::atomic::Ordering::Relaxed);
 
         let mut is_playing = transport.playing;
 
@@ -459,17 +460,48 @@ impl Plugin for PhaseBurn {
             synth.set_filter_key_track(self.params.synth_filter_key_track.modulated_plain_value());
             synth.set_filter_env_amount(self.params.synth_filter_env_amount.modulated_plain_value());
             synth.set_filter_stereo_sep(self.params.synth_filter_stereo_sep.modulated_plain_value());
+            let fe_div_to_ms = |div_idx: i32| -> f32 {
+                let div = LfoSyncDivision::from_index(div_idx);
+                (div.beats() as f64 / tempo * 60000.0).max(0.5) as f32
+            };
+            let fe_a = if self.params.synth_filter_env_attack_sync.value() {
+                fe_div_to_ms(self.params.synth_filter_env_attack_div.value())
+            } else {
+                self.params.synth_filter_env_attack.modulated_plain_value()
+            };
+            let fe_h = if self.params.synth_filter_env_hold_sync.value() {
+                fe_div_to_ms(self.params.synth_filter_env_hold_div.value())
+            } else {
+                self.params.synth_filter_env_hold.modulated_plain_value()
+            };
+            let fe_d = if self.params.synth_filter_env_decay_sync.value() {
+                fe_div_to_ms(self.params.synth_filter_env_decay_div.value())
+            } else {
+                self.params.synth_filter_env_decay.modulated_plain_value()
+            };
+            let fe_r = if self.params.synth_filter_env_release_sync.value() {
+                fe_div_to_ms(self.params.synth_filter_env_release_div.value())
+            } else {
+                self.params.synth_filter_env_release.modulated_plain_value()
+            };
             synth.set_filter_envelope(
-                self.params.synth_filter_env_attack.modulated_plain_value(),
+                fe_a,
                 self.params.synth_filter_env_attack_shape.modulated_plain_value(),
-                self.params.synth_filter_env_decay.modulated_plain_value(),
+                fe_d,
                 self.params.synth_filter_env_decay_shape.modulated_plain_value(),
                 self.params.synth_filter_env_sustain.modulated_plain_value(),
-                self.params.synth_filter_env_release.modulated_plain_value(),
+                fe_r,
                 self.params.synth_filter_env_release_shape.modulated_plain_value(),
             );
             synth.set_filter_env_dip(self.params.synth_filter_env_dip.modulated_plain_value());
             synth.set_filter_env_range(self.params.synth_filter_env_range.modulated_plain_value());
+            synth.set_filt_env_hold(fe_h);
+            synth.set_filt_env_loop_mode(self.params.synth_filter_env_loop_mode.value());
+            synth.set_filt_env_s_curves(
+                self.params.synth_filter_env_attack_s.value(),
+                self.params.synth_filter_env_decay_s.value(),
+                self.params.synth_filter_env_release_s.value(),
+            );
             synth.set_filter_drive_boost(self.params.synth_filter_drive_boost.value());
             synth.set_filter_sat_type(self.params.synth_filter_sat_type.value());
             synth.set_filter_morph(self.params.synth_filter_morph.modulated_plain_value());
@@ -566,15 +598,51 @@ impl Plugin for PhaseBurn {
 
             synth.set_volume(1.0);
 
+            let div_to_ms = |div_idx: i32| -> f32 {
+                let div = LfoSyncDivision::from_index(div_idx);
+                (div.beats() as f64 / tempo * 60000.0).max(0.5) as f32
+            };
+            let vol_a = if self.params.synth_vol_attack_sync.value() {
+                div_to_ms(self.params.synth_vol_attack_div.value())
+            } else {
+                self.params.synth_vol_attack.modulated_plain_value()
+            };
+            let vol_h = if self.params.synth_vol_hold_sync.value() {
+                div_to_ms(self.params.synth_vol_hold_div.value())
+            } else {
+                self.params.synth_vol_hold.modulated_plain_value()
+            };
+            let vol_d = if self.params.synth_vol_decay_sync.value() {
+                div_to_ms(self.params.synth_vol_decay_div.value())
+            } else {
+                self.params.synth_vol_decay.modulated_plain_value()
+            };
+            let vol_r = if self.params.synth_vol_release_sync.value() {
+                div_to_ms(self.params.synth_vol_release_div.value())
+            } else {
+                self.params.synth_vol_release.modulated_plain_value()
+            };
             synth.set_volume_envelope(
-                self.params.synth_vol_attack.modulated_plain_value(),
+                vol_a,
                 self.params.synth_vol_attack_shape.modulated_plain_value(),
-                self.params.synth_vol_decay.modulated_plain_value(),
+                vol_d,
                 self.params.synth_vol_decay_shape.modulated_plain_value(),
                 self.params.synth_vol_sustain.modulated_plain_value(),
-                self.params.synth_vol_release.modulated_plain_value(),
+                vol_r,
                 self.params.synth_vol_release_shape.modulated_plain_value(),
             );
+            synth.set_vol_env_hold(vol_h);
+            synth.set_vol_env_depth(self.params.synth_vol_depth.modulated_plain_value());
+            synth.set_vol_env_loop_mode(self.params.synth_vol_loop_mode.value());
+            synth.set_vol_env_s_curves(
+                self.params.synth_vol_attack_s.value(),
+                self.params.synth_vol_decay_s.value(),
+                self.params.synth_vol_release_s.value(),
+            );
+            synth.set_env_key_track(self.params.synth_env_key_track.modulated_plain_value());
+            synth.set_env_vel_to_attack(self.params.synth_env_vel_to_attack.modulated_plain_value());
+            synth.set_env_vel_to_decay(self.params.synth_env_vel_to_decay.modulated_plain_value());
+            synth.set_env_vel_to_sustain(self.params.synth_env_vel_to_sustain.modulated_plain_value());
             synth.set_retrigger_dip(self.params.synth_retrigger_dip.modulated_plain_value());
             let pll_tail_amount = self.params.synth_pll_tail_amount.modulated_plain_value();
             synth.set_pll_tail(
@@ -635,13 +703,35 @@ impl Plugin for PhaseBurn {
             synth.set_mod_seq_step(13, self.params.mseq_step_14.value());
             synth.set_mod_seq_step(14, self.params.mseq_step_15.value());
             synth.set_mod_seq_step(15, self.params.mseq_step_16.value());
+            synth.set_mod_seq_step(16, self.params.mseq_step_17.value());
+            synth.set_mod_seq_step(17, self.params.mseq_step_18.value());
+            synth.set_mod_seq_step(18, self.params.mseq_step_19.value());
+            synth.set_mod_seq_step(19, self.params.mseq_step_20.value());
+            synth.set_mod_seq_step(20, self.params.mseq_step_21.value());
+            synth.set_mod_seq_step(21, self.params.mseq_step_22.value());
+            synth.set_mod_seq_step(22, self.params.mseq_step_23.value());
+            synth.set_mod_seq_step(23, self.params.mseq_step_24.value());
+            synth.set_mod_seq_step(24, self.params.mseq_step_25.value());
+            synth.set_mod_seq_step(25, self.params.mseq_step_26.value());
+            synth.set_mod_seq_step(26, self.params.mseq_step_27.value());
+            synth.set_mod_seq_step(27, self.params.mseq_step_28.value());
+            synth.set_mod_seq_step(28, self.params.mseq_step_29.value());
+            synth.set_mod_seq_step(29, self.params.mseq_step_30.value());
+            synth.set_mod_seq_step(30, self.params.mseq_step_31.value());
+            synth.set_mod_seq_step(31, self.params.mseq_step_32.value());
             synth.set_mod_seq_params(
                 self.params.mseq_ties.value(),
+                self.params.mseq_ties_hi.value(),
                 self.params.mseq_division.value(),
                 self.params.mseq_slew.modulated_plain_value(),
+                self.params.mseq_length.value(),
+                self.params.mseq_retrigger.value(),
+                self.params.mseq_bipolar.value(),
             );
             synth.set_mod_seq_modulation(0, self.params.mseq_dest1.value(), self.params.mseq_amount1.modulated_plain_value());
             synth.set_mod_seq_modulation(1, self.params.mseq_dest2.value(), self.params.mseq_amount2.modulated_plain_value());
+            synth.set_mod_seq_modulation(2, self.params.mseq_dest3.value(), self.params.mseq_amount3.modulated_plain_value());
+            synth.set_mod_seq_modulation(3, self.params.mseq_dest4.value(), self.params.mseq_amount4.modulated_plain_value());
 
             let num_samples = buffer.samples();
             self.output_buffer_l.resize(num_samples, 0.0);
@@ -669,6 +759,8 @@ impl Plugin for PhaseBurn {
             } else {
                 self.params.sequencer_enable.value()
             };
+
+            synth.set_mod_seq_playing(seq_playing);
 
             let prev_seq_playing = self.was_seq_playing;
             if prev_seq_playing && !seq_playing {
@@ -733,6 +825,11 @@ impl Plugin for PhaseBurn {
                 &mut self.midi_events_buffer,
                 seq_playing,
                 passthrough_notes,
+            );
+
+            self.ui_state.mod_seq_step.store(
+                synth.mod_seq_current_step() as u8,
+                std::sync::atomic::Ordering::Relaxed,
             );
 
             let lp_premaster = self.params.looper_input_premaster.value();

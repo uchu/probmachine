@@ -91,24 +91,25 @@ pub fn render(
         .ui(|ui| {
             match current_tab {
                 0 => render_sound_tab(ui, params, setter, ui_state),
-                1 => render_envelopes_tab(ui, params, setter, ui_state),
-                2 => render_filter_tab(ui, params, setter, ui_state),
-                3 => render_fx_tab(ui, params, setter),
-                4 => render_lush_tab(ui, params, setter),
-                5 => render_comp_tab(ui, params, setter, ui_state),
-                6 => super::modulation::render_ui(ui, params, setter),
-                _ => super::modulation::render_step_mod_ui(ui, params, setter),
+                1 => render_vol_env_tab(ui, params, setter, ui_state),
+                2 => render_filt_env_tab(ui, params, setter, ui_state),
+                3 => render_filter_tab(ui, params, setter, ui_state),
+                4 => render_fx_tab(ui, params, setter),
+                5 => render_lush_tab(ui, params, setter),
+                6 => render_comp_tab(ui, params, setter, ui_state),
+                7 => super::modulation::render_ui(ui, params, setter),
+                _ => super::modulation::render_step_mod_ui(ui, params, setter, ui_state),
             }
         });
     });
 }
 
-const TAB_HEIGHT: f32 = 76.0;
+const TAB_HEIGHT: f32 = 67.0;
 const TAB_GAP: f32 = 3.0;
 
 fn render_tab_bar(ui: &mut egui::Ui, current_tab: u8) {
     let rect = ui.max_rect();
-    let tab_names = ["OSCs", "ENVs", "FILTER", "FX", "LUSH", "COMP", "LFOs", "STEP"];
+    let tab_names = ["OSCs", "VOLENV", "FLTENV", "FILTER", "FX", "LUSH", "COMP", "LFOs", "STEP"];
 
     for (i, name) in tab_names.iter().enumerate() {
         let y = rect.min.y + i as f32 * (TAB_HEIGHT + TAB_GAP);
@@ -916,13 +917,16 @@ fn render_filter_envelope_controls(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
+    ui_state: &SharedUiState,
 ) {
     let range_val = params.synth_filter_env_range.modulated_plain_value().max(1.0);
     let range_ms = range_val * 1000.0;
     let time_max_a = range_ms.min(5000.0).max(1.0);
     let time_max_dr = range_ms.min(10000.0).max(1.0);
     let shape_ticks: &[(f32, &str)] = &[(-1.0, "EXP"), (0.0, "LIN"), (1.0, "LOG")];
+    let s_ticks: &[(f32, &str)] = &[(0.0, "LIN"), (0.5, ""), (1.0, "MAX")];
     let atk_color = Some(Color32::from_rgb(140, 100, 60));
+    let hold_color = Some(Color32::from_rgb(120, 120, 60));
     let dec_color = Some(Color32::from_rgb(100, 80, 120));
     let sus_color = Some(Color32::from_rgb(60, 100, 80));
     let rel_color = Some(Color32::from_rgb(80, 80, 140));
@@ -932,35 +936,60 @@ fn render_filter_envelope_controls(
     let time_ticks_a_ref: Vec<(f32, &str)> = time_ticks_a.iter().map(|(v, s)| (*v, s.as_str())).collect();
     let time_ticks_dr = build_time_ticks(0.5, time_max_dr);
     let time_ticks_dr_ref: Vec<(f32, &str)> = time_ticks_dr.iter().map(|(v, s)| (*v, s.as_str())).collect();
+    let hold_ticks = build_time_ticks(0.0, time_max_a);
+    let hold_ticks_ref: Vec<(f32, &str)> = hold_ticks.iter().map(|(v, s)| (*v, s.as_str())).collect();
+
+    let tempo = ui_state.current_tempo.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.0;
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
-        render_vertical_slider_with_ticks(
-            ui, params, setter,
-            &params.synth_filter_env_attack, "A",
-            0.5, time_max_a, SliderScale::Exponential(2.0),
-            atk_color, &time_ticks_a_ref, None,
-        );
+        if params.synth_filter_env_attack_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_filter_env_attack_div, "A", atk_color, tempo, 1.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_filter_env_attack, "A",
+                0.5, time_max_a, SliderScale::Exponential(2.0),
+                atk_color, &time_ticks_a_ref, None,
+            );
+        }
         ui.add_space(2.0);
+        let (sh_min, sh_ticks) = if params.synth_filter_env_attack_s.value() { (0.0, s_ticks) } else { (-1.0, shape_ticks) };
         render_vertical_slider_with_ticks(
             ui, params, setter,
             &params.synth_filter_env_attack_shape, "A\u{2009}SH",
-            -1.0, 1.0, SliderScale::Linear,
-            atk_color, shape_ticks, None,
+            sh_min, 1.0, SliderScale::Linear,
+            atk_color, sh_ticks, None,
         );
         ui.add_space(4.0);
-        render_vertical_slider_with_ticks(
-            ui, params, setter,
-            &params.synth_filter_env_decay, "D",
-            0.5, time_max_dr, SliderScale::Exponential(2.0),
-            dec_color, &time_ticks_dr_ref, None,
-        );
+        if params.synth_filter_env_hold_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_filter_env_hold_div, "H", hold_color, tempo, 1.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_filter_env_hold, "H",
+                0.0, time_max_a, SliderScale::Exponential(2.0),
+                hold_color, &hold_ticks_ref, None,
+            );
+        }
+        ui.add_space(4.0);
+        if params.synth_filter_env_decay_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_filter_env_decay_div, "D", dec_color, tempo, 1.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_filter_env_decay, "D",
+                0.5, time_max_dr, SliderScale::Exponential(2.0),
+                dec_color, &time_ticks_dr_ref, None,
+            );
+        }
         ui.add_space(2.0);
+        let (sh_min, sh_ticks) = if params.synth_filter_env_decay_s.value() { (0.0, s_ticks) } else { (-1.0, shape_ticks) };
         render_vertical_slider_with_ticks(
             ui, params, setter,
             &params.synth_filter_env_decay_shape, "D\u{2009}SH",
-            -1.0, 1.0, SliderScale::Linear,
-            dec_color, shape_ticks, None,
+            sh_min, 1.0, SliderScale::Linear,
+            dec_color, sh_ticks, None,
         );
         ui.add_space(4.0);
         render_vertical_slider(
@@ -970,18 +999,23 @@ fn render_filter_envelope_controls(
             sus_color, None,
         );
         ui.add_space(4.0);
-        render_vertical_slider_with_ticks(
-            ui, params, setter,
-            &params.synth_filter_env_release, "R",
-            0.5, time_max_dr, SliderScale::Exponential(2.0),
-            rel_color, &time_ticks_dr_ref, None,
-        );
+        if params.synth_filter_env_release_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_filter_env_release_div, "R", rel_color, tempo, 4.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_filter_env_release, "R",
+                0.5, time_max_dr, SliderScale::Exponential(2.0),
+                rel_color, &time_ticks_dr_ref, None,
+            );
+        }
         ui.add_space(2.0);
+        let (sh_min, sh_ticks) = if params.synth_filter_env_release_s.value() { (0.0, s_ticks) } else { (-1.0, shape_ticks) };
         render_vertical_slider_with_ticks(
             ui, params, setter,
             &params.synth_filter_env_release_shape, "R\u{2009}SH",
-            -1.0, 1.0, SliderScale::Linear,
-            rel_color, shape_ticks, None,
+            sh_min, 1.0, SliderScale::Linear,
+            rel_color, sh_ticks, None,
         );
         ui.add_space(6.0);
         render_vertical_slider(
@@ -1014,35 +1048,7 @@ fn render_filter_envelope_controls(
 
     let viz_x = row_left + 65.0;
     let viz_y = row_top + 35.0;
-    render_filter_adsr_visualization(ui, params, viz_x, viz_y);
-
-    let btn_x = row_left + 380.0;
-    let btn_y = row_top + 35.0;
-    let btn_size = egui::vec2(120.0, 48.0);
-    let mut btn_ui = ui.new_child(egui::UiBuilder::new().max_rect(
-        egui::Rect::from_min_size(egui::pos2(btn_x, btn_y), egui::vec2(130.0, 58.0)),
-    ));
-    let (btn_rect, response) = btn_ui.allocate_exact_size(btn_size, egui::Sense::click());
-    let bg = if response.hovered() {
-        Color32::from_rgb(55, 55, 65)
-    } else {
-        Color32::from_rgb(40, 40, 48)
-    };
-    btn_ui.painter().rect_filled(btn_rect, 4.0, bg);
-    let font = egui::FontId::proportional(LABEL_FONT);
-    let galley = btn_ui.painter().layout_no_wrap("COPY VOL".to_string(), font, Color32::from_gray(160));
-    let text_pos = btn_rect.center() - galley.size() / 2.0;
-    btn_ui.painter().galley(text_pos, galley, Color32::from_gray(160));
-    if response.clicked() {
-        setter.set_parameter(&params.synth_filter_env_attack, params.synth_vol_attack.modulated_plain_value());
-        setter.set_parameter(&params.synth_filter_env_attack_shape, params.synth_vol_attack_shape.modulated_plain_value());
-        setter.set_parameter(&params.synth_filter_env_decay, params.synth_vol_decay.modulated_plain_value());
-        setter.set_parameter(&params.synth_filter_env_decay_shape, params.synth_vol_decay_shape.modulated_plain_value());
-        setter.set_parameter(&params.synth_filter_env_sustain, params.synth_vol_sustain.modulated_plain_value());
-        setter.set_parameter(&params.synth_filter_env_release, params.synth_vol_release.modulated_plain_value());
-        setter.set_parameter(&params.synth_filter_env_release_shape, params.synth_vol_release_shape.modulated_plain_value());
-        setter.set_parameter(&params.synth_filter_env_dip, params.synth_retrigger_dip.modulated_plain_value());
-    }
+    render_filter_adsr_visualization(ui, params, viz_x, viz_y, ui_state);
 }
 
 fn render_filter_adsr_visualization(
@@ -1050,6 +1056,7 @@ fn render_filter_adsr_visualization(
     params: &Arc<DeviceParams>,
     viz_x: f32,
     viz_y: f32,
+    ui_state: &SharedUiState,
 ) {
     let viz_w: f32 = 295.0;
     let viz_h: f32 = 200.0;
@@ -1078,24 +1085,50 @@ fn render_filter_adsr_visualization(
         );
     }
 
+    let tempo = ui_state.current_tempo.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.0;
+    let fe_div_to_ms = |div_idx: i32| -> f32 {
+        let div = crate::synth::lfo::LfoSyncDivision::from_index(div_idx);
+        (div.beats() as f64 / tempo.max(1.0) as f64 * 60000.0).max(0.5) as f32
+    };
+
     let range_val = params.synth_filter_env_range.modulated_plain_value().max(1.0);
     let range_ms = range_val * 1000.0;
     let max_a = range_ms.min(5000.0).max(1.0);
     let max_dr = range_ms.min(10000.0).max(1.0);
 
-    let attack_ms = params.synth_filter_env_attack.modulated_plain_value().clamp(0.5, max_a);
-    let decay_ms = params.synth_filter_env_decay.modulated_plain_value().clamp(0.5, max_dr);
+    let attack_ms = if params.synth_filter_env_attack_sync.value() {
+        fe_div_to_ms(params.synth_filter_env_attack_div.value())
+    } else {
+        params.synth_filter_env_attack.modulated_plain_value().clamp(0.5, max_a)
+    };
+    let hold_ms = if params.synth_filter_env_hold_sync.value() {
+        fe_div_to_ms(params.synth_filter_env_hold_div.value())
+    } else {
+        params.synth_filter_env_hold.modulated_plain_value().clamp(0.0, 5000.0)
+    };
+    let decay_ms = if params.synth_filter_env_decay_sync.value() {
+        fe_div_to_ms(params.synth_filter_env_decay_div.value())
+    } else {
+        params.synth_filter_env_decay.modulated_plain_value().clamp(0.5, max_dr)
+    };
+    let release_ms = if params.synth_filter_env_release_sync.value() {
+        fe_div_to_ms(params.synth_filter_env_release_div.value())
+    } else {
+        params.synth_filter_env_release.modulated_plain_value().clamp(0.5, max_dr)
+    };
     let sustain = params.synth_filter_env_sustain.modulated_plain_value().clamp(0.0, 1.0);
-    let release_ms = params.synth_filter_env_release.modulated_plain_value().clamp(0.5, max_dr);
     let attack_shape = params.synth_filter_env_attack_shape.modulated_plain_value().clamp(-1.0, 1.0);
     let decay_shape = params.synth_filter_env_decay_shape.modulated_plain_value().clamp(-1.0, 1.0);
     let release_shape = params.synth_filter_env_release_shape.modulated_plain_value().clamp(-1.0, 1.0);
+    let attack_s = params.synth_filter_env_attack_s.value();
+    let decay_s = params.synth_filter_env_decay_s.value();
+    let release_s = params.synth_filter_env_release_s.value();
 
     let dip = params.synth_filter_env_dip.modulated_plain_value().clamp(0.0, 1.0);
     let dip_ms: f32 = 2.0;
     let has_dip = dip > 0.001;
 
-    let adsr_total = attack_ms + decay_ms + release_ms;
+    let adsr_total = attack_ms + hold_ms + decay_ms + release_ms;
     let sustain_ms = adsr_total * 0.2;
     let effective_dip_ms = if has_dip { dip_ms } else { 0.0 };
     let total_ms = effective_dip_ms + adsr_total + sustain_ms;
@@ -1103,6 +1136,7 @@ fn render_filter_adsr_visualization(
 
     let dip_w = effective_dip_ms * time_scale * w;
     let a_w = attack_ms * time_scale * w;
+    let h_w = hold_ms * time_scale * w;
     let d_w = decay_ms * time_scale * w;
     let s_w = sustain_ms * time_scale * w;
     let r_w = release_ms * time_scale * w;
@@ -1110,19 +1144,66 @@ fn render_filter_adsr_visualization(
     let x0 = inner.left();
     let y_bot = inner.bottom();
 
-    let shaped_curve = |t: f32, shape: f32| -> f32 {
-        if shape > 0.0 {
-            1.0 - (1.0 - t).powf(1.0 + shape * 3.0)
-        } else if shape < 0.0 {
-            t.powf(1.0 + (-shape) * 3.0)
+    {
+        let div_line_color = Color32::from_rgb(45, 45, 55);
+        let div_label_color = Color32::from_gray(50);
+        let div_font = egui::FontId::proportional(9.0);
+        let divs: &[(f64, &str)] = &[
+            (0.03125, "1/128"), (0.0625, "1/64"), (0.125, "1/32"),
+            (0.25, "1/16"), (0.5, "1/8"), (1.0, "1/4"),
+            (2.0, "1/2"), (4.0, "1/1"), (8.0, "2/1"), (16.0, "4/1"),
+        ];
+        let mut last_x = -100.0_f32;
+        for &(beats, label) in divs {
+            let ms = (beats / tempo.max(1.0) as f64 * 60000.0) as f32;
+            if ms < 0.5 || ms > total_ms { continue; }
+            let x = inner.left() + ms / total_ms * w;
+            if (x - last_x) < 20.0 { continue; }
+            last_x = x;
+            ui.painter().line_segment(
+                [egui::pos2(x, inner.top()), egui::pos2(x, inner.bottom())],
+                egui::Stroke::new(0.5, div_line_color),
+            );
+            ui.painter().text(
+                egui::pos2(x, inner.top() + 1.0),
+                egui::Align2::CENTER_TOP,
+                label,
+                div_font.clone(),
+                div_label_color,
+            );
+        }
+    }
+
+    let shaped_curve = |t: f32, shape: f32, s_curve: bool| -> f32 {
+        let sd = if s_curve { (shape as f64).max(0.0) * 2.0 } else { shape as f64 };
+        let td = t as f64;
+        if sd.abs() < 0.01 { return t; }
+        let k = 1.0 + sd.abs() * 9.0;
+        let ln_k = if sd > 0.0 { k.ln() } else { -k.ln() };
+        if s_curve {
+            let ka = ln_k.abs();
+            let denom = ka.exp_m1();
+            (if ln_k > 0.0 {
+                if td <= 0.5 { 0.5 * (td * 2.0 * ka).exp_m1() / denom }
+                else { 1.0 - 0.5 * ((1.0 - td) * 2.0 * ka).exp_m1() / denom }
+            } else {
+                if td <= 0.5 { 0.5 * (1.0 - ((1.0 - td * 2.0) * ka).exp_m1() / denom) }
+                else { 1.0 - 0.5 * (1.0 - ((1.0 - (1.0 - td) * 2.0) * ka).exp_m1() / denom) }
+            }) as f32
         } else {
-            t
+            (if ln_k > 0.0 {
+                (td * ln_k).exp_m1() / ln_k.exp_m1()
+            } else {
+                let pk = -ln_k;
+                1.0 - ((1.0 - td) * pk).exp_m1() / pk.exp_m1()
+            }) as f32
         }
     };
 
     let segments = 16;
     let mut points = Vec::with_capacity(segments * 4 + 10);
     let dip_color = Color32::from_rgb(140, 80, 80);
+    let hold_color = Color32::from_rgb(120, 120, 60);
 
     if has_dip {
         let dip_start_v = sustain;
@@ -1143,7 +1224,7 @@ fn render_filter_adsr_visualization(
 
         for i in 0..=segments {
             let t = i as f32 / segments as f32;
-            let v = dip_target_v + shaped_curve(t, attack_shape) * (1.0 - dip_target_v);
+            let v = dip_target_v + shaped_curve(t, attack_shape, attack_s) * (1.0 - dip_target_v);
             points.push(egui::pos2(dip_x_end + t * a_w, y_bot - v * h));
         }
     } else {
@@ -1151,15 +1232,27 @@ fn render_filter_adsr_visualization(
 
         for i in 0..=segments {
             let t = i as f32 / segments as f32;
-            let v = shaped_curve(t, attack_shape);
+            let v = shaped_curve(t, attack_shape, attack_s);
             points.push(egui::pos2(x0 + t * a_w, y_bot - v * h));
         }
     }
 
-    let x_d_start = x0 + dip_w + a_w;
+    let x_h_start = x0 + dip_w + a_w;
+    if h_w > 0.5 {
+        let hold_end = egui::pos2(x_h_start + h_w, y_bot - h);
+        points.push(hold_end);
+
+        let hold_start_idx = points.len() - 2;
+        ui.painter().line_segment(
+            [points[hold_start_idx], hold_end],
+            egui::Stroke::new(1.5, hold_color),
+        );
+    }
+
+    let x_d_start = x_h_start + h_w;
     for i in 1..=segments {
         let t = i as f32 / segments as f32;
-        let v = 1.0 - shaped_curve(t, decay_shape) * (1.0 - sustain);
+        let v = 1.0 - shaped_curve(t, decay_shape, decay_s) * (1.0 - sustain);
         points.push(egui::pos2(x_d_start + t * d_w, y_bot - v * h));
     }
 
@@ -1169,7 +1262,7 @@ fn render_filter_adsr_visualization(
     let x_r_start = x_s_end;
     for i in 1..=segments {
         let t = i as f32 / segments as f32;
-        let v = sustain * (1.0 - shaped_curve(t, release_shape));
+        let v = sustain * (1.0 - shaped_curve(t, release_shape, release_s));
         points.push(egui::pos2(x_r_start + t * r_w, y_bot - v * h));
     }
 
@@ -1186,7 +1279,7 @@ fn render_filter_adsr_visualization(
         egui::Stroke::new(0.5, sustain_color),
     );
 
-    let total_adsr_ms = attack_ms + decay_ms + release_ms;
+    let total_adsr_ms = attack_ms + hold_ms + decay_ms + release_ms;
     let duration_str = if total_adsr_ms >= 1000.0 {
         format!("{:.1}s", total_adsr_ms / 1000.0)
     } else {
@@ -1548,15 +1641,14 @@ fn render_filter_sat_type_buttons(
     });
 }
 
-fn render_envelopes_tab(
+fn render_vol_env_tab(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
-    _ui_state: &Arc<SharedUiState>,
+    ui_state: &SharedUiState,
 ) {
     let content_rect = ui.max_rect();
-    let half_w = content_rect.width() / 2.0;
-    let sep_x = content_rect.left() + half_w;
+    let sep_x = content_rect.left() + content_rect.width() * 0.58;
     let margin = FRAME_MARGIN;
 
     let left_rect = egui::Rect::from_min_max(
@@ -1567,7 +1659,7 @@ fn render_envelopes_tab(
     left_ui.vertical(|ui| {
         ui.label(egui::RichText::new("VOLUME ENVELOPE").size(HEADER_FONT).strong());
         ui.add_space(10.0);
-        render_envelope_controls_compact(ui, params, setter);
+        render_envelope_controls_compact(ui, params, setter, ui_state);
     });
 
     ui.painter().line_segment(
@@ -1576,14 +1668,254 @@ fn render_envelopes_tab(
     );
 
     let right_rect = egui::Rect::from_min_max(
-        egui::pos2(sep_x + 10.0 + margin.left as f32, content_rect.top() + margin.top as f32),
+        egui::pos2(sep_x + 10.0, content_rect.top() + margin.top as f32),
         egui::pos2(content_rect.right() - margin.right as f32, content_rect.bottom()),
     );
     let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
     right_ui.vertical(|ui| {
+        ui.label(egui::RichText::new("MODIFIERS").size(HEADER_FONT).strong());
+        ui.add_space(10.0);
+
+        let mod_color = Some(Color32::from_rgb(100, 120, 80));
+        let vel_color = Some(Color32::from_rgb(120, 100, 60));
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_vertical_slider(
+                ui, params, setter,
+                &params.synth_vol_depth, "DPTH",
+                0.0, 1.0, SliderScale::Linear,
+                mod_color, None,
+            );
+            render_vertical_slider(
+                ui, params, setter,
+                &params.synth_env_key_track, "KEY",
+                0.0, 1.0, SliderScale::Linear,
+                mod_color, None,
+            );
+            ui.add_space(4.0);
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_env_vel_to_attack, "V>A",
+                -1.0, 1.0, SliderScale::Linear,
+                vel_color, &[(-1.0, "-1"), (0.0, "0"), (1.0, "+1")], None,
+            );
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_env_vel_to_decay, "V>D",
+                -1.0, 1.0, SliderScale::Linear,
+                vel_color, &[(-1.0, "-1"), (0.0, "0"), (1.0, "+1")], None,
+            );
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_env_vel_to_sustain, "V>S",
+                -1.0, 1.0, SliderScale::Linear,
+                vel_color, &[(-1.0, "-1"), (0.0, "0"), (1.0, "+1")], None,
+            );
+            ui.add_space(8.0);
+            let s_accent = Color32::from_rgb(180, 140, 60);
+            ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 5.0;
+                render_s_mode_button(ui, setter, &params.synth_vol_attack_s, "A S-MODE", s_accent, 100.0, 48.0);
+                render_s_mode_button(ui, setter, &params.synth_vol_decay_s, "D S-MODE", s_accent, 100.0, 48.0);
+                render_s_mode_button(ui, setter, &params.synth_vol_release_s, "R S-MODE", s_accent, 100.0, 48.0);
+            });
+        });
+
+        ui.add_space(20.0);
+        let loop_accent = Color32::from_rgb(80, 120, 160);
+        let current_loop = params.synth_vol_loop_mode.value();
+        ui.label(egui::RichText::new("LOOP MODE").size(14.0).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_looper_select_button(ui, setter, &params.synth_vol_loop_mode, "ONE", 0, current_loop, loop_accent, 80.0, 48.0);
+            render_looper_select_button(ui, setter, &params.synth_vol_loop_mode, "LOOP", 1, current_loop, loop_accent, 80.0, 48.0);
+        });
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("TEMPO SYNC").size(14.0).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        let tempo = ui_state.current_tempo.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.0;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_env_sync_row(ui, setter, "A", &params.synth_vol_attack_sync, &params.synth_vol_attack_div, "vs_a", tempo);
+            render_env_sync_row(ui, setter, "D", &params.synth_vol_decay_sync, &params.synth_vol_decay_div, "vs_d", tempo);
+        });
+        ui.add_space(5.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_env_sync_row(ui, setter, "H", &params.synth_vol_hold_sync, &params.synth_vol_hold_div, "vs_h", tempo);
+            render_env_sync_row(ui, setter, "R", &params.synth_vol_release_sync, &params.synth_vol_release_div, "vs_r", tempo);
+        });
+    });
+}
+
+fn render_filt_env_tab(
+    ui: &mut egui::Ui,
+    params: &Arc<DeviceParams>,
+    setter: &ParamSetter,
+    ui_state: &SharedUiState,
+) {
+    let content_rect = ui.max_rect();
+    let sep_x = content_rect.left() + content_rect.width() * 0.58;
+    let margin = FRAME_MARGIN;
+
+    let left_rect = egui::Rect::from_min_max(
+        egui::pos2(content_rect.left() + margin.left as f32 + 5.0, content_rect.top() + margin.top as f32),
+        egui::pos2(sep_x - 10.0, content_rect.bottom()),
+    );
+    let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
+    left_ui.vertical(|ui| {
         ui.label(egui::RichText::new("FILTER ENVELOPE").size(HEADER_FONT).strong());
         ui.add_space(10.0);
-        render_filter_envelope_controls(ui, params, setter);
+        render_filter_envelope_controls(ui, params, setter, ui_state);
+    });
+
+    ui.painter().line_segment(
+        [egui::pos2(sep_x, content_rect.top()), egui::pos2(sep_x, content_rect.bottom())],
+        egui::Stroke::new(1.0, Color32::BLACK),
+    );
+
+    let right_rect = egui::Rect::from_min_max(
+        egui::pos2(sep_x + 10.0, content_rect.top() + margin.top as f32),
+        egui::pos2(content_rect.right() - margin.right as f32, content_rect.bottom()),
+    );
+    let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
+    right_ui.vertical(|ui| {
+        ui.label(egui::RichText::new("OPTIONS").size(HEADER_FONT).strong());
+        ui.add_space(10.0);
+
+        let btn_size = egui::vec2(120.0, 48.0);
+        let (btn_rect, response) = ui.allocate_exact_size(btn_size, egui::Sense::click());
+        let bg = if response.hovered() {
+            Color32::from_rgb(55, 55, 65)
+        } else {
+            Color32::from_rgb(40, 40, 48)
+        };
+        ui.painter().rect_filled(btn_rect, 4.0, bg);
+        let font = egui::FontId::proportional(LABEL_FONT);
+        let galley = ui.painter().layout_no_wrap("COPY VOL".to_string(), font, Color32::from_gray(160));
+        let text_pos = btn_rect.center() - galley.size() / 2.0;
+        ui.painter().galley(text_pos, galley, Color32::from_gray(160));
+        if response.clicked() {
+            setter.set_parameter(&params.synth_filter_env_attack, params.synth_vol_attack.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_attack_shape, params.synth_vol_attack_shape.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_decay, params.synth_vol_decay.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_decay_shape, params.synth_vol_decay_shape.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_sustain, params.synth_vol_sustain.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_release, params.synth_vol_release.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_release_shape, params.synth_vol_release_shape.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_dip, params.synth_retrigger_dip.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_hold, params.synth_vol_hold.modulated_plain_value());
+            setter.set_parameter(&params.synth_filter_env_loop_mode, params.synth_vol_loop_mode.value());
+            setter.set_parameter(&params.synth_filter_env_attack_sync, params.synth_vol_attack_sync.value());
+            setter.set_parameter(&params.synth_filter_env_hold_sync, params.synth_vol_hold_sync.value());
+            setter.set_parameter(&params.synth_filter_env_decay_sync, params.synth_vol_decay_sync.value());
+            setter.set_parameter(&params.synth_filter_env_release_sync, params.synth_vol_release_sync.value());
+            setter.set_parameter(&params.synth_filter_env_attack_div, params.synth_vol_attack_div.value());
+            setter.set_parameter(&params.synth_filter_env_hold_div, params.synth_vol_hold_div.value());
+            setter.set_parameter(&params.synth_filter_env_decay_div, params.synth_vol_decay_div.value());
+            setter.set_parameter(&params.synth_filter_env_release_div, params.synth_vol_release_div.value());
+            setter.set_parameter(&params.synth_filter_env_attack_s, params.synth_vol_attack_s.value());
+            setter.set_parameter(&params.synth_filter_env_decay_s, params.synth_vol_decay_s.value());
+            setter.set_parameter(&params.synth_filter_env_release_s, params.synth_vol_release_s.value());
+        }
+
+        ui.add_space(15.0);
+        ui.label(egui::RichText::new("S-CURVE").size(14.0).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        let s_accent = Color32::from_rgb(180, 140, 60);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_s_mode_button(ui, setter, &params.synth_filter_env_attack_s, "A S-MODE", s_accent, 100.0, 48.0);
+            render_s_mode_button(ui, setter, &params.synth_filter_env_decay_s, "D S-MODE", s_accent, 100.0, 48.0);
+            render_s_mode_button(ui, setter, &params.synth_filter_env_release_s, "R S-MODE", s_accent, 100.0, 48.0);
+        });
+
+        ui.add_space(15.0);
+        let loop_accent = Color32::from_rgb(100, 80, 160);
+        let current_loop = params.synth_filter_env_loop_mode.value();
+        ui.label(egui::RichText::new("LOOP MODE").size(14.0).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_looper_select_button(ui, setter, &params.synth_filter_env_loop_mode, "ONE", 0, current_loop, loop_accent, 80.0, 48.0);
+            render_looper_select_button(ui, setter, &params.synth_filter_env_loop_mode, "LOOP", 1, current_loop, loop_accent, 80.0, 48.0);
+        });
+
+        ui.add_space(13.0);
+        ui.label(egui::RichText::new("TEMPO SYNC").size(14.0).color(Color32::from_gray(140)));
+        ui.add_space(6.0);
+        let tempo = ui_state.current_tempo.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.0;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_env_sync_row(ui, setter, "A", &params.synth_filter_env_attack_sync, &params.synth_filter_env_attack_div, "fs_a", tempo);
+            render_env_sync_row(ui, setter, "D", &params.synth_filter_env_decay_sync, &params.synth_filter_env_decay_div, "fs_d", tempo);
+        });
+        ui.add_space(5.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+            render_env_sync_row(ui, setter, "H", &params.synth_filter_env_hold_sync, &params.synth_filter_env_hold_div, "fs_h", tempo);
+            render_env_sync_row(ui, setter, "R", &params.synth_filter_env_release_sync, &params.synth_filter_env_release_div, "fs_r", tempo);
+        });
+    });
+}
+
+fn render_env_sync_row(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    label: &str,
+    sync_param: &nih_plug::prelude::BoolParam,
+    div_param: &nih_plug::prelude::IntParam,
+    _id: &str,
+    tempo: f32,
+) {
+    let is_on = sync_param.value();
+    let accent = Color32::from_rgb(80, 140, 120);
+    ui.horizontal(|ui| {
+        ui.set_min_width(170.0);
+        ui.set_max_width(170.0);
+        ui.spacing_mut().item_spacing.x = 8.0;
+
+        let btn_text = format!("{} SYNC", label);
+        let btn_size = egui::vec2(80.0, 48.0);
+        let (rect, response) = ui.allocate_exact_size(btn_size, egui::Sense::click());
+
+        let (bg, text_col) = if is_on {
+            (accent, Color32::WHITE)
+        } else {
+            let hover = if response.hovered() { Color32::from_rgb(55, 55, 65) } else { Color32::from_rgb(40, 40, 48) };
+            (hover, Color32::from_gray(160))
+        };
+        ui.painter().rect_filled(rect, 4.0, bg);
+        if is_on {
+            ui.painter().rect_stroke(rect, 4.0,
+                egui::Stroke::new(2.0, Color32::from_rgb(
+                    accent.r().saturating_add(30),
+                    accent.g().saturating_add(20),
+                    accent.b().saturating_add(20),
+                )),
+                egui::epaint::StrokeKind::Inside,
+            );
+        }
+        let font = egui::FontId::proportional(LABEL_FONT);
+        let galley = ui.painter().layout_no_wrap(btn_text, font, text_col);
+        let text_pos = rect.center() - galley.size() / 2.0;
+        ui.painter().galley(text_pos, galley, text_col);
+        if response.clicked() {
+            setter.set_parameter(sync_param, !is_on);
+        }
+
+        if is_on {
+            let div = crate::synth::lfo::LfoSyncDivision::from_index(div_param.value());
+            let ms = div.beats() / tempo.max(1.0) as f64 * 60000.0;
+            let val_str = if ms >= 1000.0 {
+                format!("{} {:.1}s", div.label(), ms / 1000.0)
+            } else {
+                format!("{} {:.0}ms", div.label(), ms)
+            };
+            ui.label(egui::RichText::new(val_str).size(14.0).color(Color32::from_gray(120)));
+        }
     });
 }
 
@@ -2598,14 +2930,56 @@ fn render_looper_select_button(
     }
 }
 
-const LOOPER_DIV_NAMES: [&str; 16] = [
+fn render_s_mode_button(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    param: &nih_plug::prelude::BoolParam,
+    label: &str,
+    accent: Color32,
+    w: f32,
+    h: f32,
+) {
+    let is_on = param.value();
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(w, h), egui::Sense::click());
+
+    let (bg, text_col) = if is_on {
+        (accent, Color32::WHITE)
+    } else {
+        let hover = if response.hovered() { Color32::from_rgb(55, 55, 65) } else { Color32::from_rgb(40, 40, 48) };
+        (hover, Color32::from_gray(160))
+    };
+
+    ui.painter().rect_filled(rect, 4.0, bg);
+    if is_on {
+        ui.painter().rect_stroke(rect, 4.0,
+            egui::Stroke::new(2.0, Color32::from_rgb(
+                accent.r().saturating_add(30),
+                accent.g().saturating_add(20),
+                accent.b().saturating_add(20),
+            )),
+            egui::epaint::StrokeKind::Inside,
+        );
+    }
+
+    let font = egui::FontId::proportional(LABEL_FONT);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_col);
+    let text_pos = rect.center() - galley.size() / 2.0;
+    ui.painter().galley(text_pos, galley, text_col);
+
+    if response.clicked() {
+        setter.set_parameter(param, !is_on);
+    }
+}
+
+const LOOPER_DIV_NAMES: [&str; 18] = [
     "1/1", "1/2", "1/4", "1/8", "1/16", "1/32",
     "1/2.", "1/4.", "1/8.", "1/16.",
     "1/2T", "1/4T", "1/8T", "1/16T",
     "2/1", "4/1",
+    "1/64", "1/128",
 ];
-const LOOPER_DIV_ORDER: [usize; 16] = [
-    15, 14, 0, 1, 2, 3, 4, 5,
+const LOOPER_DIV_ORDER: [usize; 18] = [
+    15, 14, 0, 1, 2, 3, 4, 5, 16, 17,
     6, 7, 8, 9,
     10, 11, 12, 13,
 ];
@@ -3141,6 +3515,104 @@ fn render_vertical_slider_with_ticks<P: Param>(
     });
 }
 
+// Division indices sorted by beat duration (ascending: fastest → slowest)
+const SYNC_DIV_BY_BEATS: [usize; 18] = [
+    17, 16, 5, 13, 4, 12, 9, 3, 11, 8, 2, 10, 7, 1, 6, 0, 14, 15,
+];
+
+fn render_vertical_sync_div_slider(
+    ui: &mut egui::Ui,
+    setter: &ParamSetter,
+    div_param: &nih_plug::prelude::IntParam,
+    label: &str,
+    color: Option<Color32>,
+    _tempo: f32,
+    max_beats: f64,
+) {
+    use crate::synth::lfo::LfoSyncDivision;
+
+    let allowed: Vec<usize> = SYNC_DIV_BY_BEATS.iter().copied()
+        .filter(|&idx| LfoSyncDivision::from_index(idx as i32).beats() <= max_beats + 0.001)
+        .collect();
+    let max_pos = (allowed.len() as f32 - 1.0).max(0.0);
+
+    ui.vertical(|ui| {
+        ui.set_width(SLIDER_COL_WIDTH);
+
+        if let Some(fill_color) = color {
+            ui.style_mut().visuals.widgets.inactive.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.hovered.bg_fill = fill_color;
+            ui.style_mut().visuals.widgets.active.bg_fill = fill_color;
+        }
+
+        ui.style_mut().spacing.slider_width = SLIDER_RAIL_LENGTH;
+        ui.style_mut().spacing.slider_rail_height = SLIDER_RAIL_THICKNESS;
+
+        let current_div = div_param.value() as usize;
+        let mut current_pos = 0.0f32;
+        for (i, &div_idx) in allowed.iter().enumerate() {
+            if div_idx == current_div {
+                current_pos = i as f32;
+                break;
+            }
+        }
+
+        let mut slider_value = current_pos;
+        let slider = egui::Slider::new(&mut slider_value, 0.0..=max_pos)
+            .vertical()
+            .show_value(false)
+            .step_by(1.0);
+        let r = ui.add(slider);
+        if r.changed() {
+            let pos = slider_value.round().clamp(0.0, max_pos) as usize;
+            let new_div_idx = allowed[pos];
+            setter.set_parameter(div_param, new_div_idx as i32);
+        }
+
+        let rail_rect = r.rect;
+        let handle_radius = SLIDER_RAIL_THICKNESS * 0.55;
+        let rail_top = rail_rect.top() + handle_radius;
+        let rail_bottom = rail_rect.bottom() - handle_radius;
+        let rail_height = rail_bottom - rail_top;
+        let label_color = Color32::from_gray(55);
+        let label_font = egui::FontId::proportional(10.0);
+        let label_x = rail_rect.right() + 3.0;
+
+        let n = allowed.len();
+        let step = if n <= 6 { 1 } else { (n - 1) / 5 };
+        for i in (0..n).step_by(step.max(1)) {
+            let div = LfoSyncDivision::from_index(allowed[i] as i32);
+            let t = i as f32 / max_pos;
+            let y = rail_bottom - t * rail_height;
+            let galley = ui.painter().layout_no_wrap(div.label().to_string(), label_font.clone(), label_color);
+            let text_height = galley.size().y;
+            ui.painter().galley(egui::pos2(label_x, y - text_height / 2.0), galley, label_color);
+        }
+        if n > 1 {
+            let last = n - 1;
+            if last % step != 0 {
+                let div = LfoSyncDivision::from_index(allowed[last] as i32);
+                let y = rail_top;
+                let galley = ui.painter().layout_no_wrap(div.label().to_string(), label_font.clone(), label_color);
+                let text_height = galley.size().y;
+                ui.painter().galley(egui::pos2(label_x, y - text_height / 2.0), galley, label_color);
+            }
+        }
+
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
+            let offset = match label.chars().count() {
+                1 => 5.0,
+                2 => -1.0,
+                3 => -7.0,
+                _ => -12.0,
+            };
+            ui.add_space(offset);
+            ui.label(egui::RichText::new(label).size(LABEL_FONT));
+        });
+    });
+}
+
 fn render_int_vertical_slider(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
@@ -3381,11 +3853,13 @@ fn render_envelope_controls_compact(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
+    ui_state: &SharedUiState,
 ) {
     let range_ms = params.synth_env_range.modulated_plain_value().max(20.0);
     let time_max_a = range_ms.min(5000.0).max(1.0);
     let time_max_dr = range_ms.min(10000.0).max(1.0);
     let shape_ticks: &[(f32, &str)] = &[(-1.0, "EXP"), (0.0, "LIN"), (1.0, "LOG")];
+    let s_ticks: &[(f32, &str)] = &[(0.0, "LIN"), (0.5, ""), (1.0, "MAX")];
     let atk_color = Some(Color32::from_rgb(140, 100, 60));
     let dec_color = Some(Color32::from_rgb(100, 80, 120));
     let sus_color = Some(Color32::from_rgb(60, 100, 80));
@@ -3397,34 +3871,61 @@ fn render_envelope_controls_compact(
     let time_ticks_dr = build_time_ticks(0.5, time_max_dr);
     let time_ticks_dr_ref: Vec<(f32, &str)> = time_ticks_dr.iter().map(|(v, s)| (*v, s.as_str())).collect();
 
+    let hold_color = Some(Color32::from_rgb(120, 120, 60));
+    let hold_ticks = build_time_ticks(0.0, time_max_a);
+    let hold_ticks_ref: Vec<(f32, &str)> = hold_ticks.iter().map(|(v, s)| (*v, s.as_str())).collect();
+
+    let tempo = ui_state.current_tempo.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.0;
+
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
-        render_vertical_slider_with_ticks(
-            ui, params, setter,
-            &params.synth_vol_attack, "A",
-            0.5, time_max_a, SliderScale::Exponential(2.0),
-            atk_color, &time_ticks_a_ref, None,
-        );
+        if params.synth_vol_attack_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_vol_attack_div, "A", atk_color, tempo, 1.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_vol_attack, "A",
+                0.5, time_max_a, SliderScale::Exponential(2.0),
+                atk_color, &time_ticks_a_ref, None,
+            );
+        }
         ui.add_space(2.0);
+        let (sh_min, sh_ticks) = if params.synth_vol_attack_s.value() { (0.0, s_ticks) } else { (-1.0, shape_ticks) };
         render_vertical_slider_with_ticks(
             ui, params, setter,
             &params.synth_vol_attack_shape, "A\u{2009}SH",
-            -1.0, 1.0, SliderScale::Linear,
-            atk_color, shape_ticks, None,
+            sh_min, 1.0, SliderScale::Linear,
+            atk_color, sh_ticks, None,
         );
         ui.add_space(4.0);
-        render_vertical_slider_with_ticks(
-            ui, params, setter,
-            &params.synth_vol_decay, "D",
-            0.5, time_max_dr, SliderScale::Exponential(2.0),
-            dec_color, &time_ticks_dr_ref, None,
-        );
+        if params.synth_vol_hold_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_vol_hold_div, "H", hold_color, tempo, 1.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_vol_hold, "H",
+                0.0, time_max_a, SliderScale::Exponential(2.0),
+                hold_color, &hold_ticks_ref, None,
+            );
+        }
+        ui.add_space(4.0);
+        if params.synth_vol_decay_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_vol_decay_div, "D", dec_color, tempo, 1.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_vol_decay, "D",
+                0.5, time_max_dr, SliderScale::Exponential(2.0),
+                dec_color, &time_ticks_dr_ref, None,
+            );
+        }
         ui.add_space(2.0);
+        let (sh_min, sh_ticks) = if params.synth_vol_decay_s.value() { (0.0, s_ticks) } else { (-1.0, shape_ticks) };
         render_vertical_slider_with_ticks(
             ui, params, setter,
             &params.synth_vol_decay_shape, "D\u{2009}SH",
-            -1.0, 1.0, SliderScale::Linear,
-            dec_color, shape_ticks, None,
+            sh_min, 1.0, SliderScale::Linear,
+            dec_color, sh_ticks, None,
         );
         ui.add_space(4.0);
         render_vertical_slider(
@@ -3434,18 +3935,23 @@ fn render_envelope_controls_compact(
             sus_color, None,
         );
         ui.add_space(4.0);
-        render_vertical_slider_with_ticks(
-            ui, params, setter,
-            &params.synth_vol_release, "R",
-            0.5, time_max_dr, SliderScale::Exponential(2.0),
-            rel_color, &time_ticks_dr_ref, None,
-        );
+        if params.synth_vol_release_sync.value() {
+            render_vertical_sync_div_slider(ui, setter, &params.synth_vol_release_div, "R", rel_color, tempo, 4.0);
+        } else {
+            render_vertical_slider_with_ticks(
+                ui, params, setter,
+                &params.synth_vol_release, "R",
+                0.5, time_max_dr, SliderScale::Exponential(2.0),
+                rel_color, &time_ticks_dr_ref, None,
+            );
+        }
         ui.add_space(2.0);
+        let (sh_min, sh_ticks) = if params.synth_vol_release_s.value() { (0.0, s_ticks) } else { (-1.0, shape_ticks) };
         render_vertical_slider_with_ticks(
             ui, params, setter,
             &params.synth_vol_release_shape, "R\u{2009}SH",
-            -1.0, 1.0, SliderScale::Linear,
-            rel_color, shape_ticks, None,
+            sh_min, 1.0, SliderScale::Linear,
+            rel_color, sh_ticks, None,
         );
         ui.add_space(6.0);
         render_vertical_slider(
@@ -3484,7 +3990,7 @@ fn render_envelope_controls_compact(
     // ADSR chart in the middle
     let viz_x = row_left + 65.0;
     let viz_y = row_top + 35.0;
-    render_adsr_visualization(ui, params, viz_x, viz_y);
+    render_adsr_visualization(ui, params, viz_x, viz_y, ui_state);
 
     // PLL TAIL label + AMT + TIME sliders on the right
     let slider_x = row_left + 400.0;
@@ -3523,6 +4029,7 @@ fn render_adsr_visualization(
     params: &Arc<DeviceParams>,
     viz_x: f32,
     viz_y: f32,
+    ui_state: &SharedUiState,
 ) {
     let viz_w: f32 = 295.0;
     let viz_h: f32 = 200.0;
@@ -3552,17 +4059,44 @@ fn render_adsr_visualization(
         );
     }
 
+    let tempo = ui_state.current_tempo.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.0;
+    let div_to_ms = |div_idx: i32| -> f32 {
+        let div = crate::synth::lfo::LfoSyncDivision::from_index(div_idx);
+        (div.beats() as f64 / tempo.max(1.0) as f64 * 60000.0).max(0.5) as f32
+    };
+
     let range_ms = params.synth_env_range.modulated_plain_value();
     let max_a = range_ms.min(5000.0).max(1.0);
     let max_dr = range_ms.min(10000.0).max(1.0);
 
-    let attack_ms = params.synth_vol_attack.modulated_plain_value().clamp(0.5, max_a);
-    let decay_ms = params.synth_vol_decay.modulated_plain_value().clamp(0.5, max_dr);
+    let attack_ms = if params.synth_vol_attack_sync.value() {
+        div_to_ms(params.synth_vol_attack_div.value())
+    } else {
+        params.synth_vol_attack.modulated_plain_value().clamp(0.5, max_a)
+    };
+    let hold_ms = if params.synth_vol_hold_sync.value() {
+        div_to_ms(params.synth_vol_hold_div.value())
+    } else {
+        params.synth_vol_hold.modulated_plain_value().clamp(0.0, 5000.0)
+    };
+    let decay_ms = if params.synth_vol_decay_sync.value() {
+        div_to_ms(params.synth_vol_decay_div.value())
+    } else {
+        params.synth_vol_decay.modulated_plain_value().clamp(0.5, max_dr)
+    };
+    let release_ms = if params.synth_vol_release_sync.value() {
+        div_to_ms(params.synth_vol_release_div.value())
+    } else {
+        params.synth_vol_release.modulated_plain_value().clamp(0.5, max_dr)
+    };
     let sustain = params.synth_vol_sustain.modulated_plain_value().clamp(0.0, 1.0);
-    let release_ms = params.synth_vol_release.modulated_plain_value().clamp(0.5, max_dr);
     let attack_shape = params.synth_vol_attack_shape.modulated_plain_value().clamp(-1.0, 1.0);
     let decay_shape = params.synth_vol_decay_shape.modulated_plain_value().clamp(-1.0, 1.0);
     let release_shape = params.synth_vol_release_shape.modulated_plain_value().clamp(-1.0, 1.0);
+    let attack_s = params.synth_vol_attack_s.value();
+    let decay_s = params.synth_vol_decay_s.value();
+    let release_s = params.synth_vol_release_s.value();
+    let depth = params.synth_vol_depth.modulated_plain_value().clamp(0.0, 1.0);
 
     let dip = params.synth_retrigger_dip.modulated_plain_value().clamp(0.0, 1.0);
     let dip_ms: f32 = 2.0;
@@ -3572,7 +4106,7 @@ fn render_adsr_visualization(
     let tail_amount = params.synth_pll_tail_amount.modulated_plain_value().clamp(0.0, 1.0);
     let pll_tail_on = tail_amount > 0.001;
 
-    let adsr_total = attack_ms + decay_ms + release_ms;
+    let adsr_total = attack_ms + hold_ms + decay_ms + release_ms;
     let sustain_ms = adsr_total * 0.2;
     let tail_ms = if pll_tail_on { tail_time_ms } else { 0.0 };
     let effective_dip_ms = if has_dip { dip_ms } else { 0.0 };
@@ -3581,6 +4115,7 @@ fn render_adsr_visualization(
 
     let dip_w = effective_dip_ms * time_scale * w;
     let a_w = attack_ms * time_scale * w;
+    let h_w = hold_ms * time_scale * w;
     let d_w = decay_ms * time_scale * w;
     let s_w = sustain_ms * time_scale * w;
     let r_w = release_ms * time_scale * w;
@@ -3589,19 +4124,66 @@ fn render_adsr_visualization(
     let x0 = inner.left();
     let y_bot = inner.bottom();
 
-    let shaped_curve = |t: f32, shape: f32| -> f32 {
-        if shape > 0.0 {
-            1.0 - (1.0 - t).powf(1.0 + shape * 3.0)
-        } else if shape < 0.0 {
-            t.powf(1.0 + (-shape) * 3.0)
+    {
+        let div_line_color = Color32::from_rgb(45, 45, 55);
+        let div_label_color = Color32::from_gray(50);
+        let div_font = egui::FontId::proportional(9.0);
+        let divs: &[(f64, &str)] = &[
+            (0.03125, "1/128"), (0.0625, "1/64"), (0.125, "1/32"),
+            (0.25, "1/16"), (0.5, "1/8"), (1.0, "1/4"),
+            (2.0, "1/2"), (4.0, "1/1"), (8.0, "2/1"), (16.0, "4/1"),
+        ];
+        let mut last_x = -100.0_f32;
+        for &(beats, label) in divs {
+            let ms = (beats / tempo.max(1.0) as f64 * 60000.0) as f32;
+            if ms < 0.5 || ms > total_ms { continue; }
+            let x = inner.left() + ms / total_ms * w;
+            if (x - last_x) < 20.0 { continue; }
+            last_x = x;
+            ui.painter().line_segment(
+                [egui::pos2(x, inner.top()), egui::pos2(x, inner.bottom())],
+                egui::Stroke::new(0.5, div_line_color),
+            );
+            ui.painter().text(
+                egui::pos2(x, inner.top() + 1.0),
+                egui::Align2::CENTER_TOP,
+                label,
+                div_font.clone(),
+                div_label_color,
+            );
+        }
+    }
+
+    let shaped_curve = |t: f32, shape: f32, s_curve: bool| -> f32 {
+        let sd = if s_curve { (shape as f64).max(0.0) * 2.0 } else { shape as f64 };
+        let td = t as f64;
+        if sd.abs() < 0.01 { return t; }
+        let k = 1.0 + sd.abs() * 9.0;
+        let ln_k = if sd > 0.0 { k.ln() } else { -k.ln() };
+        if s_curve {
+            let ka = ln_k.abs();
+            let denom = ka.exp_m1();
+            (if ln_k > 0.0 {
+                if td <= 0.5 { 0.5 * (td * 2.0 * ka).exp_m1() / denom }
+                else { 1.0 - 0.5 * ((1.0 - td) * 2.0 * ka).exp_m1() / denom }
+            } else {
+                if td <= 0.5 { 0.5 * (1.0 - ((1.0 - td * 2.0) * ka).exp_m1() / denom) }
+                else { 1.0 - 0.5 * (1.0 - ((1.0 - (1.0 - td) * 2.0) * ka).exp_m1() / denom) }
+            }) as f32
         } else {
-            t
+            (if ln_k > 0.0 {
+                (td * ln_k).exp_m1() / ln_k.exp_m1()
+            } else {
+                let pk = -ln_k;
+                1.0 - ((1.0 - td) * pk).exp_m1() / pk.exp_m1()
+            }) as f32
         }
     };
 
     let segments = 16;
     let mut points = Vec::with_capacity(segments * 4 + 10);
     let dip_color = Color32::from_rgb(140, 80, 80);
+    let hold_color = Color32::from_rgb(120, 120, 60);
 
     if has_dip {
         let dip_start_v = sustain;
@@ -3622,7 +4204,7 @@ fn render_adsr_visualization(
 
         for i in 0..=segments {
             let t = i as f32 / segments as f32;
-            let v = dip_target_v + shaped_curve(t, attack_shape) * (1.0 - dip_target_v);
+            let v = dip_target_v + shaped_curve(t, attack_shape, attack_s) * (1.0 - dip_target_v);
             points.push(egui::pos2(dip_x_end + t * a_w, y_bot - v * h));
         }
     } else {
@@ -3630,15 +4212,27 @@ fn render_adsr_visualization(
 
         for i in 0..=segments {
             let t = i as f32 / segments as f32;
-            let v = shaped_curve(t, attack_shape);
+            let v = shaped_curve(t, attack_shape, attack_s);
             points.push(egui::pos2(x0 + t * a_w, y_bot - v * h));
         }
     }
 
-    let x_d_start = x0 + dip_w + a_w;
+    let x_h_start = x0 + dip_w + a_w;
+    if h_w > 0.5 {
+        let hold_end = egui::pos2(x_h_start + h_w, y_bot - h);
+        points.push(hold_end);
+
+        let hold_start_idx = points.len() - 2;
+        ui.painter().line_segment(
+            [points[hold_start_idx], hold_end],
+            egui::Stroke::new(1.5, hold_color),
+        );
+    }
+
+    let x_d_start = x_h_start + h_w;
     for i in 1..=segments {
         let t = i as f32 / segments as f32;
-        let v = 1.0 - shaped_curve(t, decay_shape) * (1.0 - sustain);
+        let v = 1.0 - shaped_curve(t, decay_shape, decay_s) * (1.0 - sustain);
         points.push(egui::pos2(x_d_start + t * d_w, y_bot - v * h));
     }
 
@@ -3648,7 +4242,7 @@ fn render_adsr_visualization(
     let x_r_start = x_s_end;
     for i in 1..=segments {
         let t = i as f32 / segments as f32;
-        let v = sustain * (1.0 - shaped_curve(t, release_shape));
+        let v = sustain * (1.0 - shaped_curve(t, release_shape, release_s));
         points.push(egui::pos2(x_r_start + t * r_w, y_bot - v * h));
     }
 
@@ -3687,7 +4281,16 @@ fn render_adsr_visualization(
         egui::Stroke::new(0.5, sustain_color),
     );
 
-    let total_adsr_ms = attack_ms + decay_ms + release_ms;
+    if depth < 0.999 {
+        let depth_color = Color32::from_rgb(80, 60, 100);
+        let floor_y = y_bot - (1.0 - depth) * h;
+        ui.painter().line_segment(
+            [egui::pos2(inner.left(), floor_y), egui::pos2(inner.right(), floor_y)],
+            egui::Stroke::new(0.5, depth_color),
+        );
+    }
+
+    let total_adsr_ms = attack_ms + hold_ms + decay_ms + release_ms;
     let duration_str = if total_adsr_ms >= 1000.0 {
         format!("{:.1}s", total_adsr_ms / 1000.0)
     } else {

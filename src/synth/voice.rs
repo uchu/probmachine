@@ -2,7 +2,7 @@
 
 use super::dsp::{Oversampling, SlewValue, apply_distortion, mono_wavefold, mono_wavefold_pi};
 use super::oscillator::{Oscillator, PolyBlepWrapper, PLLOscillator, SawOscillator};
-use super::envelope::{Envelope, TailEnvelope};
+use super::envelope::{Envelope, EnvelopeLoopMode, TailEnvelope};
 use super::lfo::ModulationValues;
 use super::simd::{stereo, stereo_left, stereo_right, stereo_wavefold, stereo_wavefold_pi, OnePoleSlewValue, StereoDCBlocker};
 use super::ladder_filter::{LadderFilter, FilterParams};
@@ -288,13 +288,18 @@ pub struct Voice {
     filter_envelope: Envelope,
     filt_env_attack: f64,
     filt_env_attack_shape: f64,
+    filt_env_hold: f64,
     filt_env_decay: f64,
     filt_env_decay_shape: f64,
     filt_env_sustain: f64,
     filt_env_release: f64,
     filt_env_release_shape: f64,
+    filt_env_attack_s_curve: bool,
+    filt_env_decay_s_curve: bool,
+    filt_env_release_s_curve: bool,
     filt_env_dip: f64,
     filt_env_range: f64,
+    filt_env_loop_mode: EnvelopeLoopMode,
     filter_drive_boost: i32,
 
     // ===== PLL =====
@@ -347,12 +352,23 @@ pub struct Voice {
     // ===== Volume Envelope =====
     vol_env_attack: f64,
     vol_env_attack_shape: f64,
+    vol_env_hold: f64,
     vol_env_decay: f64,
     vol_env_decay_shape: f64,
     vol_env_sustain: f64,
     vol_env_release: f64,
     vol_env_release_shape: f64,
+    vol_env_attack_s_curve: bool,
+    vol_env_decay_s_curve: bool,
+    vol_env_release_s_curve: bool,
+    vol_env_depth: f64,
+    vol_env_loop_mode: EnvelopeLoopMode,
     velocity: f64,
+    env_key_track: f64,
+    env_vel_to_attack: f64,
+    env_vel_to_decay: f64,
+    env_vel_to_sustain: f64,
+    current_midi_note: f64,
 
     // ===== Retrigger / Phase / PLL Tail =====
     retrigger_dip: f64,
@@ -486,6 +502,13 @@ pub struct Voice {
     mod_env_range: f64,
     mod_pll_tail_amount: f64,
     mod_pll_tail_time: f64,
+    mod_env_hold: f64,
+    mod_env_key_track: f64,
+    mod_env_depth: f64,
+    mod_env_vel_attack: f64,
+    mod_env_vel_decay: f64,
+    mod_env_vel_sustain: f64,
+    mod_filt_env_hold: f64,
 
     // Slews for modulation (critical for smooth, crackle-free modulation)
     mod_slew_pll_damping: SlewValue,
@@ -527,6 +550,13 @@ pub struct Voice {
     mod_slew_env_range: SlewValue,
     mod_slew_pll_tail_amount: SlewValue,
     mod_slew_pll_tail_time: SlewValue,
+    mod_slew_env_hold: SlewValue,
+    mod_slew_env_key_track: SlewValue,
+    mod_slew_env_depth: SlewValue,
+    mod_slew_env_vel_attack: SlewValue,
+    mod_slew_env_vel_decay: SlewValue,
+    mod_slew_env_vel_sustain: SlewValue,
+    mod_slew_filt_env_hold: SlewValue,
 
     pll_mult_slew_time: f64,
     bpm: f64,
@@ -784,13 +814,18 @@ impl Voice {
             filter_envelope: Envelope::new(sample_rate_f64),
             filt_env_attack: 10.0,
             filt_env_attack_shape: 0.0,
+            filt_env_hold: 0.0,
             filt_env_decay: 100.0,
             filt_env_decay_shape: 0.0,
             filt_env_sustain: 0.7,
             filt_env_release: 200.0,
             filt_env_release_shape: 0.0,
+            filt_env_attack_s_curve: false,
+            filt_env_decay_s_curve: false,
+            filt_env_release_s_curve: false,
             filt_env_dip: 0.0,
             filt_env_range: 4.0,
+            filt_env_loop_mode: EnvelopeLoopMode::OneShot,
             filter_drive_boost: 0,
 
             pll_volume: 0.0,
@@ -839,12 +874,23 @@ impl Voice {
 
             vol_env_attack: 10.0,
             vol_env_attack_shape: 0.0,
+            vol_env_hold: 0.0,
             vol_env_decay: 100.0,
             vol_env_decay_shape: 0.0,
             vol_env_sustain: 0.7,
             vol_env_release: 200.0,
             vol_env_release_shape: 0.0,
+            vol_env_attack_s_curve: false,
+            vol_env_decay_s_curve: false,
+            vol_env_release_s_curve: false,
+            vol_env_depth: 1.0,
+            vol_env_loop_mode: EnvelopeLoopMode::OneShot,
             velocity: 1.0,
+            env_key_track: 0.0,
+            env_vel_to_attack: 0.0,
+            env_vel_to_decay: 0.0,
+            env_vel_to_sustain: 0.0,
+            current_midi_note: 60.0,
 
             retrigger_dip: 0.0,
             pll_tail_enabled: false,
@@ -962,6 +1008,13 @@ impl Voice {
             mod_env_range: 0.0,
             mod_pll_tail_amount: 0.0,
             mod_pll_tail_time: 0.0,
+            mod_env_hold: 0.0,
+            mod_env_key_track: 0.0,
+            mod_env_depth: 0.0,
+            mod_env_vel_attack: 0.0,
+            mod_env_vel_decay: 0.0,
+            mod_env_vel_sustain: 0.0,
+            mod_filt_env_hold: 0.0,
 
             mod_slew_pll_damping: make_slew(),
             mod_slew_pll_influence: make_slew(),
@@ -1002,6 +1055,13 @@ impl Voice {
             mod_slew_env_range: make_slew(),
             mod_slew_pll_tail_amount: make_slew(),
             mod_slew_pll_tail_time: make_slew(),
+            mod_slew_env_hold: make_slew(),
+            mod_slew_env_key_track: make_slew(),
+            mod_slew_env_depth: make_slew(),
+            mod_slew_env_vel_attack: make_slew(),
+            mod_slew_env_vel_decay: make_slew(),
+            mod_slew_env_vel_sustain: make_slew(),
+            mod_slew_filt_env_hold: make_slew(),
 
             pll_mult_slew_time: 0.15,
             bpm: 120.0,
@@ -1501,9 +1561,12 @@ impl Voice {
     }
 
     pub fn apply_modulation(&mut self, mod_values: &ModulationValues) {
-        // Apply slew to all modulation values for smooth, crackle-free modulation
-        // Using fast slew (5ms) for responsive modulation while avoiding artifacts
-        const MOD_SLEW_MS: f64 = 5.0;
+        // Minimal anti-click slew on modulation values.
+        // 0.5ms (~22 samples at 44.1kHz) prevents clicks from routing changes
+        // without rounding LFO waveform shapes or reducing modulation depth.
+        // Source-level slewing (LFO S&H slew, ModSeq output slew) handles
+        // smoothing of discontinuous modulation sources independently.
+        const MOD_SLEW_MS: f64 = 0.5;
 
         self.mod_pll_damping = self.mod_slew_pll_damping.next(mod_values.pll_damping, MOD_SLEW_MS);
         self.mod_pll_influence = self.mod_slew_pll_influence.next(mod_values.pll_influence, MOD_SLEW_MS);
@@ -1540,6 +1603,13 @@ impl Voice {
         self.mod_env_range = self.mod_slew_env_range.next(mod_values.env_range, MOD_SLEW_MS);
         self.mod_pll_tail_amount = self.mod_slew_pll_tail_amount.next(mod_values.pll_tail_amount, MOD_SLEW_MS);
         self.mod_pll_tail_time = self.mod_slew_pll_tail_time.next(mod_values.pll_tail_time, MOD_SLEW_MS);
+        self.mod_env_hold = self.mod_slew_env_hold.next(mod_values.env_hold, MOD_SLEW_MS);
+        self.mod_env_key_track = self.mod_slew_env_key_track.next(mod_values.env_key_track, MOD_SLEW_MS);
+        self.mod_env_depth = self.mod_slew_env_depth.next(mod_values.env_depth, MOD_SLEW_MS);
+        self.mod_env_vel_attack = self.mod_slew_env_vel_attack.next(mod_values.env_vel_attack, MOD_SLEW_MS);
+        self.mod_env_vel_decay = self.mod_slew_env_vel_decay.next(mod_values.env_vel_decay, MOD_SLEW_MS);
+        self.mod_env_vel_sustain = self.mod_slew_env_vel_sustain.next(mod_values.env_vel_sustain, MOD_SLEW_MS);
+        self.mod_filt_env_hold = self.mod_slew_filt_env_hold.next(mod_values.filt_env_hold, MOD_SLEW_MS);
         self.mod_filter_cutoff = self.mod_slew_filter_cutoff.next(mod_values.filter_cutoff, MOD_SLEW_MS);
         self.mod_filter_resonance = self.mod_slew_filter_resonance.next(mod_values.filter_resonance, MOD_SLEW_MS);
         self.mod_filter_drive = self.mod_slew_filter_drive.next(mod_values.filter_drive, MOD_SLEW_MS);
@@ -1576,6 +1646,37 @@ impl Voice {
         self.vol_env_release_shape = release_shape;
     }
 
+    pub fn set_vol_env_hold(&mut self, hold: f64) { self.vol_env_hold = hold.max(0.0); }
+    pub fn set_vol_env_depth(&mut self, depth: f64) { self.vol_env_depth = depth.clamp(0.0, 1.0); }
+    pub fn set_vol_env_loop_mode(&mut self, mode: i32) {
+        self.vol_env_loop_mode = match mode {
+            1 => EnvelopeLoopMode::LoopAHD,
+            _ => EnvelopeLoopMode::OneShot,
+        };
+    }
+    pub fn set_vol_env_s_curves(&mut self, attack_s: bool, decay_s: bool, release_s: bool) {
+        self.vol_env_attack_s_curve = attack_s;
+        self.vol_env_decay_s_curve = decay_s;
+        self.vol_env_release_s_curve = release_s;
+    }
+    pub fn set_filt_env_s_curves(&mut self, attack_s: bool, decay_s: bool, release_s: bool) {
+        self.filt_env_attack_s_curve = attack_s;
+        self.filt_env_decay_s_curve = decay_s;
+        self.filt_env_release_s_curve = release_s;
+    }
+    pub fn set_filt_env_hold(&mut self, hold: f64) { self.filt_env_hold = hold.max(0.0); }
+    pub fn set_filt_env_loop_mode(&mut self, mode: i32) {
+        self.filt_env_loop_mode = match mode {
+            1 => EnvelopeLoopMode::LoopAHD,
+            _ => EnvelopeLoopMode::OneShot,
+        };
+    }
+    pub fn set_env_key_track(&mut self, amount: f64) { self.env_key_track = amount.clamp(0.0, 1.0); }
+    pub fn set_env_vel_to_attack(&mut self, amount: f64) { self.env_vel_to_attack = amount.clamp(-1.0, 1.0); }
+    pub fn set_env_vel_to_decay(&mut self, amount: f64) { self.env_vel_to_decay = amount.clamp(-1.0, 1.0); }
+    pub fn set_env_vel_to_sustain(&mut self, amount: f64) { self.env_vel_to_sustain = amount.clamp(-1.0, 1.0); }
+    pub fn set_midi_note(&mut self, note: u8) { self.current_midi_note = note as f64; }
+
     pub fn set_retrigger_dip(&mut self, dip: f64) {
         self.retrigger_dip = dip.clamp(0.0, 1.0);
     }
@@ -1606,17 +1707,27 @@ impl Voice {
         self.volume_envelope.trigger(
             self.vol_env_attack,
             self.vol_env_attack_shape,
+            self.vol_env_hold,
             self.vol_env_decay,
             self.vol_env_decay_shape,
             self.vol_env_sustain,
             self.vol_env_release,
             self.vol_env_release_shape,
+            self.vol_env_loop_mode,
+            self.vol_env_attack_s_curve,
+            self.vol_env_decay_s_curve,
+            self.vol_env_release_s_curve,
         );
         self.filter_envelope.trigger(
             self.filt_env_attack, self.filt_env_attack_shape,
+            self.filt_env_hold,
             self.filt_env_decay, self.filt_env_decay_shape,
             self.filt_env_sustain,
             self.filt_env_release, self.filt_env_release_shape,
+            self.filt_env_loop_mode,
+            self.filt_env_attack_s_curve,
+            self.filt_env_decay_s_curve,
+            self.filt_env_release_s_curve,
         );
 
         if was_idle {
@@ -1629,19 +1740,29 @@ impl Voice {
         self.volume_envelope.trigger_with_dip(
             self.vol_env_attack,
             self.vol_env_attack_shape,
+            self.vol_env_hold,
             self.vol_env_decay,
             self.vol_env_decay_shape,
             self.vol_env_sustain,
             self.vol_env_release,
             self.vol_env_release_shape,
+            self.vol_env_loop_mode,
             effective_dip,
+            self.vol_env_attack_s_curve,
+            self.vol_env_decay_s_curve,
+            self.vol_env_release_s_curve,
         );
         self.filter_envelope.trigger_with_dip(
             self.filt_env_attack, self.filt_env_attack_shape,
+            self.filt_env_hold,
             self.filt_env_decay, self.filt_env_decay_shape,
             self.filt_env_sustain,
             self.filt_env_release, self.filt_env_release_shape,
+            self.filt_env_loop_mode,
             self.filt_env_dip,
+            self.filt_env_attack_s_curve,
+            self.filt_env_decay_s_curve,
+            self.filt_env_release_s_curve,
         );
     }
 
@@ -1736,20 +1857,46 @@ impl Voice {
         let volume_env = if self.vca_mode {
             1.0
         } else {
-            let mod_attack = (self.vol_env_attack + self.mod_env_attack * 4000.0).max(0.5);
+            let eff_key_track = (self.env_key_track + self.mod_env_key_track).clamp(0.0, 1.0);
+            let kt_scale = if eff_key_track > 0.001 {
+                2.0_f64.powf(-eff_key_track * (self.current_midi_note - 60.0) / 12.0)
+            } else {
+                1.0
+            };
+            let vel = self.velocity;
+            let eff_vel_atk = (self.env_vel_to_attack + self.mod_env_vel_attack).clamp(-1.0, 1.0);
+            let vel_attack_scale = if eff_vel_atk.abs() > 0.001 {
+                2.0_f64.powf(-eff_vel_atk * (vel - 0.5) * 4.0)
+            } else { 1.0 };
+            let eff_vel_dec = (self.env_vel_to_decay + self.mod_env_vel_decay).clamp(-1.0, 1.0);
+            let vel_decay_scale = if eff_vel_dec.abs() > 0.001 {
+                2.0_f64.powf(-eff_vel_dec * (vel - 0.5) * 4.0)
+            } else { 1.0 };
+            let eff_vel_sus = (self.env_vel_to_sustain + self.mod_env_vel_sustain).clamp(-1.0, 1.0);
+            let vel_sustain_offset = eff_vel_sus * (vel - 0.5);
+
+            let mod_attack = (self.vol_env_attack + self.mod_env_attack * 4000.0).max(0.5) * kt_scale * vel_attack_scale;
             let mod_attack_shape = (self.vol_env_attack_shape + self.mod_env_attack_shape).clamp(-1.0, 1.0);
-            let mod_decay = (self.vol_env_decay + self.mod_env_decay * 8000.0).max(0.5);
+            let mod_hold = (self.vol_env_hold + self.mod_env_hold * 5000.0).max(0.0) * kt_scale;
+            let mod_decay = (self.vol_env_decay + self.mod_env_decay * 8000.0).max(0.5) * kt_scale * vel_decay_scale;
             let mod_decay_shape = (self.vol_env_decay_shape + self.mod_env_decay_shape).clamp(-1.0, 1.0);
-            let mod_sustain = (self.vol_env_sustain + self.mod_env_sustain).clamp(0.0, 1.0);
-            let mod_release = (self.vol_env_release + self.mod_env_release * 8000.0).max(0.5);
+            let mod_sustain = (self.vol_env_sustain + self.mod_env_sustain + vel_sustain_offset).clamp(0.0, 1.0);
+            let mod_release = (self.vol_env_release + self.mod_env_release * 8000.0).max(0.5) * kt_scale;
             let mod_release_shape = (self.vol_env_release_shape + self.mod_env_release_shape).clamp(-1.0, 1.0);
             self.volume_envelope.update_params(
                 mod_attack, mod_attack_shape,
+                mod_hold,
                 mod_decay, mod_decay_shape,
                 mod_sustain,
                 mod_release, mod_release_shape,
+                self.vol_env_loop_mode,
+                self.vol_env_attack_s_curve,
+                self.vol_env_decay_s_curve,
+                self.vol_env_release_s_curve,
             );
-            self.volume_envelope.next()
+            let raw_env = self.volume_envelope.next();
+            let eff_depth = (self.vol_env_depth + self.mod_env_depth).clamp(0.0, 1.0);
+            eff_depth * raw_env + (1.0 - eff_depth)
         };
 
         let glide_ms = if self.glide_time_ms > 0.5 { self.glide_time_ms } else { 0.5 };
@@ -1795,8 +1942,10 @@ impl Voice {
         self.saw_shape_amount = (self.saw_shape_amount_slew.next(self.target_saw_shape_amount, 50.0) + self.mod_saw_shape_amount).clamp(0.0, 1.0);
         self.saw_tight = self.saw_tight_slew.next(self.target_saw_tight, 50.0).clamp(0.0, 1.0);
 
-        // Filter slews + modulation
-        self.filter_cutoff = (self.filter_cutoff_slew.next(self.target_filter_cutoff, 0.001) + self.mod_filter_cutoff * 10000.0).clamp(20.0, 20000.0);
+        // Filter slews + modulation (octave-based for perceptually consistent depth)
+        let base_cutoff = self.filter_cutoff_slew.next(self.target_filter_cutoff, 0.001);
+        let mod_octaves = self.mod_filter_cutoff * 5.0;
+        self.filter_cutoff = (base_cutoff * mod_octaves.exp2()).clamp(20.0, 20000.0);
         self.filter_resonance = (self.filter_resonance_slew.next(self.target_filter_resonance, 20.0) + self.mod_filter_resonance).clamp(0.0, 1.05);
         self.filter_drive = (self.filter_drive_slew.next(self.target_filter_drive, 20.0) + self.mod_filter_drive).clamp(0.0, 1.0);
         self.filter_stereo_sep = self.filter_stereo_sep_slew.next(self.target_filter_stereo_sep, 20.0).clamp(0.0, 0.50);
@@ -2174,9 +2323,14 @@ impl Voice {
             let filter_env = if self.filter_envelope.is_active() {
                 self.filter_envelope.update_params(
                     self.filt_env_attack, self.filt_env_attack_shape,
+                    (self.filt_env_hold + self.mod_filt_env_hold * 5000.0).max(0.0),
                     self.filt_env_decay, self.filt_env_decay_shape,
                     self.filt_env_sustain,
                     self.filt_env_release, self.filt_env_release_shape,
+                    self.filt_env_loop_mode,
+                    self.filt_env_attack_s_curve,
+                    self.filt_env_decay_s_curve,
+                    self.filt_env_release_s_curve,
                 );
                 self.filter_envelope.next()
             } else {

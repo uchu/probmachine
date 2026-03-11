@@ -345,6 +345,32 @@ pub struct PresetData {
     #[serde(default = "default_filter_env_range")]
     pub synth_filter_env_range: f32,
     #[serde(default)]
+    pub synth_filter_env_hold: f32,
+    #[serde(default)]
+    pub synth_filter_env_loop_mode: i32,
+    #[serde(default)]
+    pub synth_filter_env_attack_s: bool,
+    #[serde(default)]
+    pub synth_filter_env_decay_s: bool,
+    #[serde(default)]
+    pub synth_filter_env_release_s: bool,
+    #[serde(default)]
+    pub synth_filter_env_attack_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_filter_env_attack_div: i32,
+    #[serde(default)]
+    pub synth_filter_env_hold_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_filter_env_hold_div: i32,
+    #[serde(default)]
+    pub synth_filter_env_decay_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_filter_env_decay_div: i32,
+    #[serde(default)]
+    pub synth_filter_env_release_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_filter_env_release_div: i32,
+    #[serde(default)]
     pub synth_filter_drive_boost: i32,
     #[serde(default)]
     pub synth_filter_sat_type: i32,
@@ -368,9 +394,51 @@ pub struct PresetData {
     pub synth_filter_poles: i32,
 
     pub synth_vol_attack: f32,
+    #[serde(default)]
+    pub synth_vol_attack_shape: f32,
     pub synth_vol_decay: f32,
+    #[serde(default)]
+    pub synth_vol_decay_shape: f32,
     pub synth_vol_sustain: f32,
     pub synth_vol_release: f32,
+    #[serde(default)]
+    pub synth_vol_release_shape: f32,
+    #[serde(default)]
+    pub synth_vol_attack_s: bool,
+    #[serde(default)]
+    pub synth_vol_decay_s: bool,
+    #[serde(default)]
+    pub synth_vol_release_s: bool,
+    #[serde(default)]
+    pub synth_vol_hold: f32,
+    #[serde(default = "default_vol_depth")]
+    pub synth_vol_depth: f32,
+    #[serde(default)]
+    pub synth_vol_loop_mode: i32,
+    #[serde(default)]
+    pub synth_env_key_track: f32,
+    #[serde(default)]
+    pub synth_env_vel_to_attack: f32,
+    #[serde(default)]
+    pub synth_env_vel_to_decay: f32,
+    #[serde(default)]
+    pub synth_env_vel_to_sustain: f32,
+    #[serde(default)]
+    pub synth_vol_attack_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_vol_attack_div: i32,
+    #[serde(default)]
+    pub synth_vol_hold_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_vol_hold_div: i32,
+    #[serde(default)]
+    pub synth_vol_decay_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_vol_decay_div: i32,
+    #[serde(default)]
+    pub synth_vol_release_sync: bool,
+    #[serde(default = "default_div")]
+    pub synth_vol_release_div: i32,
     #[serde(default)]
     pub synth_retrigger_dip: f32,
     #[serde(default = "default_env_range")]
@@ -619,6 +687,8 @@ fn default_phase_reset() -> bool { true }
 fn default_env_range() -> f32 { 500.0 }
 fn default_pll_tail_time() -> f32 { 500.0 }
 fn default_pll_tail_amount() -> f32 { 0.3 }
+fn default_vol_depth() -> f32 { 1.0 }
+fn default_div() -> i32 { 3 }
 
 impl Default for PresetData {
     fn default() -> Self {
@@ -755,6 +825,19 @@ impl Default for PresetData {
             synth_filter_env_release_shape: 0.0,
             synth_filter_env_dip: 0.0,
             synth_filter_env_range: 4.0,
+            synth_filter_env_hold: 0.0,
+            synth_filter_env_loop_mode: 0,
+            synth_filter_env_attack_s: false,
+            synth_filter_env_decay_s: false,
+            synth_filter_env_release_s: false,
+            synth_filter_env_attack_sync: false,
+            synth_filter_env_attack_div: 3,
+            synth_filter_env_hold_sync: false,
+            synth_filter_env_hold_div: 3,
+            synth_filter_env_decay_sync: false,
+            synth_filter_env_decay_div: 3,
+            synth_filter_env_release_sync: false,
+            synth_filter_env_release_div: 3,
             synth_filter_drive_boost: 0,
             synth_filter_sat_type: 0,
             synth_filter_morph: 0.0,
@@ -768,9 +851,30 @@ impl Default for PresetData {
             synth_filter_poles: 0,
 
             synth_vol_attack: 10.0,
+            synth_vol_attack_shape: 0.0,
             synth_vol_decay: 100.0,
+            synth_vol_decay_shape: 0.0,
             synth_vol_sustain: 0.7,
             synth_vol_release: 200.0,
+            synth_vol_release_shape: 0.0,
+            synth_vol_attack_s: false,
+            synth_vol_decay_s: false,
+            synth_vol_release_s: false,
+            synth_vol_hold: 0.0,
+            synth_vol_depth: 1.0,
+            synth_vol_loop_mode: 0,
+            synth_env_key_track: 0.0,
+            synth_env_vel_to_attack: 0.0,
+            synth_env_vel_to_decay: 0.0,
+            synth_env_vel_to_sustain: 0.0,
+            synth_vol_attack_sync: false,
+            synth_vol_attack_div: 3,
+            synth_vol_hold_sync: false,
+            synth_vol_hold_div: 3,
+            synth_vol_decay_sync: false,
+            synth_vol_decay_div: 3,
+            synth_vol_release_sync: false,
+            synth_vol_release_div: 3,
             synth_retrigger_dip: 0.0,
             synth_env_range: 500.0,
             synth_phase_reset: true,
@@ -900,7 +1004,7 @@ pub struct Preset {
     pub author: String,
     #[serde(default)]
     pub description: String,
-    pub data: PresetData,
+    pub data: Box<PresetData>,
 }
 
 fn default_author() -> String {
@@ -913,7 +1017,7 @@ impl Preset {
             name: name.to_string(),
             author: "User".to_string(),
             description: String::new(),
-            data: PresetData::default(),
+            data: Box::new(PresetData::default()),
         }
     }
 
@@ -922,7 +1026,7 @@ impl Preset {
             name: name.to_string(),
             author: "Factory".to_string(),
             description: String::new(),
-            data: PresetData::default(),
+            data: Box::new(PresetData::default()),
         }
     }
 
@@ -932,7 +1036,7 @@ impl Preset {
             name: name.to_string(),
             author: "User".to_string(),
             description: String::new(),
-            data,
+            data: Box::new(data),
         }
     }
 
@@ -941,7 +1045,7 @@ impl Preset {
             name: name.to_string(),
             author: author.to_string(),
             description: description.chars().take(256).collect(),
-            data,
+            data: Box::new(data),
         }
     }
 }

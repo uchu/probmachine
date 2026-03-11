@@ -127,15 +127,25 @@
 
 | ID | Name | Range | Default |
 |----|------|-------|---------|
-| synth_filter_env_attack | Atk | 0.5–5000ms | 10.0 |
+| synth_filter_env_attack | Atk | 0.1–5000ms | 10.0 |
 | synth_filter_env_attack_shape | AtkSh | -1.0..+1.0 | 0.0 |
-| synth_filter_env_decay | Dec | 0.5–10000ms | 100.0 |
+| synth_filter_env_hold | Hold | 0–5000ms | 0.0 |
+| synth_filter_env_decay | Dec | 0.1–10000ms | 100.0 |
 | synth_filter_env_decay_shape | DecSh | -1.0..+1.0 | 0.0 |
 | synth_filter_env_sustain | Sus | 0.0–1.0 | 0.7 |
-| synth_filter_env_release | Rel | 0.5–10000ms | 200.0 |
+| synth_filter_env_release | Rel | 0.1–10000ms (3ms internal floor) | 200.0 |
 | synth_filter_env_release_shape | RelSh | -1.0..+1.0 | 0.0 |
+| synth_filter_env_attack_s | A S | bool | false |
+| synth_filter_env_decay_s | D S | bool | false |
+| synth_filter_env_release_s | R S | bool | false |
 | synth_filter_env_dip | Dip | 0.0–1.0 | 0.0 |
 | synth_filter_env_range | Range | 1.0–8.0 octaves | 4.0 |
+| synth_filter_env_loop_mode | Loop | 0=OneShot, 1=LoopAHD | 0 |
+| synth_filter_env_sync | Sync | bool | false |
+| synth_filter_env_attack_div | A Div | 0–15 | 3 (1/8) |
+| synth_filter_env_hold_div | H Div | 0–15 | 4 (1/16) |
+| synth_filter_env_decay_div | D Div | 0–15 | 2 (1/4) |
+| synth_filter_env_release_div | R Div | 0–15 | 2 (1/4) |
 
 ## Coloration
 
@@ -164,14 +174,29 @@
 
 | ID | Name | Range | Default |
 |----|------|-------|---------|
-| synth_vol_attack | Atk | 0.5–5000ms | 10.0 |
+| synth_vol_attack | Atk | 0.1–5000ms | 10.0 |
 | synth_vol_attack_shape | AtkSh | -1.0..+1.0 | 0.0 |
-| synth_vol_decay | Dec | 0.5–10000ms | 100.0 |
+| synth_vol_hold | Hold | 0–5000ms | 0.0 |
+| synth_vol_decay | Dec | 0.1–10000ms | 100.0 |
 | synth_vol_decay_shape | DecSh | -1.0..+1.0 | 0.0 |
 | synth_vol_sustain | Sus | 0.0–1.0 | 0.7 |
-| synth_vol_release | Rel | 0.5–10000ms | 200.0 |
+| synth_vol_release | Rel | 0.1–10000ms (3ms internal floor) | 200.0 |
 | synth_vol_release_shape | RelSh | -1.0..+1.0 | 0.0 |
+| synth_vol_attack_s | A S | bool | false |
+| synth_vol_decay_s | D S | bool | false |
+| synth_vol_release_s | R S | bool | false |
+| synth_vol_depth | Depth | 0.0–1.0 | 1.0 |
+| synth_vol_loop_mode | Loop | 0=OneShot, 1=LoopAHD | 0 |
+| synth_env_key_track | KT | 0.0–1.0 | 0.0 |
+| synth_env_vel_to_attack | V→Atk | -1.0..+1.0 | 0.0 |
+| synth_env_vel_to_decay | V→Dec | -1.0..+1.0 | 0.0 |
+| synth_env_vel_to_sustain | V→Sus | -1.0..+1.0 | 0.0 |
 | synth_retrigger_dip | Dip | 0.0–1.0 | 0.0 |
+| synth_vol_env_sync | Sync | bool | false |
+| synth_vol_attack_div | A Div | 0–15 | 3 (1/8) |
+| synth_vol_hold_div | H Div | 0–15 | 4 (1/16) |
+| synth_vol_decay_div | D Div | 0–15 | 2 (1/4) |
+| synth_vol_release_div | R Div | 0–15 | 2 (1/4) |
 | synth_phase_reset | PhRst | bool | true |
 | synth_pll_tail | Tail | bool | false |
 | synth_pll_tail_time | TailT | 50–5000ms | 500.0 |
@@ -196,15 +221,15 @@
 | lfo[N]_rate | Rate | 0.01–50Hz | 1.0 |
 | lfo[N]_waveform | Wave | 0=Sin,1=Tri,2=Saw,3=Sq,4=S&H | 0 |
 | lfo[N]_tempo_sync | Sync | bool | false |
-| lfo[N]_sync_division | Div | 0–13 | 2 |
+| lfo[N]_sync_division | Div | 0–17 | 2 |
 | lfo[N]_sync_source | Src | -1..2 | -1 |
 | lfo[N]_phase_mod | PhMod | 0.0–1.0 | 0.0 |
-| lfo[N]_dest1/dest2 | Dst | 0–30 | 0 |
+| lfo[N]_dest1/dest2 | Dst | 0–59 | 0 |
 | lfo[N]_amount1/amount2 | Amt | -1.0..+1.0 | 0.0 |
 
-**Sync divisions:** 0=1/1, 1=1/2, 2=1/4, 3=1/8, 4=1/16, 5=1/32, 6=1/2D, 7=1/4D, 8=1/8D, 9=1/16D, 10=1/2T, 11=1/4T, 12=1/8T, 13=1/16T
+**Sync divisions:** 0=1/1, 1=1/2, 2=1/4, 3=1/8, 4=1/16, 5=1/32, 6=1/2D, 7=1/4D, 8=1/8D, 9=1/16D, 10=1/2T, 11=1/4T, 12=1/8T, 13=1/16T, 14=2/1, 15=4/1, 16=1/64, 17=1/128
 
-**Mod destinations:** 0=None | PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult, 21=MultD | Sub: 19=Vol | VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol | SAW: 28=Fold, 29=SHP, 30=Vol | Color: 13=Drift, 14=Tube | Filter: 42=Cutoff, 43=Res, 44=Drive, 45=EnvAmt, 46=Morph, 47=FM, 48=Feedback, 49=BassLock, 50=PoleSpread, 51=ResChar, 52=ResTilt
+**Mod destinations:** 0=None | PLL: 1=Damp, 2=Infl, 3=Track, 4=FM, 5=XFB, 6=OT, 7=Rng, 17=Vol, 20=Mult, 21=MultD | Sub: 19=Vol | VPS: 8=D, 9=V, 25=VΔ, 23=DΔ, 24=Fold, 22=SHP, 18=Vol | SAW: 28=Fold, 29=SHP, 30=Vol | Color: 13=Drift, 14=Tube | Env: 31=Atk, 32=AtkSh, 33=Dec, 34=DecSh, 35=Sus, 36=Rel, 37=RelSh, 38=Dip, 39=Rng, 53=Hold, 54=KT, 55=Depth, 56=V→Atk, 57=V→Dec, 58=V→Sus | Filter: 42=Cutoff, 43=Res, 44=Drive, 45=EnvAmt, 46=Morph, 47=FM, 48=Feedback, 49=BassLock, 50=PoleSpread, 51=ResChar, 52=ResTilt, 59=FE Hold | Tail: 40=Amt, 41=Time
 
 ## Step Modulator
 
@@ -212,10 +237,16 @@
 |----|------|-------|---------|
 | mseq_step_[1-16] | Step N | -1.0..+1.0 | 0.0 |
 | mseq_ties | Ties | 0–65535 bitmask | 0 |
-| mseq_division | Rate | 0–13 | 3 |
+| mseq_division | Rate | 0–17 | 3 |
 | mseq_slew | Slew | 0–200ms | 5.0 |
-| mseq_dest1/dest2 | Dst | 0–30 | 0 |
+| mseq_length | Length | 1–16 | 16 |
+| mseq_retrigger | Retrig | bool | false |
+| mseq_bipolar | Bipolar | bool | true |
+| mseq_prob_[1-16] | Prob N | 0.0–1.0 | 1.0 |
+| mseq_dest1/dest2 | Dst | 0–59 | 0 |
 | mseq_amount1/amount2 | Amt | -1.0..+1.0 | 0.0 |
+| mseq_dest3/dest4 | Dst | 0–59 | 0 |
+| mseq_amount3/amount4 | Amt | -1.0..+1.0 | 0.0 |
 
 ## Compressor
 

@@ -20,6 +20,8 @@ pub enum LfoSyncDivision {
     Eighth,     // 1/8
     Sixteenth,  // 1/16
     ThirtySecond, // 1/32
+    SixtyFourth,  // 1/64
+    OneTwentyEighth, // 1/128
     // Dotted divisions (1.5x duration)
     HalfDotted,
     QuarterDotted,
@@ -44,6 +46,8 @@ impl LfoSyncDivision {
             LfoSyncDivision::Eighth => 0.5,
             LfoSyncDivision::Sixteenth => 0.25,
             LfoSyncDivision::ThirtySecond => 0.125,
+            LfoSyncDivision::SixtyFourth => 0.0625,
+            LfoSyncDivision::OneTwentyEighth => 0.03125,
             // Dotted = 1.5x normal
             LfoSyncDivision::HalfDotted => 3.0,
             LfoSyncDivision::QuarterDotted => 1.5,
@@ -77,6 +81,8 @@ impl LfoSyncDivision {
             13 => LfoSyncDivision::SixteenthTriplet,
             14 => LfoSyncDivision::TwoBars,
             15 => LfoSyncDivision::FourBars,
+            16 => LfoSyncDivision::SixtyFourth,
+            17 => LfoSyncDivision::OneTwentyEighth,
             _ => LfoSyncDivision::Quarter,
         }
     }
@@ -89,6 +95,8 @@ impl LfoSyncDivision {
             LfoSyncDivision::Eighth => "1/8",
             LfoSyncDivision::Sixteenth => "1/16",
             LfoSyncDivision::ThirtySecond => "1/32",
+            LfoSyncDivision::SixtyFourth => "1/64",
+            LfoSyncDivision::OneTwentyEighth => "1/128",
             LfoSyncDivision::HalfDotted => "1/2.",
             LfoSyncDivision::QuarterDotted => "1/4.",
             LfoSyncDivision::EighthDotted => "1/8.",
@@ -287,8 +295,15 @@ impl Lfo {
         // Generate output
         let raw_output = self.generate_waveform(self.phase);
 
-        // Apply slew for smooth output (critical for avoiding crackles)
-        self.output_slew.next(raw_output, self.slew_time_ms)
+        // Only S&H needs output slew (discrete jumps between random values).
+        // Continuous waveforms (Sine, Tri, Saw, Square) produce their intended
+        // shape without slew — the voice mod_slew provides anti-click protection.
+        if self.waveform == LfoWaveform::SampleAndHold {
+            self.output_slew.next(raw_output, self.slew_time_ms)
+        } else {
+            self.output_slew.next(raw_output, 0.0);
+            raw_output
+        }
     }
 }
 
@@ -349,6 +364,13 @@ pub enum ModDestination {
     FilterPoleSpread,
     FilterResCharacter,
     FilterResTilt,
+    EnvHold,
+    EnvKeyTrack,
+    EnvDepth,
+    EnvVelAttack,
+    EnvVelDecay,
+    EnvVelSustain,
+    FiltEnvHold,
 }
 
 impl ModDestination {
@@ -407,6 +429,13 @@ impl ModDestination {
             50 => ModDestination::FilterPoleSpread,
             51 => ModDestination::FilterResCharacter,
             52 => ModDestination::FilterResTilt,
+            53 => ModDestination::EnvHold,
+            54 => ModDestination::EnvKeyTrack,
+            55 => ModDestination::EnvDepth,
+            56 => ModDestination::EnvVelAttack,
+            57 => ModDestination::EnvVelDecay,
+            58 => ModDestination::EnvVelSustain,
+            59 => ModDestination::FiltEnvHold,
             _ => ModDestination::None,
         }
     }
@@ -460,6 +489,13 @@ impl ModDestination {
             ModDestination::FilterPoleSpread => "Flt Sprd",
             ModDestination::FilterResCharacter => "Flt Char",
             ModDestination::FilterResTilt => "Flt Tilt",
+            ModDestination::EnvHold => "Env Hold",
+            ModDestination::EnvKeyTrack => "Env KT",
+            ModDestination::EnvDepth => "Env Dpth",
+            ModDestination::EnvVelAttack => "Vel>Atk",
+            ModDestination::EnvVelDecay => "Vel>Dec",
+            ModDestination::EnvVelSustain => "Vel>Sus",
+            ModDestination::FiltEnvHold => "FE Hold",
         }
     }
 }
@@ -513,6 +549,13 @@ pub struct ModulationValues {
     pub filter_pole_spread: f64,
     pub filter_res_character: f64,
     pub filter_res_tilt: f64,
+    pub env_hold: f64,
+    pub env_key_track: f64,
+    pub env_depth: f64,
+    pub env_vel_attack: f64,
+    pub env_vel_decay: f64,
+    pub env_vel_sustain: f64,
+    pub filt_env_hold: f64,
 }
 
 impl ModulationValues {
@@ -563,6 +606,13 @@ impl ModulationValues {
         self.filter_pole_spread += other.filter_pole_spread;
         self.filter_res_character += other.filter_res_character;
         self.filter_res_tilt += other.filter_res_tilt;
+        self.env_hold += other.env_hold;
+        self.env_key_track += other.env_key_track;
+        self.env_depth += other.env_depth;
+        self.env_vel_attack += other.env_vel_attack;
+        self.env_vel_decay += other.env_vel_decay;
+        self.env_vel_sustain += other.env_vel_sustain;
+        self.filt_env_hold += other.filt_env_hold;
     }
 
     pub fn add_modulation(&mut self, dest: ModDestination, amount: f64, lfo_value: f64) {
@@ -615,6 +665,13 @@ impl ModulationValues {
             ModDestination::FilterPoleSpread => self.filter_pole_spread += mod_value,
             ModDestination::FilterResCharacter => self.filter_res_character += mod_value,
             ModDestination::FilterResTilt => self.filter_res_tilt += mod_value,
+            ModDestination::EnvHold => self.env_hold += mod_value,
+            ModDestination::EnvKeyTrack => self.env_key_track += mod_value,
+            ModDestination::EnvDepth => self.env_depth += mod_value,
+            ModDestination::EnvVelAttack => self.env_vel_attack += mod_value,
+            ModDestination::EnvVelDecay => self.env_vel_decay += mod_value,
+            ModDestination::EnvVelSustain => self.env_vel_sustain += mod_value,
+            ModDestination::FiltEnvHold => self.filt_env_hold += mod_value,
         }
     }
 }

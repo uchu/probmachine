@@ -1,9 +1,11 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use nih_plug_egui::egui::{self, Color32};
 use crate::params::DeviceParams;
 use crate::ui::grid_picker::{self, GridPickerGroup};
+use crate::ui::shared_state::SharedUiState;
 use nih_plug::prelude::*;
 
 const WAVE_BTN_SIZE: f32 = 56.0;
@@ -83,16 +85,13 @@ const DEST_GROUPS: &[GridPickerGroup] = &[
     },
 ];
 
-const FONT: f32 = 17.0;
+const FONT: f32 = 19.0;
 const COMBO_FONT: f32 = 18.0;
-const HEADER_FONT: f32 = 19.0;
-const LABEL_COLOR: Color32 = Color32::from_gray(120);
+const HEADER_FONT: f32 = 18.0;
+const LABEL_COLOR: Color32 = Color32::from_gray(140);
 const DISABLED_COLOR: Color32 = Color32::from_gray(30);
 const COMBO_BTN_HEIGHT: f32 = 38.0;
 const SLIDER_RAIL: f32 = 18.0;
-const AMOUNT_SLIDER_WIDTH: f32 = 200.0;
-const DEST_COMBO_WIDTH: f32 = 170.0;
-
 const COL_WIDTH: f32 = 330.0;
 const COL_GAP: f32 = 25.0;
 const COL_LEFT_PAD: f32 = 30.0;
@@ -106,15 +105,15 @@ const RATE_COLOR: Color32 = Color32::from_rgb(80, 100, 80);
 const PHASE_MOD_COLOR: Color32 = Color32::from_rgb(100, 60, 100);
 const ROUTE_AMOUNT_COLOR: Color32 = Color32::from_rgb(60, 80, 120);
 
-const STEP_BAR_WIDTH: f32 = 46.0;
-const STEP_BAR_HEIGHT: f32 = 140.0;
-const STEP_BAR_GAP: f32 = 4.0;
 const TIE_BTN_SIZE: f32 = 20.0;
 const STEP_COLOR_POS: Color32 = Color32::from_rgb(80, 140, 200);
 const STEP_COLOR_NEG: Color32 = Color32::from_rgb(200, 100, 80);
 const TIE_COLOR_ON: Color32 = Color32::from_rgb(200, 170, 60);
 const TIE_COLOR_OFF: Color32 = Color32::from_gray(45);
 const SLEW_COLOR: Color32 = Color32::from_rgb(120, 80, 60);
+const STEP_COLOR_UNI: Color32 = Color32::from_rgb(100, 170, 120);
+const PLAYHEAD_COLOR: Color32 = Color32::from_rgb(255, 200, 80);
+const TOOL_BTN_COLOR: Color32 = Color32::from_rgb(60, 80, 100);
 
 pub fn render_ui(
     ui: &mut egui::Ui,
@@ -164,10 +163,11 @@ pub fn render_step_mod_ui(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
+    ui_state: &Arc<SharedUiState>,
 ) {
     grid_picker::set_content_rect(ui, ui.available_rect_before_wrap());
     ui.add_space(6.0);
-    render_step_seq_panel(ui, params, setter);
+    render_step_seq_panel(ui, params, setter, ui_state);
 }
 
 fn render_lfo_column(
@@ -544,180 +544,372 @@ fn render_division_combo<F: FnOnce(usize)>(
     }
 }
 
-fn get_step_params(params: &Arc<DeviceParams>) -> [&FloatParam; 16] {
+fn get_step_params(params: &Arc<DeviceParams>) -> [&FloatParam; 32] {
     [
         &params.mseq_step_1, &params.mseq_step_2, &params.mseq_step_3, &params.mseq_step_4,
         &params.mseq_step_5, &params.mseq_step_6, &params.mseq_step_7, &params.mseq_step_8,
         &params.mseq_step_9, &params.mseq_step_10, &params.mseq_step_11, &params.mseq_step_12,
         &params.mseq_step_13, &params.mseq_step_14, &params.mseq_step_15, &params.mseq_step_16,
+        &params.mseq_step_17, &params.mseq_step_18, &params.mseq_step_19, &params.mseq_step_20,
+        &params.mseq_step_21, &params.mseq_step_22, &params.mseq_step_23, &params.mseq_step_24,
+        &params.mseq_step_25, &params.mseq_step_26, &params.mseq_step_27, &params.mseq_step_28,
+        &params.mseq_step_29, &params.mseq_step_30, &params.mseq_step_31, &params.mseq_step_32,
     ]
+}
+
+const BTN_W: f32 = 80.0;
+const BTN_H: f32 = 48.0;
+const UNSELECTED_BG: Color32 = Color32::from_rgb(40, 40, 48);
+const UNSELECTED_TEXT: Color32 = Color32::from_gray(160);
+const HOVER_BG: Color32 = Color32::from_rgb(55, 55, 65);
+const BTN_FONT: f32 = 14.0;
+const BTN_RADIUS: f32 = 4.0;
+
+fn render_option_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    selected: bool,
+    accent: Color32,
+) -> bool {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(BTN_W, BTN_H), egui::Sense::click());
+    let (bg, text_col) = if selected {
+        (accent, Color32::WHITE)
+    } else {
+        (UNSELECTED_BG, UNSELECTED_TEXT)
+    };
+    let draw_bg = if response.hovered() && !selected { HOVER_BG } else { bg };
+    ui.painter().rect_filled(rect, BTN_RADIUS, draw_bg);
+    if selected {
+        let stroke_col = Color32::from_rgb(
+            (accent.r() as u16 + 30).min(255) as u8,
+            (accent.g() as u16 + 20).min(255) as u8,
+            (accent.b() as u16 + 20).min(255) as u8,
+        );
+        ui.painter().rect_stroke(rect, BTN_RADIUS, egui::Stroke::new(2.0, stroke_col), egui::epaint::StrokeKind::Inside);
+    }
+    let galley = ui.painter().layout_no_wrap(label.to_string(), egui::FontId::proportional(BTN_FONT), text_col);
+    ui.painter().galley(rect.center() - galley.size() / 2.0, galley, text_col);
+    response.clicked()
 }
 
 fn render_step_seq_panel(
     ui: &mut egui::Ui,
     params: &Arc<DeviceParams>,
     setter: &ParamSetter,
+    ui_state: &Arc<SharedUiState>,
 ) {
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("STEP SEQ")
-            .size(HEADER_FONT).strong());
+    let content_rect = ui.max_rect();
+    let margin_l = 32.0;
+    let margin_r = 4.0;
+    let margin_t = 14.0;
+    let usable_w = content_rect.width() - margin_l - margin_r;
 
-        ui.add_space(24.0);
-
-        ui.label(egui::RichText::new("RATE").size(FONT).color(LABEL_COLOR));
-        ui.add_space(4.0);
-        render_division_combo(ui, "mseq_div", 100.0,
-            params.mseq_division.value() as usize,
-            |i| setter.set_parameter(&params.mseq_division, i as i32));
-
-        ui.add_space(20.0);
-
-        ui.label(egui::RichText::new("SLEW").size(FONT).color(LABEL_COLOR));
-        ui.add_space(4.0);
-        set_slider_color(ui, SLEW_COLOR);
-        let mut slew_val = params.mseq_slew.modulated_plain_value();
-        ui.style_mut().spacing.slider_width = 140.0;
-        ui.style_mut().spacing.slider_rail_height = SLIDER_RAIL;
-        let slider = egui::Slider::new(&mut slew_val, 0.0..=200.0)
-            .suffix(" ms")
-            .clamping(egui::SliderClamping::Always);
-        if ui.add(slider).changed() {
-            setter.set_parameter(&params.mseq_slew, slew_val);
-        }
-    });
-
-    ui.add_space(10.0);
-
+    let active_step = ui_state.mod_seq_step.load(Ordering::Relaxed) as usize;
+    let length = params.mseq_length.value() as usize;
+    let bipolar = params.mseq_bipolar.value();
     let step_params = get_step_params(params);
-    let ties = params.mseq_ties.value() as u16;
+    let ties_lo = params.mseq_ties.value() as u16 as u32;
+    let ties_hi = params.mseq_ties_hi.value() as u16 as u32;
+    let ties = ties_lo | (ties_hi << 16);
 
-    ui.horizontal(|ui| {
-        ui.add_space(10.0);
-        for (i, step_param) in step_params.iter().enumerate() {
-            render_step_bar(ui, setter, i, step_param);
-        }
-    });
+    let num_bars: usize = if length > 16 { 32 } else { 16 };
+    let gap = 3.0;
+    let bar_w = ((usable_w - (num_bars as f32 - 1.0) * gap) / num_bars as f32).floor().max(12.0);
 
-    ui.add_space(4.0);
+    let inner_rect = egui::Rect::from_min_max(
+        egui::pos2(content_rect.left() + margin_l, content_rect.top() + margin_t),
+        egui::pos2(content_rect.right() - margin_r, content_rect.bottom()),
+    );
+    let mut inner_ui = ui.new_child(egui::UiBuilder::new().max_rect(inner_rect));
+    inner_ui.vertical(|ui| {
+        ui.set_width(usable_w);
 
-    ui.horizontal(|ui| {
-        ui.add_space(10.0);
-        for i in 0..16 {
-            let tied = (ties >> i) & 1 == 1;
-            let new_tied = render_tie_button(ui, i, tied);
-            if new_tied != tied {
-                let new_ties = if new_tied {
-                    ties | (1 << i)
-                } else {
-                    ties & !(1 << i)
-                };
-                setter.set_parameter(&params.mseq_ties, new_ties as i32);
+        ui.label(egui::RichText::new("STEP SEQ").size(HEADER_FONT).strong());
+        ui.add_space(9.0);
+
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+
+            let mode_accent = Color32::from_rgb(140, 80, 160);
+            if render_option_button(ui, "BIPOLAR", bipolar, mode_accent) {
+                setter.set_parameter(&params.mseq_bipolar, true);
             }
-        }
-    });
+            if render_option_button(ui, "UNIPOLAR", !bipolar, mode_accent) {
+                setter.set_parameter(&params.mseq_bipolar, false);
+            }
 
-    ui.add_space(12.0);
+            ui.add_space(12.0);
 
-    ui.horizontal(|ui| {
+            let retrigger = params.mseq_retrigger.value();
+            if render_option_button(ui, "FREE", !retrigger, Color32::from_rgb(50, 55, 60)) {
+                setter.set_parameter(&params.mseq_retrigger, false);
+            }
+            if render_option_button(ui, "RETRIG", retrigger, Color32::from_rgb(80, 160, 80)) {
+                setter.set_parameter(&params.mseq_retrigger, true);
+            }
+
+            ui.add_space(16.0);
+            ui.label(egui::RichText::new("RATE").size(FONT).color(LABEL_COLOR));
+            ui.add_space(4.0);
+            render_division_combo(ui, "mseq_div", 100.0,
+                params.mseq_division.value() as usize,
+                |i| setter.set_parameter(&params.mseq_division, i as i32));
+
+            ui.add_space(16.0);
+            ui.label(egui::RichText::new("LENGTH").size(FONT).color(LABEL_COLOR));
+            ui.add_space(4.0);
+            let length_names: [&str; 32] = [
+                "1", "2", "3", "4", "5", "6", "7", "8",
+                "9", "10", "11", "12", "13", "14", "15", "16",
+                "17", "18", "19", "20", "21", "22", "23", "24",
+                "25", "26", "27", "28", "29", "30", "31", "32",
+            ];
+            render_combo(ui, "mseq_len", 70.0, &length_names,
+                (params.mseq_length.value() - 1) as usize,
+                |i| setter.set_parameter(&params.mseq_length, (i + 1) as i32));
+        });
+
         ui.add_space(10.0);
-        render_route_slot_horizontal(ui, setter, "mseq", 1, &params.mseq_dest1, &params.mseq_amount1, DEST_COMBO_WIDTH, AMOUNT_SLIDER_WIDTH);
-        ui.add_space(40.0);
-        render_route_slot_horizontal(ui, setter, "mseq", 2, &params.mseq_dest2, &params.mseq_amount2, DEST_COMBO_WIDTH, AMOUNT_SLIDER_WIDTH);
+
+        ui.horizontal(|ui| {
+            for i in 0..num_bars {
+                render_step_bar_enhanced(ui, setter, i, step_params[i],
+                    i == active_step, i < length, bipolar, bar_w);
+                if i < num_bars - 1 { ui.add_space(gap); }
+            }
+        });
+
+        ui.add_space(3.0);
+
+        ui.horizontal(|ui| {
+            for i in 0..num_bars {
+                let tied = (ties >> i) & 1 == 1;
+                let new_tied = render_tie_button_enhanced(ui, i, tied, i < length, bar_w);
+                if new_tied != tied {
+                    let new_ties = if new_tied { ties | (1 << i) } else { ties & !(1 << i) };
+                    setter.set_parameter(&params.mseq_ties, (new_ties & 0xFFFF) as i32);
+                    setter.set_parameter(&params.mseq_ties_hi, ((new_ties >> 16) & 0xFFFF) as i32);
+                }
+                if i < num_bars - 1 { ui.add_space(gap); }
+            }
+        });
+
+        ui.add_space(13.0);
+
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 5.0;
+
+            ui.label(egui::RichText::new("SLEW").size(FONT).color(LABEL_COLOR));
+            ui.add_space(4.0);
+            set_slider_color(ui, SLEW_COLOR);
+            let mut slew_val = params.mseq_slew.modulated_plain_value();
+            ui.style_mut().spacing.slider_width = 120.0;
+            ui.style_mut().spacing.slider_rail_height = SLIDER_RAIL;
+            let slider = egui::Slider::new(&mut slew_val, 0.0..=200.0)
+                .suffix(" ms")
+                .clamping(egui::SliderClamping::Always);
+            if ui.add(slider).changed() {
+                setter.set_parameter(&params.mseq_slew, slew_val);
+            }
+
+            ui.add_space(20.0);
+
+            if render_styled_button(ui, "RANDOM", TOOL_BTN_COLOR) {
+                for sp in &step_params[..num_bars] {
+                    setter.set_parameter(*sp, rand::random::<f32>() * 2.0 - 1.0);
+                }
+            }
+            if render_styled_button(ui, "CLEAR", TOOL_BTN_COLOR) {
+                for sp in &step_params { setter.set_parameter(*sp, 0.0); }
+                setter.set_parameter(&params.mseq_ties, 0);
+                setter.set_parameter(&params.mseq_ties_hi, 0);
+            }
+            if render_styled_button(ui, "INVERT", TOOL_BTN_COLOR) {
+                for sp in &step_params[..num_bars] { setter.set_parameter(*sp, -sp.value()); }
+            }
+            if render_styled_button(ui, "MIRROR", TOOL_BTN_COLOR) {
+                let vals: Vec<f32> = step_params[..num_bars].iter().map(|p| p.value()).collect();
+                for (i, sp) in step_params[..num_bars].iter().enumerate() {
+                    setter.set_parameter(*sp, vals[num_bars - 1 - i]);
+                }
+            }
+        });
+
+        ui.add_space(10.0);
+
+        for row in 0..2 {
+            ui.horizontal(|ui| {
+                let slots: [(usize, &IntParam, &FloatParam); 2] = if row == 0 {
+                    [(1, &params.mseq_dest1, &params.mseq_amount1),
+                     (2, &params.mseq_dest2, &params.mseq_amount2)]
+                } else {
+                    [(3, &params.mseq_dest3, &params.mseq_amount3),
+                     (4, &params.mseq_dest4, &params.mseq_amount4)]
+                };
+                for (slot, dest, amount) in slots {
+                    render_route_slot_horizontal(ui, setter, "mseq", slot, dest, amount,
+                        COL_DEST_COMBO, AMOUNT_INLINE_WIDTH);
+                    ui.add_space(20.0);
+                }
+            });
+            if row == 0 { ui.add_space(6.0); }
+        }
     });
 }
 
-fn render_step_bar(
+fn render_styled_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    color: Color32,
+) -> bool {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(BTN_W, BTN_H), egui::Sense::click());
+    let bg = if response.hovered() {
+        Color32::from_rgb(
+            (color.r() as u16 + 25).min(255) as u8,
+            (color.g() as u16 + 25).min(255) as u8,
+            (color.b() as u16 + 25).min(255) as u8,
+        )
+    } else { color };
+    ui.painter().rect_filled(rect, BTN_RADIUS, bg);
+    let galley = ui.painter().layout_no_wrap(
+        label.to_string(), egui::FontId::proportional(BTN_FONT), Color32::WHITE,
+    );
+    ui.painter().galley(rect.center() - galley.size() / 2.0, galley, Color32::WHITE);
+    response.clicked()
+}
+
+fn render_step_bar_enhanced(
     ui: &mut egui::Ui,
     setter: &ParamSetter,
     _step_idx: usize,
     param: &FloatParam,
+    is_active: bool,
+    is_enabled: bool,
+    bipolar: bool,
+    bar_w: f32,
 ) {
-    let total_width = STEP_BAR_WIDTH + STEP_BAR_GAP;
-    let desired_size = egui::vec2(total_width, STEP_BAR_HEIGHT);
-    let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
-
-    let bar_rect = egui::Rect::from_min_size(
-        rect.min,
-        egui::vec2(STEP_BAR_WIDTH, STEP_BAR_HEIGHT),
-    );
+    let bar_h = 160.0;
+    let desired_size = egui::vec2(bar_w, bar_h);
+    let sense = if is_enabled { egui::Sense::click_and_drag() } else { egui::Sense::hover() };
+    let (rect, response) = ui.allocate_exact_size(desired_size, sense);
 
     let value = param.value();
-    let center_y = bar_rect.center().y;
 
-    ui.painter().rect_filled(bar_rect, 2.0, Color32::from_gray(35));
+    let bg = if is_enabled { Color32::from_gray(35) } else { Color32::from_gray(25) };
+    ui.painter().rect_filled(rect, 2.0, bg);
 
-    ui.painter().line_segment(
-        [egui::pos2(bar_rect.left(), center_y), egui::pos2(bar_rect.right(), center_y)],
-        egui::Stroke::new(1.0, Color32::from_gray(55)),
-    );
+    if is_active && is_enabled {
+        ui.painter().rect_stroke(rect, 2.0, egui::Stroke::new(2.0, PLAYHEAD_COLOR), egui::epaint::StrokeKind::Inside);
+    }
 
-    if value.abs() > 0.005 {
-        let fill_color = if value > 0.0 { STEP_COLOR_POS } else { STEP_COLOR_NEG };
-        let fill_top;
-        let fill_bottom;
-        if value > 0.0 {
-            fill_top = center_y - (value * (STEP_BAR_HEIGHT / 2.0));
-            fill_bottom = center_y;
-        } else {
-            fill_top = center_y;
-            fill_bottom = center_y + (-value * (STEP_BAR_HEIGHT / 2.0));
-        }
-        let fill_rect = egui::Rect::from_min_max(
-            egui::pos2(bar_rect.left() + 1.0, fill_top),
-            egui::pos2(bar_rect.right() - 1.0, fill_bottom),
+    let alpha = if is_enabled { 255 } else { 80 };
+
+    if bipolar {
+        let center_y = rect.center().y;
+        ui.painter().line_segment(
+            [egui::pos2(rect.left(), center_y), egui::pos2(rect.right(), center_y)],
+            egui::Stroke::new(1.0, Color32::from_gray(55)),
         );
-        ui.painter().rect_filled(fill_rect, 0.0, fill_color);
+
+        if value.abs() > 0.005 {
+            let fill_color = if value > 0.0 {
+                Color32::from_rgba_premultiplied(
+                    (STEP_COLOR_POS.r() as u16 * alpha as u16 / 255) as u8,
+                    (STEP_COLOR_POS.g() as u16 * alpha as u16 / 255) as u8,
+                    (STEP_COLOR_POS.b() as u16 * alpha as u16 / 255) as u8,
+                    alpha,
+                )
+            } else {
+                Color32::from_rgba_premultiplied(
+                    (STEP_COLOR_NEG.r() as u16 * alpha as u16 / 255) as u8,
+                    (STEP_COLOR_NEG.g() as u16 * alpha as u16 / 255) as u8,
+                    (STEP_COLOR_NEG.b() as u16 * alpha as u16 / 255) as u8,
+                    alpha,
+                )
+            };
+            let (fill_top, fill_bottom) = if value > 0.0 {
+                (center_y - (value * (bar_h / 2.0)), center_y)
+            } else {
+                (center_y, center_y + (-value * (bar_h / 2.0)))
+            };
+            let fill_rect = egui::Rect::from_min_max(
+                egui::pos2(rect.left() + 1.0, fill_top),
+                egui::pos2(rect.right() - 1.0, fill_bottom),
+            );
+            ui.painter().rect_filled(fill_rect, 0.0, fill_color);
+        }
+    } else {
+        let display_val = (value + 1.0) * 0.5;
+        if display_val > 0.005 {
+            let fill_color = Color32::from_rgba_premultiplied(
+                (STEP_COLOR_UNI.r() as u16 * alpha as u16 / 255) as u8,
+                (STEP_COLOR_UNI.g() as u16 * alpha as u16 / 255) as u8,
+                (STEP_COLOR_UNI.b() as u16 * alpha as u16 / 255) as u8,
+                alpha,
+            );
+            let fill_top = rect.bottom() - (display_val * bar_h);
+            let fill_rect = egui::Rect::from_min_max(
+                egui::pos2(rect.left() + 1.0, fill_top),
+                egui::pos2(rect.right() - 1.0, rect.bottom() - 1.0),
+            );
+            ui.painter().rect_filled(fill_rect, 0.0, fill_color);
+        }
     }
 
-    if response.dragged() {
-        let drag_delta = response.drag_delta();
-        let sensitivity = 1.0 / STEP_BAR_HEIGHT;
-        let new_value = (value - drag_delta.y * sensitivity).clamp(-1.0, 1.0);
-        setter.set_parameter(param, new_value);
-    }
-
-    if response.double_clicked() {
-        setter.set_parameter(param, 0.0);
+    if is_enabled {
+        if response.dragged() {
+            let drag_delta = response.drag_delta();
+            let sensitivity = 1.0 / bar_h;
+            let new_value = (value - drag_delta.y * sensitivity).clamp(-1.0, 1.0);
+            setter.set_parameter(param, new_value);
+        }
+        if response.double_clicked() {
+            setter.set_parameter(param, 0.0);
+        }
+        let display = if bipolar { value } else { (value + 1.0) * 0.5 };
+        response.on_hover_text(format!("{:.2}", display));
     }
 }
 
-fn render_tie_button(
+fn render_tie_button_enhanced(
     ui: &mut egui::Ui,
     step_idx: usize,
     tied: bool,
+    is_enabled: bool,
+    bar_w: f32,
 ) -> bool {
-    let total_width = STEP_BAR_WIDTH + STEP_BAR_GAP;
-    let desired_size = egui::vec2(total_width, TIE_BTN_SIZE);
-    let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    let desired_size = egui::vec2(bar_w, TIE_BTN_SIZE);
+    let sense = if is_enabled { egui::Sense::click() } else { egui::Sense::hover() };
+    let (rect, response) = ui.allocate_exact_size(desired_size, sense);
 
-    let btn_rect = egui::Rect::from_min_size(
-        rect.min,
-        egui::vec2(STEP_BAR_WIDTH, TIE_BTN_SIZE),
-    );
+    let bg = if !is_enabled {
+        Color32::from_gray(22)
+    } else if tied {
+        TIE_COLOR_ON
+    } else {
+        TIE_COLOR_OFF
+    };
+    ui.painter().rect_filled(rect, 2.0, bg);
 
-    let bg = if tied { TIE_COLOR_ON } else { TIE_COLOR_OFF };
-    ui.painter().rect_filled(btn_rect, 2.0, bg);
-
-    if tied && step_idx < 15 {
-        let y = btn_rect.center().y;
+    if tied && is_enabled && step_idx < 15 {
+        let y = rect.center().y;
         ui.painter().line_segment(
-            [egui::pos2(btn_rect.right() - 2.0, y), egui::pos2(btn_rect.right() + STEP_BAR_GAP + 2.0, y)],
+            [egui::pos2(rect.right() - 2.0, y), egui::pos2(rect.right() + 5.0, y)],
             egui::Stroke::new(2.0, TIE_COLOR_ON),
         );
     }
 
-    let label = if tied { "T" } else { "" };
-    if !label.is_empty() {
+    if tied && is_enabled {
         ui.painter().text(
-            btn_rect.center(),
+            rect.center(),
             egui::Align2::CENTER_CENTER,
-            label,
+            "T",
             egui::FontId::proportional(11.0),
             Color32::from_gray(30),
         );
     }
 
-    if response.clicked() { !tied } else { tied }
+    if is_enabled && response.clicked() { !tied } else { tied }
 }
 
 fn render_toggle(ui: &mut egui::Ui, value: &mut bool, label: &str) {

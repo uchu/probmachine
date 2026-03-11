@@ -95,7 +95,7 @@ Generalized N-pole transistor ladder filter (D'Angelo & Valimaki topology). Swit
 
 ### Parameters
 - **Poles**: 4-POLE (24dB/oct) or 8-POLE (48dB/oct)
-- **Cutoff** (20Hz–20kHz): Exponential scaling, modulation range ±10kHz
+- **Cutoff** (20Hz–20kHz): Exponential scaling, modulation range ±5 octaves (logarithmic, perceptually consistent)
 - **Resonance** (0–1.05): >1.0 enables self-oscillation, bass compensation applied
 - **Drive** (0–1): Pre-filter saturation amount (1 + drive × 3 gain into tanh)
 - **Drive Boost**: OFF (1×), +12dB, +24dB, +48dB — extra gain multiplier on drive for aggressive saturation
@@ -116,9 +116,11 @@ Generalized N-pole transistor ladder filter (D'Angelo & Valimaki topology). Swit
 - **Cutoff Slew** (0–1): Smooths cutoff changes with a one-pole lowpass. At 0, cutoff responds instantly. Higher values add portamento-like lag to all cutoff modulation — envelope, LFO, and direct control.
 
 ### Filter Envelope
-Dedicated ADSR envelope for cutoff modulation, independent from the volume envelope. Same 64-bit precision Envelope implementation with shaped curves.
+Dedicated DAHDSR envelope for cutoff modulation, independent from the volume envelope. Same 64-bit precision Envelope implementation with shaped curves.
 
-- **ADSR**: Attack (0.5–5000ms), Decay (0.5–10000ms), Sustain (0–1), Release (0.5–10000ms), each with shape control
+- **DAHDSR**: Attack (0.1–5000ms), Hold (0–5000ms), Decay (0.1–10000ms), Sustain (0–1), Release (0.1–10000ms, 3ms internal floor), each stage with shape control
+- **Hold**: Delays decay by holding at peak value after attack completes. Skipped if < 0.1ms. Scales with key tracking.
+- **Loop Mode**: OneShot (default) or LoopAHD — loops Attack→Hold→Decay while note held, creating repeating envelope shapes
 - **Dip**: Retrigger dip (0–1) for percussive filter plucks on re-articulation
 - **Range**: Maximum modulation depth in octaves (1–8). Combined with Env Amount: `env_mod = env_amount × envelope_output × range`
 - **Copy from Vol Env**: UI button copies all volume envelope ADSR + dip params to filter envelope
@@ -129,7 +131,7 @@ Dedicated ADSR envelope for cutoff modulation, independent from the volume envel
 ```
 
 ### Modulation Targets
-Cutoff, Resonance, Drive, and Env Amount are available as LFO/Step Mod destinations (indices 42–45). Advanced filter controls are also modulatable: Pole Morph (46), Filter FM (47), Feedback (48), Bass Lock (49), Pole Spread (50), Resonance Character (51), Resonance Tilt (52).
+Cutoff, Resonance, Drive, and Env Amount are available as LFO/Step Mod destinations (indices 42–45). Advanced filter controls are also modulatable: Pole Morph (46), Filter FM (47), Feedback (48), Bass Lock (49), Pole Spread (50), Resonance Character (51), Resonance Tilt (52). Envelope extended targets: Env Hold (53), Env Key Track (54), Env Depth (55), Vel→Attack (56), Vel→Decay (57), Vel→Sustain (58), Filter Env Hold (59).
 
 ## Effects Chain
 
@@ -153,9 +155,25 @@ High-shelf exciter at 4.5kHz. Amount = boost level, Drive = tanh saturation on e
 
 ## Envelopes
 
-Custom 64-bit precision ADSR envelope. Attack 0.5–5000ms, Decay 0.5–10000ms, Sustain 0–1, Release 0.5–10000ms. Each stage has shape control (-1.0 to +1.0: negative=logarithmic, 0=linear, positive=exponential) using RC-circuit-like curves.
+Custom 64-bit precision DAHDSR envelope (Attack-Hold-Decay-Sustain-Release). Attack 0.1–5000ms, Hold 0–5000ms, Decay 0.1–10000ms, Sustain 0–1, Release 0.1–10000ms. Each stage has shape control (-1.0 to +1.0: negative=logarithmic, 0=linear, positive=exponential) using RC-circuit-like curves. Optional S-curve mode per stage (attack, decay, release) splits the exponential curve into two symmetric halves for ease-in-out behavior — the shape slider then controls S-curve intensity. Uses `exp_m1` for numerical stability, C1-continuous at the midpoint.
+
+- **Hold Stage**: Holds at peak (1.0) after attack completes, before decay begins. Skipped if < 0.1ms. Useful for pads and sustained transients.
+- **Loop Mode**: OneShot (default DAHDSR) or LoopAHD — loops Attack→Hold→Decay while note is held, creating rhythmic or evolving shapes. Loop starts from sustain level when decay completes.
+- **Depth** (volume env only): Controls how much the envelope affects output. At 1.0 = normal envelope behavior. At 0.0 = constant output (envelope bypassed). Formula: `output = depth × raw_env + (1.0 - depth)`.
+- **Tempo Sync**: When enabled, attack, hold, decay, and release times are derived from musical divisions (1/1 through 1/128, dotted, triplets, 2/1, 4/1) synced to host/MIDI clock BPM. Formula: `time_ms = division_beats / BPM × 60000`. Each stage has an independent division selector.
+- **Key Tracking**: Scales envelope times by `2^(-key_track × (note-60)/12)`. Higher notes get shorter envelopes, lower notes get longer. Applied to attack, hold, decay, and release.
+- **Velocity Routing**: Three independent velocity→envelope routes:
+  - **Vel→Attack**: Velocity modulates attack time via `2^(-amount × (vel-0.5) × 4)`. Positive = high velocity → shorter attack.
+  - **Vel→Decay**: Same formula for decay time.
+  - **Vel→Sustain**: Linear offset `amount × (vel - 0.5)` added to sustain level.
 
 Retrigger from any stage starts attack from current value (C0-continuous). Retrigger Dip (0–1) creates percussive re-articulation by dipping amplitude before re-attack. Phase Reset toggle controls whether oscillator phases reset on retrigger. Sustain changes smoothly via 3ms one-pole filter.
+
+### Anti-Click Protection
+
+- **Release floor:** User-facing release can go as low as 0.1ms, but the internal minimum is clamped to 3ms to prevent discontinuities when cutting complex waveforms. This preserves snappy release feel while eliminating clicks on low-frequency content.
+- **Quick fade on force-off:** When the envelope is forcibly stopped (e.g., preset change), a 2ms linear fade-out replaces the previous hard cut to zero. If a new note triggers during the fade, the attack starts from the current fading value for seamless continuity.
+- **Attack minimum:** 0.1ms (~4–5 samples at 44.1kHz) allows near-instant transients for percussive sounds. Clicks on the attack side are perceptually acceptable and often desirable.
 
 PLL Tail: When enabled, PLL resonance rings out after note release with configurable decay time (50–5000ms) and amount (0–1).
 
@@ -163,7 +181,7 @@ PLL Tail: When enabled, PLL resonance rings out after note release with configur
 
 3 independent LFOs, each with 2 mod destination slots.
 
-**Waveforms:** Sine, Triangle, Saw, Square, Sample&Hold. Free-run (0.01–50Hz) or tempo-synced (1/1 to 1/32 including dotted/triplet).
+**Waveforms:** Sine, Triangle, Saw, Square, Sample&Hold. Free-run (0.01–50Hz) or tempo-synced (1/1 to 1/32 including dotted/triplet). Output slew (user-configurable, default 5ms) applies only to S&H waveform to smooth random step transitions; continuous waveforms pass through unslewed for full waveform fidelity.
 
 **Cross-modulation:** Each LFO can use another as phase modulation source.
 
@@ -171,9 +189,21 @@ PLL Tail: When enabled, PLL resonance rings out after note release with configur
 
 ## Modulation Step Sequencer
 
-16-step bipolar (-1 to +1) sequencer with 303-style ties and slew. Tempo-synced (same divisions as LFOs). 2 destination slots.
+Variable-length (1–16 steps) bipolar or unipolar step sequencer with tempo sync (same divisions as LFOs) and 4 modulation routing slots.
 
-Tied steps: linear interpolation between values (glide). Non-tied: smoothed by slew parameter (0–200ms).
+**Step values:** -1.0 to +1.0 per step. In bipolar mode (default), output spans the full range. In unipolar mode, output is 0.0 to +1.0.
+
+**Variable length:** 1–16 steps via mseq_length. The sequence loops at the configured length.
+
+**Ties:** 303-style ties use smoothstep (S-curve) interpolation between adjacent step values for smooth glides. Non-tied steps use the slew parameter (0–200ms) for transition smoothing.
+
+**Per-step probability:** Each step has an independent probability (0–100%). When a step fires, its probability is evaluated — on failure, the previous value is held.
+
+**Retrigger:** When enabled, the sequence resets to step 1 on each note-on event. When disabled (default), the sequence free-runs with the tempo.
+
+**Routing:** 4 destination slots (dest1–dest4), each with bipolar amount (-1.0 to +1.0).
+
+**Utility tools:** Random (randomize step values), Clear (zero all steps), Invert (negate all values), Mirror (reverse step order).
 
 ## Pitched Looper
 
